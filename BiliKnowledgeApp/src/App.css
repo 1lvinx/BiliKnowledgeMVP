@@ -787,6 +787,44 @@ textarea:focus-visible {
   display: contents;
 }
 
+.dashboard-focus-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.overview-kicker {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--bk-tertiary-label);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.dashboard-focus-head h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--bk-label);
+}
+
+.dashboard-focus-head p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--bk-secondary-label);
+}
+
+.dashboard-focus-cta {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .focus-card {
   min-height: 118px;
   padding: 18px;

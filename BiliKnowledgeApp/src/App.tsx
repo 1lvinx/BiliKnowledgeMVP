@@ -869,9 +869,9 @@ function renderDashboard({
         <header className="dashboard-focus-head">
           <div>
             <span className="overview-kicker">{t("dashboard.knowledgeStudio")}</span>
-            <h2>继续推进收藏→知识库工作流</h2>
+            <h2>{t("dashboard.continueWorkflow")}</h2>
             <p>
-              {videos.length} 个视频 · {projects.length} 个候选项目 · {pendingCount} 条待审核
+              {t("dashboard.videoCount", { count: videos.length })} · {t("dashboard.projectCount", { count: projects.length })} · {t("dashboard.pendingCount", { count: pendingCount })}
             </p>
           </div>
           <div className="dashboard-focus-cta">
@@ -893,9 +893,9 @@ function renderDashboard({
 
         <div className="dashboard-focus-strip">
           <article className="focus-card is-primary">
-            <div className="focus-card-meta">当前优先级</div>
+            <div className="focus-card-meta">{t("dashboard.focusPriority")}</div>
             <div className="focus-card-value">{activeVideo?.priority ?? "P0"}</div>
-            <p>{activeVideo?.title ?? "导入收藏后即可看到今日重点视频。"}</p>
+            <p>{activeVideo?.title ?? t("dashboard.importFavoritesHint")}</p>
             {activeVideo && (
               <div className="focus-card-tags">
                 <MacTagPill tone={priorityTone(activeVideo.priority)}>{activeVideo.priority}</MacTagPill>
@@ -904,45 +904,45 @@ function renderDashboard({
             )}
           </article>
           <article className="focus-card">
-            <div className="focus-card-meta">项目候选</div>
+            <div className="focus-card-meta">{t("dashboard.focusCandidates")}</div>
             <div className="focus-card-value">{projects.length}</div>
-            <p>提取的开源仓库，等待验证商业/复用价值。</p>
-            <MacTagPill tone="warm">标注后同步</MacTagPill>
+            <p>{t("dashboard.extractedReposHint")}</p>
+            <MacTagPill tone="warm">{t("dashboard.taggedSync")}</MacTagPill>
           </article>
           <article className="focus-card">
-            <div className="focus-card-meta">待审核视频</div>
+            <div className="focus-card-meta">{t("dashboard.focusPendingReview")}</div>
             <div className="focus-card-value">{pendingCount}</div>
-            <p>浏览并标记状态，维持知识库健康度。</p>
-            <MacTagPill tone="critical">优先处理 P0</MacTagPill>
+            <p>{t("dashboard.browseAndMarkHint")}</p>
+            <MacTagPill tone="critical">{t("dashboard.priorityP0")}</MacTagPill>
           </article>
           <article className="focus-card">
-            <div className="focus-card-meta">脚本运行</div>
+            <div className="focus-card-meta">{t("dashboard.focusScriptRuns")}</div>
             <div className="focus-card-value">{logs.length}</div>
-            <p>最近的自动化日志可在下方控制台查看。</p>
-            <MacTagPill tone="cool">检查输出</MacTagPill>
+            <p>{t("dashboard.recentLogsHint")}</p>
+            <MacTagPill tone="cool">{t("dashboard.checkOutput")}</MacTagPill>
           </article>
         </div>
       </section>
 
       <section className="dashboard-metrics-grid">
         <div className="metric-card">
-          <span>视频总量</span>
+          <span>{t("dashboard.totalVideos")}</span>
           <strong>{videos.length}</strong>
         </div>
         <div className="metric-card">
-          <span>项目总量</span>
+          <span>{t("dashboard.totalProjects")}</span>
           <strong>{projects.length}</strong>
         </div>
         <div className="metric-card">
-          <span>已审核</span>
+          <span>{t("dashboard.reviewed")}</span>
           <strong>{reviewedCount}</strong>
         </div>
         <div className="metric-card">
-          <span>待处理</span>
+          <span>{t("dashboard.pending")}</span>
           <strong>{pendingCount}</strong>
         </div>
         <div className="metric-card">
-          <span>P0 数量</span>
+          <span>{t("dashboard.p0Count")}</span>
           <strong>{p0Count}</strong>
         </div>
       </section>
@@ -952,7 +952,7 @@ function renderDashboard({
         <article className="dashboard-board">
           <header className="dashboard-board-head">
             <div>
-              <h3>继续处理</h3>
+              <h3>{t("dashboard.continueWorking")}</h3>
               {activeVideo && <span>{activeVideo.id}</span>}
             </div>
             <MacToolbarButton
@@ -993,7 +993,7 @@ function renderDashboard({
 
         <article className="dashboard-board">
           <header className="dashboard-board-head">
-            <h3>快速操作</h3>
+            <h3>{t("dashboard.quickActions")}</h3>
           </header>
           <div className="dashboard-actions">
             <button
@@ -1047,7 +1047,7 @@ function renderDashboard({
         <article className="dashboard-board">
           <header className="dashboard-board-head">
             <div>
-              <h3>项目候选</h3>
+              <h3>{t("dashboard.projectCandidates")}</h3>
               <span>{projects.length} 个</span>
             </div>
           </header>
@@ -1078,8 +1078,8 @@ function renderDashboard({
         <article className="dashboard-board">
           <header className="dashboard-board-head">
             <div>
-              <h3>自动化日志</h3>
-              <span>{logs.length} 条</span>
+              <h3>{t("dashboard.automationLogs")}</h3>
+              <span>{t("dashboard.logCount", { count: logs.length })}</span>
             </div>
             <MacToolbarButton
               icon={<Terminal size={14} />}
@@ -1110,8 +1110,8 @@ function renderDashboard({
         <article className="dashboard-table">
           <header className="dashboard-table-head">
             <div>
-              <h3>视频状态</h3>
-              <span>筛选并更新优先级</span>
+              <h3>{t("dashboard.videoStatus")}</h3>
+              <span>{t("dashboard.filterUpdate")}</span>
             </div>
             <div className="dashboard-table-actions">
               <select
@@ -1176,8 +1176,8 @@ function renderDashboard({
         <aside className="dashboard-detail">
           <div className="dashboard-note-card">
             <header>
-              <span>当前视频</span>
-              <strong>{activeVideo?.title ?? "等待选择"}</strong>
+              <span>{t("dashboard.currentVideo")}</span>
+              <strong>{activeVideo?.title ?? t("dashboard.waitingSelection")}</strong>
             </header>
             <div className="dashboard-note-body">
               {noteContent ? (
@@ -1185,7 +1185,7 @@ function renderDashboard({
                   <ReactMarkdown>{noteContent}</ReactMarkdown>
                 </div>
               ) : (
-                <p>选择左侧视频或导入收藏后可预览笔记。</p>
+                <p>{t("dashboard.selectVideoHint")}</p>
               )}
             </div>
             <footer>
@@ -1199,7 +1199,7 @@ function renderDashboard({
 
           <div className="dashboard-console-card">
             <header>
-              <span>脚本控制台</span>
+              <span>{t("dashboard.scriptConsole")}</span>
               <MacToolbarButton
                 icon={<Terminal size={14} />}
                 label={t("dashboard.scrollToBottom")}

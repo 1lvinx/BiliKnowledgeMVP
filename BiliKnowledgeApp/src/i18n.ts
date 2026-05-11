@@ -104,6 +104,10 @@ const translations: Record<string, Record<string, string>> = {
     "dashboard.noMatchingVideosHint": "修改筛选条件或导入新视频。",
     "dashboard.runHealthCheck": "运行健康检查",
     "dashboard.quickImport": "快速导入",
+    "dashboard.focusPriority": "当前优先级",
+    "dashboard.focusCandidates": "开源候选",
+    "dashboard.focusPendingReview": "待审核视频",
+    "dashboard.focusScriptRuns": "脚本运行",
 
     /* ── Toolbar Actions ── */
     "action.import": "导入",
@@ -456,6 +460,10 @@ const translations: Record<string, Record<string, string>> = {
     "dashboard.noMatchingVideosHint": "Modify filters or import new videos.",
     "dashboard.runHealthCheck": "Run Health Check",
     "dashboard.quickImport": "Quick Import",
+    "dashboard.focusPriority": "Priority",
+    "dashboard.focusCandidates": "Candidates",
+    "dashboard.focusPendingReview": "Pending Review",
+    "dashboard.focusScriptRuns": "Script Runs",
 
     /* ── Toolbar Actions ── */
     "action.import": "Import",
