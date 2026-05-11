@@ -398,6 +398,7 @@ function App() {
     try {
       setIsRunning(true);
       setSelectedScript(name);
+      setError(null);
       setLogs((prev) => [...prev, t("error.scriptStart", { name })]);
       await invoke("run_script", { scriptName: name, args });
       setLogs((prev) => [...prev, t("error.scriptSuccess")]);
@@ -405,8 +406,11 @@ function App() {
       await fetchProjects();
       setError(null);
     } catch (err) {
-      setLogs((prev) => [...prev, t("error.scriptError", { error: String(err) })]);
-      setError(t("error.scriptFailed"));
+      const errMsg = String(err);
+      setLogs((prev) => [...prev, t("error.scriptError", { error: errMsg })]);
+      if (!errMsg.includes("exit code") && !errMsg.includes("issues")) {
+        setError(t("error.scriptFailed"));
+      }
     } finally {
       setIsRunning(false);
     }

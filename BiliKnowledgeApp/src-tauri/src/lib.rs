@@ -234,11 +234,16 @@ async fn run_script<R: Runtime>(
 
     let knowledge_root = ensure_path_under_base(&base, &base)?;
     let scripts_root = ensure_path_under_base(&knowledge_root, &knowledge_root.join("scripts"))?;
-    let python_path = PathBuf::from("../external/bilibili-favorites/.venv/bin/python");
+    // Resolve python relative to project root (knowledge base's parent)
+    let project_root = base.parent().unwrap_or(&base);
+    let python_path = project_root.join("external/bilibili-favorites/.venv/bin/python");
     let script_path = ensure_path_under_base(&scripts_root, &scripts_root.join(script_name))?;
 
     if !python_path.exists() {
-        return Err("Python 虚拟环境未找到，请确认已安装依赖。".into());
+        return Err(format!(
+            "Python 虚拟环境未找到：{}\n请确认已安装依赖。",
+            python_path.display()
+        ));
     }
     if !script_path.exists() {
         return Err(format!("脚本未找到: {}", script_name));
