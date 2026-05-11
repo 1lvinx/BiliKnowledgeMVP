@@ -588,6 +588,7 @@ function App() {
           renderDashboard({
             activeVideo,
             isPreview: !tauriAvailable,
+            isRunning,
             logs,
             p0Count,
             pendingCount,
@@ -758,6 +759,7 @@ function getToolbarAction({
 function renderDashboard({
   activeVideo,
   isPreview,
+  isRunning,
   logs,
   p0Count,
   pendingCount,
@@ -777,6 +779,7 @@ function renderDashboard({
 }: {
   activeVideo: Video | null;
   isPreview: boolean;
+  isRunning: boolean;
   logs: string[];
   p0Count: number;
   pendingCount: number;
@@ -841,14 +844,16 @@ function renderDashboard({
           </div>
           <div className="onboarding-actions">
             <MacToolbarButton
+              disabled={isRunning}
               icon={<HardDrive size={14} />}
-              label={t("onboarding.createWorkspace")}
+              label={isRunning ? t("toolbar.running") : t("onboarding.createWorkspace")}
               onClick={() => runPythonScript("validate_knowledge_base.py")}
               primary
             />
             <MacToolbarButton
+              disabled={isRunning}
               icon={<CloudDownload size={14} />}
-              label={t("onboarding.runImport")}
+              label={isRunning ? t("toolbar.running") : t("onboarding.runImport")}
               onClick={() => runPythonScript("parse_favorites.py", ["--limit", "20"])}
             />
           </div>
@@ -871,14 +876,16 @@ function renderDashboard({
           </div>
           <div className="dashboard-focus-cta">
             <MacToolbarButton
+              disabled={isRunning}
               icon={<Sparkles size={14} />}
-              label={t("dashboard.runHealthCheck")}
+              label={isRunning ? t("toolbar.running") : t("dashboard.runHealthCheck")}
               onClick={() => runPythonScript("validate_knowledge_base.py")}
               primary
             />
             <MacToolbarButton
+              disabled={isRunning}
               icon={<CloudDownload size={14} />}
-              label={t("dashboard.quickImport")}
+              label={isRunning ? t("toolbar.running") : t("dashboard.quickImport")}
               onClick={() => runPythonScript("parse_favorites.py", ["--limit", "20"])}
             />
           </div>
@@ -991,6 +998,7 @@ function renderDashboard({
           <div className="dashboard-actions">
             <button
               className="dashboard-action"
+              disabled={isRunning}
               onClick={() => runPythonScript("parse_favorites.py", ["--limit", "20"])}
               type="button"
             >
@@ -998,13 +1006,14 @@ function renderDashboard({
                 <CloudDownload size={16} />
               </span>
               <div>
-                <strong>导入收藏</strong>
-                <span>刷新本地 manifest，并生成最新待办。</span>
+                <strong>{t("dashboard.importFavorites")}</strong>
+                <span>{t("dashboard.importFavoritesDesc")}</span>
               </div>
               <ChevronRight size={16} />
             </button>
             <button
               className="dashboard-action"
+              disabled={isRunning}
               onClick={() => runPythonScript("extract_projects.py")}
               type="button"
             >
@@ -1012,13 +1021,14 @@ function renderDashboard({
                 <Boxes size={16} />
               </span>
               <div>
-                <strong>提取项目</strong>
-                <span>从 Markdown 笔记中识别开源候选。</span>
+                <strong>{t("dashboard.extractProjects")}</strong>
+                <span>{t("dashboard.extractProjectsDesc")}</span>
               </div>
               <ChevronRight size={16} />
             </button>
             <button
               className="dashboard-action"
+              disabled={isRunning}
               onClick={() => runPythonScript("validate_knowledge_base.py")}
               type="button"
             >
@@ -1026,8 +1036,8 @@ function renderDashboard({
                 <ShieldCheck size={16} />
               </span>
               <div>
-                <strong>健康检查</strong>
-                <span>结构、链接与敏感信息检查。</span>
+                <strong>{t("dashboard.healthCheck")}</strong>
+                <span>{t("dashboard.healthCheckDesc")}</span>
               </div>
               <ChevronRight size={16} />
             </button>
