@@ -279,7 +279,7 @@ function App() {
       setVideos(JSON.parse(data));
       setError(null);
     } catch {
-      setError("无法同步本地清单，请检查数据文件。");
+      setError("Unable to sync local manifest. Please check the data file.");
     }
   }
 
@@ -309,7 +309,7 @@ function App() {
       setNoteContent(content);
     } catch {
       setSelectedVideo(video);
-      setNoteContent("### 暂无笔记\n\n该视频可能尚未处理。");
+      setNoteContent("### No notes yet\n\nThis video may not have been processed.");
     }
   }
 
@@ -853,9 +853,9 @@ function renderDashboard({
           <div className="dashboard-board-feed custom-scrollbar">
             {recentVideos.length === 0 ? (
               <MacEmptyState
-                detail="运行快速导入后会显示最新收藏。"
+                detail="Run Quick Import to see recent favorites."
                 icon={<PlaySquare size={20} />}
-                title="暂无收藏"
+                title="No favorites"
               />
             ) : (
               recentVideos.map((video) => (
@@ -940,9 +940,9 @@ function renderDashboard({
           <div className="dashboard-board-feed custom-scrollbar">
             {projectCards.length === 0 ? (
               <MacEmptyState
-                detail="从视频页运行提取功能即可生成候选项目。"
+                detail="Run the Extract command from any video to generate candidates."
                 icon={<Boxes size={20} />}
-                title="暂无候选"
+                title="No candidates"
               />
             ) : (
               projectCards.map((project) => (
@@ -976,9 +976,9 @@ function renderDashboard({
           <div className="dashboard-board-feed custom-scrollbar">
             {recentLogs.length === 0 ? (
               <MacEmptyState
-                detail="运行任意脚本后会显示最新日志。"
+                detail="Run any script to see recent output."
                 icon={<Activity size={20} />}
-                title="暂无日志"
+                title="No logs"
               />
             ) : (
               recentLogs.map((log, index) => (
@@ -1194,7 +1194,10 @@ function VideoInspector({
   if (!activeVideo) {
     return (
       <aside className="mac-inspector">
-        <MacEmptyState title="Select a video" />
+        <MacEmptyState
+          detail="Choose a video from the list to view details and actions."
+          title="No video selected"
+        />
       </aside>
     );
   }
@@ -1317,7 +1320,11 @@ function renderNotes({
               </div>
             </article>
           ) : (
-            <MacEmptyState icon={<FileText size={28} />} title="Select a note" />
+            <MacEmptyState
+              detail="Choose a note from the list or open a markdown document."
+              icon={<FileText size={28} />}
+              title="No note selected"
+            />
           )}
         </div>
       </section>

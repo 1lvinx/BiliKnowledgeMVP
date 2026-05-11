@@ -38,6 +38,16 @@
   --bk-shadow-subtle: 0 8px 20px rgba(5, 10, 20, 0.32);
   --bk-shadow-panel: 0 20px 54px rgba(4, 12, 26, 0.55), 0 4px 12px rgba(4, 12, 22, 0.48);
   --bk-shadow-lift: 0 24px 80px rgba(9, 20, 38, 0.72), 0 8px 18px rgba(8, 16, 32, 0.5);
+
+  --bk-surface-hover: rgba(40, 56, 88, 0.52);
+  --bk-surface-selected: rgba(61, 139, 255, 0.12);
+  --bk-input-bg: rgba(18, 28, 48, 0.85);
+  --bk-input-border: rgba(90, 120, 172, 0.48);
+  --bk-input-focus-ring: rgba(61, 139, 255, 0.28);
+  --bk-code-bg: rgba(22, 34, 58, 0.85);
+  --bk-danger-surface: rgba(255, 92, 92, 0.12);
+  --bk-danger-border: rgba(255, 92, 92, 0.28);
+
   --bk-motion-fast: 150ms cubic-bezier(0.45, 0.05, 0.2, 1);
   --bk-motion-base: 240ms cubic-bezier(0.45, 0.05, 0.2, 1);
   --bk-motion-spring: 280ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -629,7 +639,7 @@ textarea:focus-visible {
   padding: 16px 14px;
   border: 1px solid var(--bk-separator);
   border-radius: var(--bk-radius-panel);
-  background: #fff;
+  background: var(--bk-elevated-bg);
   box-shadow: var(--bk-shadow-panel);
   transition:
     border-color var(--bk-motion-base),
@@ -685,7 +695,7 @@ textarea:focus-visible {
   border: 1px solid var(--bk-separator);
   border-radius: var(--bk-radius-panel);
   overflow: hidden;
-  background: #fff;
+  background: var(--bk-elevated-bg);
   box-shadow: var(--bk-shadow-panel);
 }
 
@@ -713,7 +723,7 @@ textarea:focus-visible {
 }
 
 .overview-list-row:hover {
-  background: #f9fafb;
+  background: var(--bk-surface-hover);
   transform: translateX(2px);
 }
 
@@ -775,7 +785,7 @@ textarea:focus-visible {
 }
 
 .overview-action-row:hover {
-  background: #f9fafb;
+  background: var(--bk-surface-hover);
   transform: translateX(2px);
 }
 
@@ -838,7 +848,7 @@ textarea:focus-visible {
 .mac-panel {
   border: 1px solid var(--bk-separator);
   border-radius: var(--bk-radius-panel);
-  background: #fff;
+  background: var(--bk-elevated-bg);
   box-shadow: var(--bk-shadow-panel);
   overflow: hidden;
   transition:
@@ -915,7 +925,7 @@ textarea:focus-visible {
 }
 
 .mac-native-row:hover {
-  background: #f9fafb;
+  background: var(--bk-surface-hover);
   transform: translateX(2px);
 }
 
@@ -1092,14 +1102,14 @@ textarea:focus-visible {
 .mac-inline-notice.tone-success {
   border-color: rgba(18, 183, 106, 0.22);
   background: var(--bk-green-soft);
-  color: #067647;
+  color: var(--bk-green);
 }
 
 .mac-console {
   height: 150px;
   min-height: 150px;
   border-top: 1px solid var(--bk-separator);
-  background: #f9fafb;
+  background: var(--bk-content-bg);
 }
 
 .mac-console header {
@@ -1184,8 +1194,8 @@ textarea:focus-visible {
 }
 
 .mac-settings-nav button.is-active {
-  background: #eef4ff;
-  color: #3538cd;
+  background: var(--bk-fill-hover);
+  color: var(--bk-blue);
 }
 
 .mac-settings-stack {
@@ -1208,7 +1218,7 @@ textarea:focus-visible {
   overflow: hidden;
   border: 1px solid var(--bk-separator);
   border-radius: var(--bk-radius-panel);
-  background: #fff;
+  background: var(--bk-elevated-bg);
   box-shadow: var(--bk-shadow-panel);
 }
 
@@ -1249,9 +1259,9 @@ textarea:focus-visible {
   width: 100%;
   min-width: 0;
   min-height: 30px;
-  border: 1px solid var(--bk-separator);
+  border: 1px solid var(--bk-input-border);
   border-radius: var(--bk-radius-control);
-  background: #fff;
+  background: var(--bk-input-bg);
   color: var(--bk-label);
   padding: 0 8px;
   font-size: 13px;
@@ -1260,8 +1270,8 @@ textarea:focus-visible {
 
 .mac-input:focus,
 .mac-select:focus {
-  border-color: rgba(70, 95, 255, 0.45);
-  box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.1);
+  border-color: var(--bk-blue);
+  box-shadow: 0 0 0 3px var(--bk-input-focus-ring);
 }
 
 .mac-switch {
@@ -1283,7 +1293,7 @@ textarea:focus-visible {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--bk-label);
   box-shadow: var(--bk-shadow-subtle);
   content: "";
 }
@@ -1296,7 +1306,7 @@ textarea:focus-visible {
   height: 100%;
   overflow: auto;
   padding: 28px 40px;
-  background: #fff;
+  background: var(--bk-content-bg);
 }
 
 .mac-note-reader article {
@@ -1336,7 +1346,7 @@ textarea:focus-visible {
   overflow: auto;
   border: 1px solid var(--bk-separator);
   border-radius: 8px;
-  background: #f7f7f9;
+  background: var(--bk-code-bg);
   padding: 10px;
 }
 
@@ -1371,7 +1381,7 @@ textarea:focus-visible {
   padding: 8px 10px;
   border: 1px solid var(--bk-separator);
   border-radius: var(--bk-radius-panel);
-  background: #fff;
+  background: var(--bk-elevated-bg);
   box-shadow: var(--bk-shadow-subtle);
 }
 
@@ -1443,7 +1453,7 @@ textarea:focus-visible {
 }
 
 .script-row:hover {
-  background: #f9fafb;
+  background: var(--bk-surface-hover);
   transform: translateX(2px);
 }
 
@@ -1576,7 +1586,7 @@ textarea:focus-visible {
   border: 1px solid rgba(18, 183, 106, 0.22);
   border-radius: var(--bk-radius-panel);
   background: var(--bk-green-soft);
-  color: #067647;
+  color: var(--bk-green);
   font-size: 13px;
 }
 
@@ -1596,7 +1606,7 @@ textarea:focus-visible {
   padding: 0 12px;
   border: 1px solid var(--bk-separator);
   border-radius: var(--bk-radius-control);
-  background: #fff;
+  background: var(--bk-elevated-bg);
   color: var(--bk-label);
   font-size: 13px;
   font-weight: 600;
@@ -1709,7 +1719,7 @@ textarea:focus-visible {
 }
 
 .kb-folder-row:hover {
-  background: #f9fafb;
+  background: var(--bk-surface-hover);
   transform: translateX(2px);
 }
 
@@ -1782,7 +1792,7 @@ textarea:focus-visible {
 }
 
 .kb-note-row:hover {
-  background: #f9fafb;
+  background: var(--bk-surface-hover);
   transform: translateX(2px);
 }
 
@@ -1911,12 +1921,12 @@ textarea:focus-visible {
 }
 
 .status-pass {
-  color: #067647;
+  color: var(--bk-green);
   background: var(--bk-green-soft);
 }
 
 .status-review {
-  color: #b54708;
+  color: var(--bk-orange);
   background: rgba(255, 159, 10, 0.16);
 }
 
