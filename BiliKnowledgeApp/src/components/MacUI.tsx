@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Search } from "lucide-react";
 import { cn } from "../lib/utils";
+import { t } from "../i18n";
 
 interface ShellProps {
   sidebar: ReactNode;
@@ -27,7 +28,7 @@ export function MacSidebar({ children }: { children: ReactNode }) {
         <div className="mac-sidebar-brand-mark">BK</div>
         <div className="mac-sidebar-brand-copy">
           <strong>BiliKnowledge</strong>
-          <span>Local intelligence studio</span>
+          <span>{t("sidebar.localIntelligenceStudio")}</span>
         </div>
       </div>
       {children}

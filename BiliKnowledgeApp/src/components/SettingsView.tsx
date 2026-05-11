@@ -87,7 +87,7 @@ function normalizeConfig(value: unknown): Config {
   };
 }
 
-export function SettingsView() {
+export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: string) => void }) {
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -187,12 +187,13 @@ export function SettingsView() {
             <MacSettingsRow detail="Sets the preferred app language for supported UI text." label="Language">
               <select
                 className="mac-select"
-                onChange={(event) =>
+                onChange={(event) => {
                   setConfig({
                     ...config,
                     preferences: { ...config.preferences, language: event.target.value },
-                  })
-                }
+                  });
+                  onLanguageChange?.(event.target.value);
+                }}
                 value={config.preferences.language}
               >
                 {languageOptions.map((language) => (
@@ -363,12 +364,13 @@ export function SettingsView() {
             <MacSettingsRow detail="Choose Chinese, English, Singapore English, Russian, Japanese, or Korean." label="Language">
               <select
                 className="mac-select"
-                onChange={(event) =>
+                onChange={(event) => {
                   setConfig({
                     ...config,
                     preferences: { ...config.preferences, language: event.target.value },
-                  })
-                }
+                  });
+                  onLanguageChange?.(event.target.value);
+                }}
                 value={config.preferences.language}
               >
                 {languageOptions.map((language) => (
