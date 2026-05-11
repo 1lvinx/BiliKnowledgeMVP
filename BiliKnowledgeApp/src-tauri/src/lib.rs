@@ -403,4 +403,60 @@ mod tests {
             );
         }
     }
+
+    // ── Manifest read / update round-trip ──
+
+    #[test]
+    fn video_manifest_read_update_roundtrip() {
+        let base = temp_base("manifest-rt");
+        let manifest_dir = base.join("manifest");
+        fs::create_dir_all(&manifest_dir).unwrap();
+        let manifest_path = manifest_dir.join("videos.json");
+
+        let initial: serde_json::Value = serde_json::json!([
+            {
+                "id": "BV1test001",
+                "title": "Test Video",
+                "status": "pending"
+            },
+            {
+                "id": "BV1test002",
+                "title": "Another Video",
+                "status": "reviewed"
+            }
+        ]);
+        let initial_str = serde_json::to_string_pretty(&initial).unwrap();
+        fs::write(&manifest_path, &initial_str).unwrap();
+
+        // Read — like get_videos
+        let content = fs::read_to_string(&manifest_path).unwrap();
+        let mut videos: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert_eq!(videos.as_array().unwrap().len(), 2);
+
+        // Update — like update_video_status("BV1test001", "reviewed")
+        let target_id = "BV1test001";
+        let new_status = "reviewed";
+        let arr = videos.as_array_mut().unwrap();
+        let mut found = false;
+        for video in arr.iter_mut() {
+            if video["id"] == target_id {
+                video["status"] = serde_json::Value::String(new_status.to_string());
+                found = true;
+                break;
+            }
+        }
+        assert!(found, "Target video should be found");
+
+        let updated_str = serde_json::to_string_pretty(&videos).unwrap();
+        fs::write(&manifest_path, updated_str).unwrap();
+
+        // Read back and verify
+        let final_content = fs::read_to_string(&manifest_path).unwrap();
+        let final_videos: serde_json::Value = serde_json::from_str(&final_content).unwrap();
+        let updated = &final_videos.as_array().unwrap()[0];
+        assert_eq!(updated["status"], "reviewed");
+        assert_eq!(final_videos.as_array().unwrap()[1]["status"], "reviewed");
+
+        fs::remove_dir_all(&base).ok();
+    }
 }
