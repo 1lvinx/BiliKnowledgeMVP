@@ -1,0 +1,122 @@
+[
+  {
+    "bvid": "BV1xK4y1E7pR",
+    "title": "用Claude Code搭建个人AI工作流全攻略",
+    "url": "https://www.bilibili.com/video/BV1xK4y1E7pR",
+    "uploader": "AI效率派",
+    "uploader_uid": "123456001",
+    "favorite_folder": "AI工具",
+    "duration": "1245",
+    "pubdate": "2026-04-20",
+    "desc": "Claude Code + MCP + Agent工作流搭建教程，从零到一构建个人AI生产力系统",
+    "tags": ["AI", "Claude", "工作流", "Agent"]
+  },
+  {
+    "bvid": "BV1yL3z2F8sT",
+    "title": "RAG系统实战：从向量数据库到生产部署",
+    "url": "https://www.bilibili.com/video/BV1yL3z2F8sT",
+    "uploader": "全栈AI笔记",
+    "uploader_uid": "123456002",
+    "favorite_folder": "AI工具",
+    "duration": "1890",
+    "pubdate": "2026-04-18",
+    "desc": "RAG完整链路：文档解析、Embedding、向量库、检索、生成、部署",
+    "tags": ["RAG", "向量数据库", "LangChain", "FastAPI"]
+  },
+  {
+    "bvid": "BV1zM4a3G9uV",
+    "title": "2026年最值得关注的10个开源AI项目",
+    "url": "https://www.bilibili.com/video/BV1zM4a3G9uV",
+    "uploader": "开源情报站",
+    "uploader_uid": "123456003",
+    "favorite_folder": "开源项目",
+    "duration": "960",
+    "pubdate": "2026-04-15",
+    "desc": "盘点GitHub上最火的AI开源项目，包括Agent框架、模型推理、数据处理等",
+    "tags": ["开源", "GitHub", "AI", "项目"]
+  },
+  {
+    "bvid": "BV1nO5b4H0wX",
+    "title": "Docker部署Python全栈应用完整指南",
+    "url": "https://www.bilibili.com/video/BV1nO5b4H0wX",
+    "uploader": "DevOps老王",
+    "uploader_uid": "123456004",
+    "favorite_folder": "开发部署",
+    "duration": "1560",
+    "pubdate": "2026-04-12",
+    "desc": "FastAPI + Next.js + PostgreSQL + Redis 全容器化部署",
+    "tags": ["Docker", "部署", "Python", "FastAPI"]
+  },
+  {
+    "bvid": "BV1oP6c5I1xY",
+    "title": "Claude MCP协议深度解析与实战",
+    "url": "https://www.bilibili.com/video/BV1oP6c5I1xY",
+    "uploader": "AI架构师小明",
+    "uploader_uid": "123456005",
+    "favorite_folder": "AI工具",
+    "duration": "1320",
+    "pubdate": "2026-04-10",
+    "desc": "Model Context Protocol原理、MCP Server开发、工具集成实战",
+    "tags": ["Claude", "MCP", "Agent", "协议"]
+  },
+  {
+    "bvid": "BV1pQ7d6J2zA",
+    "title": "用Next.js 15 + Tailwind v4搭建SaaS Landing Page",
+    "url": "https://www.bilibili.com/video/BV1pQ7d6J2zA",
+    "uploader": "前端修仙路",
+    "uploader_uid": "123456006",
+    "favorite_folder": "前端开发",
+    "duration": "2100",
+    "pubdate": "2026-04-08",
+    "desc": "Next.js 15 App Router + Tailwind v4 + Framer Motion 实战",
+    "tags": ["Next.js", "Tailwind", "前端", "SaaS"]
+  },
+  {
+    "bvid": "BV1qR8e7K3aB",
+    "title": "GitHub Copilot vs Cursor vs Claude Code 对比测评",
+    "url": "https://www.bilibili.com/video/BV1qR8e7K3aB",
+    "uploader": "程序员测评官",
+    "uploader_uid": "123456007",
+    "favorite_folder": "AI工具",
+    "duration": "1680",
+    "pubdate": "2026-04-05",
+    "desc": "三大AI编程工具真实项目对比，代码质量、效率、价格全面分析",
+    "tags": ["AI编程", "Copilot", "Cursor", "Claude Code"]
+  },
+  {
+    "bvid": "BV1rS9f8L4bC",
+    "title": "Karakeep自托管书签系统搭建教程",
+    "url": "https://www.bilibili.com/video/BV1rS9f8L4bC",
+    "uploader": "自托管玩家",
+    "uploader_uid": "123456008",
+    "favorite_folder": "自托管",
+    "duration": "840",
+    "pubdate": "2026-04-02",
+    "desc": "Karakeep部署、书签管理、AI标签、全文搜索、Docker一键启动",
+    "tags": ["Karakeep", "自托管", "书签", "Docker"]
+  },
+  {
+    "bvid": "BV1sT0g9M5cD",
+    "title": "FastAPI + SQLAlchemy 2.0 异步ORM最佳实践",
+    "url": "https://www.bilibili.com/video/BV1sT0g9M5cD",
+    "uploader": "Python后端日记",
+    "uploader_uid": "123456009",
+    "favorite_folder": "后端开发",
+    "duration": "1440",
+    "pubdate": "2026-03-28",
+    "desc": "FastAPI异步架构 + SQLAlchemy 2.0 async session + 连接池优化",
+    "tags": ["FastAPI", "SQLAlchemy", "Python", "异步"]
+  },
+  {
+    "bvid": "BV1tU1h0N6dE",
+    "title": "短视频AI自动剪辑工作流：从素材到成片",
+    "url": "https://www.bilibili.com/video/BV1tU1h0N6dE",
+    "uploader": "AI创作工坊",
+    "uploader_uid": "123456010",
+    "favorite_folder": "内容创作",
+    "duration": "1920",
+    "pubdate": "2026-03-25",
+    "desc": "Whisper转录 + GPT脚本 + TTS配音 + FFmpeg剪辑 自动化流水线",
+    "tags": ["短视频", "AI剪辑", "Whisper", "自动化"]
+  }
+]

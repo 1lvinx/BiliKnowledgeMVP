@@ -1,0 +1,72 @@
+[
+  {
+    "bvid": "BV1xK4y1E7pR",
+    "title": "用Claude Code搭建个人AI工作流全攻略",
+    "category": "AI工具",
+    "sub_category": "AI编程",
+    "confidence": "high"
+  },
+  {
+    "bvid": "BV1yL3z2F8sT",
+    "title": "RAG系统实战：从向量数据库到生产部署",
+    "category": "AI技术",
+    "sub_category": "RAG",
+    "confidence": "high"
+  },
+  {
+    "bvid": "BV1zM4a3G9uV",
+    "title": "2026年最值得关注的10个开源AI项目",
+    "category": "开源项目",
+    "sub_category": "AI项目",
+    "confidence": "high"
+  },
+  {
+    "bvid": "BV1nO5b4H0wX",
+    "title": "Docker部署Python全栈应用完整指南",
+    "category": "开发部署",
+    "sub_category": "Docker",
+    "confidence": "high"
+  },
+  {
+    "bvid": "BV1oP6c5I1xY",
+    "title": "Claude MCP协议深度解析与实战",
+    "category": "AI工具",
+    "sub_category": "协议标准",
+    "confidence": "high"
+  },
+  {
+    "bvid": "BV1pQ7d6J2zA",
+    "title": "用Next.js 15 + Tailwind v4搭建SaaS Landing Page",
+    "category": "前端开发",
+    "sub_category": "框架实战",
+    "confidence": "medium"
+  },
+  {
+    "bvid": "BV1qR8e7K3aB",
+    "title": "GitHub Copilot vs Cursor vs Claude Code 对比测评",
+    "category": "AI工具",
+    "sub_category": "AI编程",
+    "confidence": "high"
+  },
+  {
+    "bvid": "BV1rS9f8L4bC",
+    "title": "Karakeep自托管书签系统搭建教程",
+    "category": "自托管",
+    "sub_category": "工具部署",
+    "confidence": "high"
+  },
+  {
+    "bvid": "BV1sT0g9M5cD",
+    "title": "FastAPI + SQLAlchemy 2.0 异步ORM最佳实践",
+    "category": "后端开发",
+    "sub_category": "Python框架",
+    "confidence": "high"
+  },
+  {
+    "bvid": "BV1tU1h0N6dE",
+    "title": "短视频AI自动剪辑工作流：从素材到成片",
+    "category": "内容创作",
+    "sub_category": "AI视频",
+    "confidence": "medium"
+  }
+]

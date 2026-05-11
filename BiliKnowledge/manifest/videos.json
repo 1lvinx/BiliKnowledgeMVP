@@ -1,0 +1,212 @@
+[
+  {
+    "id": "BV1xK4y1E7pR",
+    "title": "用Claude Code搭建个人AI工作流全攻略",
+    "url": "https://www.bilibili.com/video/BV1xK4y1E7pR",
+    "uploader": "AI效率派",
+    "favorite_folder": "AI工具",
+    "category": "AI工具",
+    "tags": [
+      "AI",
+      "Claude",
+      "工作流",
+      "Agent"
+    ],
+    "duration": "1245",
+    "pubdate": "2026-04-20",
+    "priority": "P0",
+    "status": "pending",
+    "note_path": "",
+    "project_extracted": false,
+    "remarks": ""
+  },
+  {
+    "id": "BV1yL3z2F8sT",
+    "title": "RAG系统实战：从向量数据库到生产部署",
+    "url": "https://www.bilibili.com/video/BV1yL3z2F8sT",
+    "uploader": "全栈AI笔记",
+    "favorite_folder": "AI工具",
+    "category": "AI技术",
+    "tags": [
+      "RAG",
+      "向量数据库",
+      "LangChain",
+      "FastAPI"
+    ],
+    "duration": "1890",
+    "pubdate": "2026-04-18",
+    "priority": "P0",
+    "status": "pending",
+    "note_path": "",
+    "project_extracted": false,
+    "remarks": ""
+  },
+  {
+    "id": "BV1zM4a3G9uV",
+    "title": "2026年最值得关注的10个开源AI项目",
+    "url": "https://www.bilibili.com/video/BV1zM4a3G9uV",
+    "uploader": "开源情报站",
+    "favorite_folder": "开源项目",
+    "category": "开源项目",
+    "tags": [
+      "开源",
+      "GitHub",
+      "AI",
+      "项目"
+    ],
+    "duration": "960",
+    "pubdate": "2026-04-15",
+    "priority": "P0",
+    "status": "pending",
+    "note_path": "",
+    "project_extracted": false,
+    "remarks": ""
+  },
+  {
+    "id": "BV1nO5b4H0wX",
+    "title": "Docker部署Python全栈应用完整指南",
+    "url": "https://www.bilibili.com/video/BV1nO5b4H0wX",
+    "uploader": "DevOps老王",
+    "favorite_folder": "开发部署",
+    "category": "开发部署",
+    "tags": [
+      "Docker",
+      "部署",
+      "Python",
+      "FastAPI"
+    ],
+    "duration": "1560",
+    "pubdate": "2026-04-12",
+    "priority": "P0",
+    "status": "pending",
+    "note_path": "",
+    "project_extracted": false,
+    "remarks": ""
+  },
+  {
+    "id": "BV1oP6c5I1xY",
+    "title": "Claude MCP协议深度解析与实战",
+    "url": "https://www.bilibili.com/video/BV1oP6c5I1xY",
+    "uploader": "AI架构师小明",
+    "favorite_folder": "AI工具",
+    "category": "AI工具",
+    "tags": [
+      "Claude",
+      "MCP",
+      "Agent",
+      "协议"
+    ],
+    "duration": "1320",
+    "pubdate": "2026-04-10",
+    "priority": "P0",
+    "status": "pending",
+    "note_path": "",
+    "project_extracted": false,
+    "remarks": ""
+  },
+  {
+    "id": "BV1pQ7d6J2zA",
+    "title": "用Next.js 15 + Tailwind v4搭建SaaS Landing Page",
+    "url": "https://www.bilibili.com/video/BV1pQ7d6J2zA",
+    "uploader": "前端修仙路",
+    "favorite_folder": "前端开发",
+    "category": "前端开发",
+    "tags": [
+      "Next.js",
+      "Tailwind",
+      "前端",
+      "SaaS"
+    ],
+    "duration": "2100",
+    "pubdate": "2026-04-08",
+    "priority": "P0",
+    "status": "pending",
+    "note_path": "",
+    "project_extracted": false,
+    "remarks": ""
+  },
+  {
+    "id": "BV1qR8e7K3aB",
+    "title": "GitHub Copilot vs Cursor vs Claude Code 对比测评",
+    "url": "https://www.bilibili.com/video/BV1qR8e7K3aB",
+    "uploader": "程序员测评官",
+    "favorite_folder": "AI工具",
+    "category": "AI工具",
+    "tags": [
+      "AI编程",
+      "Copilot",
+      "Cursor",
+      "Claude Code"
+    ],
+    "duration": "1680",
+    "pubdate": "2026-04-05",
+    "priority": "P0",
+    "status": "pending",
+    "note_path": "",
+    "project_extracted": false,
+    "remarks": ""
+  },
+  {
+    "id": "BV1rS9f8L4bC",
+    "title": "Karakeep自托管书签系统搭建教程",
+    "url": "https://www.bilibili.com/video/BV1rS9f8L4bC",
+    "uploader": "自托管玩家",
+    "favorite_folder": "自托管",
+    "category": "自托管",
+    "tags": [
+      "Karakeep",
+      "自托管",
+      "书签",
+      "Docker"
+    ],
+    "duration": "840",
+    "pubdate": "2026-04-02",
+    "priority": "P1",
+    "status": "pending",
+    "note_path": "",
+    "project_extracted": false,
+    "remarks": ""
+  },
+  {
+    "id": "BV1sT0g9M5cD",
+    "title": "FastAPI + SQLAlchemy 2.0 异步ORM最佳实践",
+    "url": "https://www.bilibili.com/video/BV1sT0g9M5cD",
+    "uploader": "Python后端日记",
+    "favorite_folder": "后端开发",
+    "category": "后端开发",
+    "tags": [
+      "FastAPI",
+      "SQLAlchemy",
+      "Python",
+      "异步"
+    ],
+    "duration": "1440",
+    "pubdate": "2026-03-28",
+    "priority": "P0",
+    "status": "pending",
+    "note_path": "",
+    "project_extracted": false,
+    "remarks": ""
+  },
+  {
+    "id": "BV1tU1h0N6dE",
+    "title": "短视频AI自动剪辑工作流：从素材到成片",
+    "url": "https://www.bilibili.com/video/BV1tU1h0N6dE",
+    "uploader": "AI创作工坊",
+    "favorite_folder": "内容创作",
+    "category": "内容创作",
+    "tags": [
+      "短视频",
+      "AI剪辑",
+      "Whisper",
+      "自动化"
+    ],
+    "duration": "1920",
+    "pubdate": "2026-03-25",
+    "priority": "P0",
+    "status": "pending",
+    "note_path": "",
+    "project_extracted": false,
+    "remarks": ""
+  }
+]

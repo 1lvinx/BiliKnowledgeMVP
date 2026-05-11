@@ -1,0 +1,11 @@
+id,title,url,uploader,favorite_folder,category,tags,duration,pubdate,priority,status,note_path,project_extracted,remarks
+BV1xK4y1E7pR,用Claude Code搭建个人AI工作流全攻略,https://www.bilibili.com/video/BV1xK4y1E7pR,AI效率派,AI工具,AI工具,AI|Claude|工作流|Agent,1245,2026-04-20,P0,pending,,False,
+BV1yL3z2F8sT,RAG系统实战：从向量数据库到生产部署,https://www.bilibili.com/video/BV1yL3z2F8sT,全栈AI笔记,AI工具,AI技术,RAG|向量数据库|LangChain|FastAPI,1890,2026-04-18,P0,pending,,False,
+BV1zM4a3G9uV,2026年最值得关注的10个开源AI项目,https://www.bilibili.com/video/BV1zM4a3G9uV,开源情报站,开源项目,开源项目,开源|GitHub|AI|项目,960,2026-04-15,P0,pending,,False,
+BV1nO5b4H0wX,Docker部署Python全栈应用完整指南,https://www.bilibili.com/video/BV1nO5b4H0wX,DevOps老王,开发部署,开发部署,Docker|部署|Python|FastAPI,1560,2026-04-12,P0,pending,,False,
+BV1oP6c5I1xY,Claude MCP协议深度解析与实战,https://www.bilibili.com/video/BV1oP6c5I1xY,AI架构师小明,AI工具,AI工具,Claude|MCP|Agent|协议,1320,2026-04-10,P0,pending,,False,
+BV1pQ7d6J2zA,用Next.js 15 + Tailwind v4搭建SaaS Landing Page,https://www.bilibili.com/video/BV1pQ7d6J2zA,前端修仙路,前端开发,前端开发,Next.js|Tailwind|前端|SaaS,2100,2026-04-08,P0,pending,,False,
+BV1qR8e7K3aB,GitHub Copilot vs Cursor vs Claude Code 对比测评,https://www.bilibili.com/video/BV1qR8e7K3aB,程序员测评官,AI工具,AI工具,AI编程|Copilot|Cursor|Claude Code,1680,2026-04-05,P0,pending,,False,
+BV1rS9f8L4bC,Karakeep自托管书签系统搭建教程,https://www.bilibili.com/video/BV1rS9f8L4bC,自托管玩家,自托管,自托管,Karakeep|自托管|书签|Docker,840,2026-04-02,P1,pending,,False,
+BV1sT0g9M5cD,FastAPI + SQLAlchemy 2.0 异步ORM最佳实践,https://www.bilibili.com/video/BV1sT0g9M5cD,Python后端日记,后端开发,后端开发,FastAPI|SQLAlchemy|Python|异步,1440,2026-03-28,P0,pending,,False,
+BV1tU1h0N6dE,短视频AI自动剪辑工作流：从素材到成片,https://www.bilibili.com/video/BV1tU1h0N6dE,AI创作工坊,内容创作,内容创作,短视频|AI剪辑|Whisper|自动化,1920,2026-03-25,P0,pending,,False,

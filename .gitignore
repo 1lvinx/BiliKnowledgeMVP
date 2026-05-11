@@ -1,0 +1,32 @@
+.DS_Store
+
+# dependencies
+node_modules/
+
+# build outputs
+dist/
+build/
+out/
+.next/
+
+# Rust / Tauri
+target/
+**/target/
+
+# env / secrets
+.env
+.env.*
+*.local
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# external cloned repos
+external/
+
+# caches
+.cache/
+.vite/

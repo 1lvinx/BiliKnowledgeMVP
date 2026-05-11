@@ -1,0 +1,21 @@
+# Secrets & Cookies
+secrets/
+.env
+*.env
+local_config.json
+bilibili_cookie.json
+data/config.json
+data/*cookie*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store
+*.log
+
+# BiliNote external
+external/

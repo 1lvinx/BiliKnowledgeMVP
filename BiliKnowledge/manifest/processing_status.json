@@ -1,0 +1,16 @@
+{
+  "last_updated": "2026-05-06",
+  "total_videos": 10,
+  "pending": 10,
+  "note_created": 0,
+  "projects_extracted": 0,
+  "reviewed": 0,
+  "sample_limit": 10,
+  "pipeline": {
+    "manifest_generated": true,
+    "notes_generated": false,
+    "projects_extracted": false,
+    "index_built": false,
+    "validated": false
+  }
+}
