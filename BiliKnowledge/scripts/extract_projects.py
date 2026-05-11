@@ -68,6 +68,8 @@ DOCKER_BOOLEAN_FLAGS = frozenset({
 
 DOCKER_SHORT_OPTIONS_WITH_ATTACHED_VALUE = ("-p", "-v", "-e", "-w", "-u", "-h", "-l", "-m")
 
+PORT_MAPPING_RE = re.compile(r"(?:[0-9.]+:)?\d{1,5}:\d{1,5}(?:/(?:tcp|udp))?")
+
 
 def is_cli_flag(token: str) -> bool:
     """Return True if token is a CLI flag (starts with -)."""
@@ -85,6 +87,8 @@ def is_probable_package(token: str) -> bool:
     if token.endswith(".txt") or token.endswith(".cfg") or token.endswith(".toml"):
         return False
     if token.endswith(".py"):
+        return False
+    if PORT_MAPPING_RE.fullmatch(token):
         return False
     return True
 
@@ -159,7 +163,7 @@ def is_invalid_docker_image_candidate(token: str) -> bool:
         return True
     if token.startswith(("./", "../", "/", "~")) and ":" in token:
         return True
-    if re.fullmatch(r"(?:[0-9.]+:)?\d{1,5}:\d{1,5}(?:/(?:tcp|udp))?", token):
+    if PORT_MAPPING_RE.fullmatch(token):
         return True
     return False
 
@@ -408,6 +412,12 @@ def self_test():
     pip_pkgs3 = extract_pip_packages(pip_text3)
     check("pip3 requests extracted", "requests" in pip_pkgs3)
     check("python -m pip httpx extracted", "httpx" in pip_pkgs3)
+
+    # Port mapping false-positive tests (npm/pip)
+    npm_port = extract_npm_packages("npm install 3000:3000 react")
+    check("npm port mapping not extracted", "3000:3000" not in npm_port)
+    pip_port = extract_pip_packages("pip install 8080:80 fastapi")
+    check("pip port mapping not extracted", "8080:80" not in pip_port)
 
     # GitHub extraction
     github_text = "项目地址：https://github.com/karakeep-app/karakeep"
