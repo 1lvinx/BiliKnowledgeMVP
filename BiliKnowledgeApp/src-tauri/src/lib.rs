@@ -285,3 +285,122 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    // ── ensure_safe_relative_path ──
+
+    #[test]
+    fn rejects_absolute_path() {
+        assert!(ensure_safe_relative_path("/etc/passwd").is_err());
+    }
+
+    #[test]
+    fn rejects_parent_dir_traversal() {
+        assert!(ensure_safe_relative_path("../secrets.txt").is_err());
+    }
+
+    #[test]
+    fn rejects_mixed_traversal() {
+        assert!(ensure_safe_relative_path("notes/../../etc/passwd").is_err());
+    }
+
+    #[test]
+    fn accepts_safe_relative_path() {
+        assert!(ensure_safe_relative_path("notes/test.md").is_ok());
+    }
+
+    #[test]
+    fn accepts_simple_filename() {
+        assert!(ensure_safe_relative_path("manifest/videos.json").is_ok());
+    }
+
+    // ── ensure_path_under_base ──
+
+    fn temp_base(label: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("bk-test-{}-{}", std::process::id(), label));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn accepts_child_path() {
+        let base = temp_base("child");
+        let child = base.join("notes/test.md");
+        fs::create_dir_all(child.parent().unwrap()).unwrap();
+        fs::write(&child, b"test").unwrap();
+        let result = ensure_path_under_base(&base, &child);
+        fs::remove_dir_all(&base).ok();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn rejects_sibling_path_outside_base() {
+        let base = temp_base("sibling");
+        let sibling = std::env::temp_dir().join(format!("bk-other-{}-{}", std::process::id(), "sib"));
+        fs::create_dir_all(&sibling).unwrap();
+        let result = ensure_path_under_base(&base, &sibling);
+        fs::remove_dir_all(&base).ok();
+        fs::remove_dir_all(&sibling).ok();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn accepts_normalized_path_within_base() {
+        let base = temp_base("norm");
+        let sub = base.join("sub");
+        fs::create_dir_all(&sub).unwrap();
+        let normalized = base.join("sub").join(".").join("file.txt");
+        let result = ensure_path_under_base(&base, &normalized);
+        fs::remove_dir_all(&base).ok();
+        assert!(result.is_ok());
+    }
+
+    // ── allowed_script_name ──
+
+    #[test]
+    fn accepts_whitelisted_script() {
+        assert_eq!(
+            allowed_script_name("parse_favorites.py").unwrap(),
+            "parse_favorites.py"
+        );
+    }
+
+    #[test]
+    fn accepts_whitelisted_script_with_scripts_prefix() {
+        assert_eq!(
+            allowed_script_name("scripts/parse_favorites.py").unwrap(),
+            "parse_favorites.py"
+        );
+    }
+
+    #[test]
+    fn rejects_non_whitelisted_script() {
+        assert!(allowed_script_name("evil.sh").is_err());
+    }
+
+    #[test]
+    fn rejects_traversal_in_script_name() {
+        // Traversal blocked by ensure_safe_relative_path inside allowed_script_name
+        assert!(allowed_script_name("../parse_favorites.py").is_err());
+    }
+
+    #[test]
+    fn rejects_extra_path_depth() {
+        assert!(allowed_script_name("scripts/sub/parse_favorites.py").is_err());
+    }
+
+    #[test]
+    fn accepts_all_whitelisted_scripts() {
+        for name in ALLOWED_SCRIPTS {
+            assert!(
+                allowed_script_name(name).is_ok(),
+                "Whitelisted script {name} should be accepted"
+            );
+        }
+    }
+}
