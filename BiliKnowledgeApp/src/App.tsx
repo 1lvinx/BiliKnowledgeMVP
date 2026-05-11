@@ -8,7 +8,6 @@ import {
   BookOpen,
   Boxes,
   Check,
-  ChevronLeft,
   ChevronRight,
   Circle,
   CloudDownload,
@@ -34,7 +33,6 @@ import {
   MacInlineNotice,
   MacPanel,
   MacSearchField,
-  MacSegmentedControl,
   MacSidebar,
   MacSidebarItem,
   MacSidebarSection,
@@ -50,6 +48,37 @@ import { cn } from "./lib/utils";
 import { getSavedLanguage, saveLanguage, setLanguage as setI18nLanguage, t } from "./i18n";
 import "./App.css";
 
+function localizeLabel(raw: string): string {
+  const map: Record<string, string> = {
+    /* status */
+    candidate: t("status.pending"),
+    review: t("status.needsReview"),
+    useful: t("status.ready"),
+    pending: t("status.pending"),
+    reviewed: t("status.reviewed"),
+    archived: t("status.archived"),
+    failed: t("status.failed"),
+    /* categories */
+    Visualization: "可视化",
+    "Search Engine": "搜索工具",
+    "Desktop Plugin": "桌面插件",
+    "Native App": "原生应用",
+    Automation: "自动化",
+    "Knowledge Base": "知识库",
+    Security: "安全",
+    AI: "AI",
+    Frontend: "前端",
+    Knowledge: "知识",
+    /* folders */
+    manifest: t("kb.manifest"),
+    "notes/raw": t("kb.notesRaw"),
+    projects: t("kb.projects"),
+    reports: t("kb.reports"),
+    thoughts: t("kb.thoughts"),
+  };
+  return map[raw] ?? raw;
+}
+
 type View =
   | "dashboard"
   | "favorites"
@@ -58,7 +87,8 @@ type View =
   | "projects"
   | "knowledge"
   | "scripts"
-  | "settings";
+  | "settings"
+  | "tags";
 
 type ViewMode = "list" | "detail";
 
@@ -79,6 +109,7 @@ function buildViewMeta(t: (key: string, p?: Record<string, string | number>) => 
     knowledge: { title: t("view.knowledge"), subtitle: t("view.knowledgeSubtitle") },
     scripts: { title: t("view.scripts"), subtitle: t("view.scriptsSubtitle") },
     settings: { title: t("view.settings"), subtitle: t("view.settingsSubtitle") },
+    tags: { title: t("sidebar.tags"), subtitle: t("view.tagsSubtitle") },
   };
 }
 
@@ -253,7 +284,7 @@ Open the native app build to read real files, run scripts, and update review sta
 
 function App() {
   const [currentView, setCurrentView] = useState<View>("dashboard");
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const viewMode: ViewMode = "list";
   const [videos, setVideos] = useState<Video[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -479,10 +510,10 @@ function App() {
               onClick={() => setCurrentView("knowledge")}
             />
             <MacSidebarItem
-              active={false}
+              active={currentView === "tags"}
               icon={<Tag size={16} />}
               label={t("sidebar.tags")}
-              onClick={() => setCurrentView("knowledge")}
+              onClick={() => setCurrentView("tags")}
             />
           </MacSidebarSection>
 
@@ -529,24 +560,6 @@ function App() {
       toolbar={
         <MacToolbar
           action={toolbarAction}
-          controls={
-            currentView !== "settings" ? (
-              <MacSegmentedControl
-                onChange={setViewMode}
-                options={[
-                  { value: "list", label: t("toolbar.list") },
-                  { value: "detail", label: t("toolbar.detail") },
-                ]}
-                value={viewMode}
-              />
-            ) : null
-          }
-          leading={
-            <>
-              <MacToolbarButton ariaLabel="Back" disabled icon={<ChevronLeft size={15} />} />
-              <MacToolbarButton ariaLabel="Forward" disabled icon={<ChevronRight size={15} />} />
-            </>
-          }
           search={
             currentView !== "settings" ? (
               <MacSearchField
@@ -649,6 +662,15 @@ function App() {
             setSelectedScript,
             scriptCatalog,
           })}
+        {currentView === "tags" && (
+          <div className="mac-page-scroll custom-scrollbar">
+            <MacEmptyState
+              detail={t("tags.emptyHint")}
+              icon={<Tag size={32} />}
+              title={t("tags.empty")}
+            />
+          </div>
+        )}
         {currentView === "settings" && (
           <div className="mac-page-scroll custom-scrollbar">
             <SettingsView onLanguageChange={handleLanguageChange} />
@@ -771,19 +793,73 @@ function renderDashboard({
   const recentVideos = videos.slice(0, 6);
   const recentLogs = logs.slice(-5);
   const projectCards = projects.slice(0, 4);
+  const isEmpty = videos.length === 0 && projects.length === 0;
 
   return (
     <div className="mac-page-scroll custom-scrollbar">
+      {isEmpty && (
+        <section className="dashboard-onboarding">
+          <div className="dashboard-hero">
+            <div className="dashboard-hero-main">
+              <h1 className="dashboard-hero-title">{t("onboarding.title")}</h1>
+              <p className="dashboard-hero-subtitle">{t("view.overviewSubtitle")}</p>
+            </div>
+          </div>
+          <div className="onboarding-steps">
+            <div className="onboarding-step">
+              <div className="onboarding-step-num">1</div>
+              <div className="onboarding-step-text">
+                <strong>{t("onboarding.step1")}</strong>
+                <p>{t("onboarding.step1Desc")}</p>
+              </div>
+            </div>
+            <div className="onboarding-step">
+              <div className="onboarding-step-num">2</div>
+              <div className="onboarding-step-text">
+                <strong>{t("onboarding.step2")}</strong>
+                <p>{t("onboarding.step2Desc")}</p>
+              </div>
+            </div>
+            <div className="onboarding-step">
+              <div className="onboarding-step-num">3</div>
+              <div className="onboarding-step-text">
+                <strong>{t("onboarding.step3")}</strong>
+                <p>{t("onboarding.step3Desc")}</p>
+              </div>
+            </div>
+            <div className="onboarding-step">
+              <div className="onboarding-step-num">4</div>
+              <div className="onboarding-step-text">
+                <strong>{t("onboarding.step4")}</strong>
+                <p>{t("onboarding.step4Desc")}</p>
+              </div>
+            </div>
+          </div>
+          <div className="onboarding-actions">
+            <MacToolbarButton
+              icon={<HardDrive size={14} />}
+              label={t("onboarding.createWorkspace")}
+              onClick={() => runPythonScript("validate_knowledge_base.py")}
+              primary
+            />
+            <MacToolbarButton
+              icon={<CloudDownload size={14} />}
+              label={t("onboarding.runImport")}
+              onClick={() => runPythonScript("parse_favorites.py", ["--limit", "20"])}
+            />
+          </div>
+        </section>
+      )}
       {isPreview && (
         <MacInlineNotice className="dev-preview-notice" tone="neutral">
-          <Circle size={10} fill="currentColor" /> Browser preview using sample data
+          <Circle size={10} fill="currentColor" /> {t("common.browserPreview")}
         </MacInlineNotice>
       )}
 
       <section className="dashboard-focus-grid">
         <header className="dashboard-focus-head">
           <div>
-            <span className="overview-kicker">Knowledge Studio</span>
+            <span className="overview-kicker">{t("dashboard.knowledgeStudio")}</span>
             <h2>继续推进收藏→知识库工作流</h2>
             <p>
               {videos.length} 个视频 · {projects.length} 个候选项目 · {pendingCount} 条待审核
@@ -974,7 +1050,7 @@ function renderDashboard({
                   <div className="dashboard-feed-main">
                     <div className="dashboard-feed-title">{project.name}</div>
                     <div className="dashboard-feed-meta">
-                      <span>{project.type}</span>
+                      <span>{localizeLabel(project.type)}</span>
                       <span>{project.source_note}</span>
                     </div>
                   </div>
@@ -1238,7 +1314,7 @@ function VideoInspector({
             {statusLabel(activeVideo.status)}
           </MacStatusPill>
                 <MacTagPill tone={priorityTone(activeVideo.priority)}>{activeVideo.priority}</MacTagPill>
-          <MacTagPill>{activeVideo.category}</MacTagPill>
+          <MacTagPill>{localizeLabel(activeVideo.category)}</MacTagPill>
         </div>
         <div className="mac-stat-grid">
           <div className="mac-stat">
@@ -1321,7 +1397,7 @@ function renderNotes({
               <div>
                 <div className="mac-row-title">{video.title}</div>
                 <div className="mac-row-meta">
-                  <span>{video.category}</span>
+                  <span>{localizeLabel(video.category)}</span>
                   <span>{video.pubdate}</span>
                 </div>
               </div>
@@ -1416,11 +1492,11 @@ function renderProjects({
                 <div>
                   <div className="mac-row-title">{project.name}</div>
                   <div className="mac-row-meta">
-                    <span>{project.type}</span>
+                    <span>{localizeLabel(project.type)}</span>
                     <span>{project.source_note}</span>
                   </div>
                 </div>
-                <MacStatusPill tone="blue">{project.status || "candidate"}</MacStatusPill>
+                <MacStatusPill tone="blue">{localizeLabel(project.status || "candidate")}</MacStatusPill>
               </button>
             ))}
           </div>
@@ -1430,7 +1506,7 @@ function renderProjects({
         <div className="mac-page-scroll custom-scrollbar">
           {activeProject ? (
             <div className="mac-settings-stack">
-              <MacPanel title={activeProject.name} meta={activeProject.type}>
+              <MacPanel title={activeProject.name} meta={localizeLabel(activeProject.type)}>
                 <div className="mac-inspector-content">
                   <p>{activeProject.description || "从视频笔记中提取出来的开源项目候选。"}</p>
                   <div className="flex flex-wrap gap-2">
@@ -1513,7 +1589,7 @@ function renderKnowledge({
             <div className="kb-folder-row" key={folder.name}>
               <FolderTree size={14} className="kb-folder-icon" />
               <div>
-                <div className="mac-row-title">{folder.name}</div>
+                <div className="mac-row-title">{localizeLabel(folder.name)}</div>
                 <div className="mac-row-meta">{t("kb.items", { count: folder.count })}</div>
               </div>
             </div>
@@ -1576,7 +1652,7 @@ function renderKnowledge({
               <div className="kb-folder-summary">
                 {folders.map((folder) => (
                   <div key={folder.name}>
-                    <span>{folder.name}</span>
+                    <span>{localizeLabel(folder.name)}</span>
                     <strong>{t("kb.items", { count: folder.count })}</strong>
                   </div>
                 ))}
