@@ -77,7 +77,7 @@ function buildViewMeta(t: (key: string, p?: Record<string, string | number>) => 
     notes: { title: t("view.notes"), subtitle: t("view.notesSubtitle") },
     projects: { title: t("view.projects"), subtitle: t("view.projectsSubtitle") },
     knowledge: { title: t("view.knowledge"), subtitle: t("view.knowledgeSubtitle") },
-    scripts: { title: t("view.scripts"), subtitle: t("view.scriptsSubtitle") },
+    scripts: { title: t("sidebar.healthCheck"), subtitle: t("view.scriptsSubtitle") },
     settings: { title: t("view.settings"), subtitle: t("view.settingsSubtitle") },
     tags: { title: t("sidebar.tags"), subtitle: t("view.tagsSubtitle") },
   };
@@ -168,7 +168,7 @@ function App() {
 
   const viewMeta = useMemo(() => buildViewMeta(t), [language]);
   const scriptCatalog = useMemo(() => buildScriptCatalog(t), [language]);
-  const [selectedScript, setSelectedScript] = useState(scriptCatalog[0].name);
+  const [selectedScript, setSelectedScript] = useState("validate_knowledge_base.py");
 
   const onScrollToConsole = () => {
     outputAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -377,12 +377,6 @@ function App() {
             <MacSidebarItem
               active={currentView === "scripts"}
               badge={logs.length}
-              icon={<Terminal size={16} />}
-              label={t("sidebar.scripts")}
-              onClick={() => setCurrentView("scripts")}
-            />
-            <MacSidebarItem
-              active={false}
               icon={<Activity size={16} />}
               label={t("sidebar.healthCheck")}
               onClick={() => {
@@ -574,7 +568,7 @@ function getToolbarAction({
       <MacToolbarButton
         disabled={isRunning}
         icon={<Terminal size={14} />}
-        label={isRunning ? t("toolbar.running") : t("toolbar.runSelected")}
+        label={isRunning ? t("toolbar.running") : t("dashboard.runHealthCheck")}
         onClick={() => runPythonScript(selectedScript)}
         primary
       />
