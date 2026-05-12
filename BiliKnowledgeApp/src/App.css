@@ -670,7 +670,7 @@ textarea:focus-visible {
 .dashboard-page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   min-width: 0;
   min-height: 0;
 }
@@ -780,7 +780,7 @@ textarea:focus-visible {
 .dashboard-focus-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
 }
 
 .dashboard-focus-strip {
@@ -826,41 +826,41 @@ textarea:focus-visible {
 }
 
 .focus-card {
-  min-height: 118px;
-  padding: 18px;
+  min-height: 96px;
+  padding: 16px;
   background: var(--bk-elevated-bg);
   border: 1px solid var(--bk-separator);
   border-radius: var(--bk-radius-panel);
-  box-shadow: var(--bk-shadow-panel);
+  box-shadow: var(--bk-shadow-subtle);
 }
 
 .focus-card.is-primary {
-  background: linear-gradient(180deg, #f3f5ff 0%, #ffffff 100%);
-  border-color: #dfe3ff;
+  background: var(--bk-blue-soft);
+  border-color: var(--bk-blue-soft);
 }
 
 .focus-card-meta {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--bk-tertiary-label);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 4px;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
 }
 
 .focus-card-value {
-  font-size: 24px;
-  font-weight: 720;
+  font-size: 22px;
+  font-weight: 700;
   color: var(--bk-label);
   line-height: 1.2;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .focus-card p {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   font-size: 12px;
   color: var(--bk-secondary-label);
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .focus-card-tags {
@@ -872,27 +872,25 @@ textarea:focus-visible {
 .dashboard-metrics-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
 .metric-card {
-  min-height: 72px;
-  padding: 14px 16px;
+  padding: 10px 14px;
   border: 1px solid var(--bk-separator);
   border-radius: var(--bk-radius-control);
-  background: var(--bk-elevated-bg);
-  box-shadow: var(--bk-shadow-subtle);
+  background: var(--bk-content-bg);
   text-align: center;
 }
 
 .metric-card span {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--bk-tertiary-label);
 }
 
 .metric-card strong {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--bk-label);
   font-variant-numeric: tabular-nums;
