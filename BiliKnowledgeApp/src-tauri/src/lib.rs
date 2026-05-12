@@ -16,13 +16,14 @@ const DEFAULT_CONFIG: &str = r#"{
     "sessdata": "",
     "bili_jct": "",
     "buvid3": "",
-    "dedeuserid": ""
+    "dedeuserid": "",
+    "status": "not_configured"
   },
   "ai": {
-    "provider": "anthropic",
+    "provider": "deepseek",
     "api_key": "",
-    "base_url": "",
-    "model": "claude-3-5-sonnet-20241022"
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-v4-flash"
   },
   "preferences": {
     "language": "zh-CN"
@@ -30,36 +31,123 @@ const DEFAULT_CONFIG: &str = r#"{
 }"#;
 
 fn knowledge_base_root() -> PathBuf {
+    // 1. Try exe-relative (works for both dev and release .app)
+    if let Ok(exe) = std::env::current_exe() {
+        let mut dir = exe.parent().map(|p| p.to_path_buf());
+        while let Some(d) = dir {
+            let candidate = d.join("BiliKnowledge");
+            if candidate.is_dir() {
+                if let Ok(c) = candidate.canonicalize() {
+                    return c;
+                }
+            }
+            // walk up
+            dir = d.parent().map(|p| p.to_path_buf());
+            // stop at filesystem root
+            if d.parent() == Some(&d) {
+                break;
+            }
+        }
+    }
+    // 2. Try CWD-relative
+    if let Ok(cwd) = std::env::current_dir() {
+        let candidate = cwd.join("BiliKnowledge");
+        if candidate.is_dir() {
+            if let Ok(c) = candidate.canonicalize() {
+                return c;
+            }
+        }
+        let sibling = cwd.join("../BiliKnowledge");
+        if sibling.is_dir() {
+            if let Ok(c) = sibling.canonicalize() {
+                return c;
+            }
+        }
+        // 3. Fallback: $HOME/Studio/.../BiliKnowledge
+        if let Ok(home) = std::env::var("HOME") {
+            let home_kb = PathBuf::from(&home)
+                .join("Studio/01_AI/BiliKnowledgeMVP/BiliKnowledge");
+            if home_kb.is_dir() {
+                return home_kb;
+            }
+        }
+        // 4. Last resort: CWD/BiliKnowledge, but never use root /
+        let cwd_canon = cwd.canonicalize().unwrap_or_else(|_| cwd.clone());
+        let candidate = cwd_canon.join("BiliKnowledge");
+        // If CWD is root, use HOME instead
+        if cwd_canon.as_os_str() == "/" {
+            if let Ok(home) = std::env::var("HOME") {
+                return PathBuf::from(&home).join("BiliKnowledge");
+            }
+        }
+        return candidate;
+    }
     PathBuf::from("../BiliKnowledge")
 }
 
-fn ensure_path_under_base(base: &Path, target: &Path) -> Result<PathBuf, String> {
-    let base = base
-        .canonicalize()
-        .map_err(|e| format!("Failed to canonicalize base path: {e}"))?;
+fn resolve_base_path(base: &Path) -> Result<PathBuf, String> {
+    // Like canonicalize but tolerates missing dirs
+    if base.exists() {
+        return base.canonicalize().map_err(|e| format!("Path error: {e}"));
+    }
+    // Absolute path: use as-is (parent must exist for ensure_workspace to create it)
+    if base.is_absolute() {
+        return Ok(base.to_path_buf());
+    }
+    // Relative path: resolve against CWD
+    if let Ok(cwd) = std::env::current_dir() {
+        let cwd_canon = cwd.canonicalize().unwrap_or(cwd);
+        let mut resolved = cwd_canon;
+        for c in base.components() {
+            match c {
+                Component::ParentDir => {
+                    if !resolved.pop() {
+                        return Err("Path access denied: traversal outside base".into());
+                    }
+                }
+                Component::CurDir => {}
+                Component::Normal(s) => resolved.push(s),
+                Component::Prefix(_) | Component::RootDir => {
+                    return Err("Path access denied: unexpected path component".into());
+                }
+            }
+        }
+        return Ok(resolved);
+    }
+    Err("Cannot resolve base path".into())
+}
 
-    let target = if target.exists() {
+fn ensure_path_under_base(base: &Path, target: &Path) -> Result<PathBuf, String> {
+    let resolved_base = resolve_base_path(base)?;
+
+    let resolved_target = if target.exists() {
         target
             .canonicalize()
             .map_err(|e| format!("Failed to canonicalize target path: {e}"))?
     } else {
-        let parent = target
-            .parent()
-            .ok_or_else(|| "Invalid target path".to_string())?
-            .canonicalize()
-            .map_err(|e| format!("Failed to canonicalize target parent: {e}"))?;
+        let parent = target.parent().unwrap_or_else(|| Path::new("."));
         let file_name = target
             .file_name()
             .ok_or_else(|| "Invalid target filename".to_string())?;
-
-        parent.join(file_name)
+        let parent_resolved = if parent.exists() {
+            parent
+                .canonicalize()
+                .unwrap_or_else(|_| parent.to_path_buf())
+        } else {
+            resolve_base_path(base)?.join(
+                parent
+                    .strip_prefix(base)
+                    .unwrap_or(parent),
+            )
+        };
+        parent_resolved.join(file_name)
     };
 
-    if !target.starts_with(&base) {
+    if !resolved_target.starts_with(&resolved_base) {
         return Err("Path access denied: target is outside allowed base directory".to_string());
     }
 
-    Ok(target)
+    Ok(resolved_target)
 }
 
 fn ensure_safe_relative_path(path: &str) -> Result<(), String> {
@@ -134,16 +222,31 @@ async fn run_script<R: Runtime>(
     let requested_script = script_name;
     let script_name = allowed_script_name(&requested_script)?;
     let base = knowledge_base_root();
+
+    // Validate workspace before running
+    if !base.exists() {
+        let path_str = base.to_string_lossy();
+        return Err(format!(
+            "知识库路径不存在：{}\n请先创建默认知识库。",
+            path_str
+        ));
+    }
+
     let knowledge_root = ensure_path_under_base(&base, &base)?;
     let scripts_root = ensure_path_under_base(&knowledge_root, &knowledge_root.join("scripts"))?;
-    let python_path = PathBuf::from("../external/bilibili-favorites/.venv/bin/python");
+    // Resolve python relative to project root (knowledge base's parent)
+    let project_root = base.parent().unwrap_or(&base);
+    let python_path = project_root.join("external/bilibili-favorites/.venv/bin/python");
     let script_path = ensure_path_under_base(&scripts_root, &scripts_root.join(script_name))?;
 
     if !python_path.exists() {
-        return Err("Python virtual environment not found".into());
+        return Err(format!(
+            "Python 虚拟环境未找到：{}\n请确认已安装依赖。",
+            python_path.display()
+        ));
     }
     if !script_path.exists() {
-        return Err(format!("Script not found: {}", script_name));
+        return Err(format!("脚本未找到: {}", script_name));
     }
 
     let mut command = Command::new(python_path);
@@ -268,6 +371,58 @@ fn save_config(config: String) -> Result<(), String> {
     fs::write(path, config).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn check_workspace() -> Result<String, String> {
+    let root = knowledge_base_root();
+    let exists = root.exists();
+    let is_dir = root.is_dir();
+    let manifest_exists = root.join("manifest/videos.json").exists();
+    let notes_dir_exists = root.join("notes/raw").exists();
+    let kb_root_str = root.to_string_lossy().to_string();
+
+    let status = serde_json::json!({
+        "path": kb_root_str,
+        "exists": exists,
+        "is_dir": is_dir,
+        "manifest_exists": manifest_exists,
+        "notes_dir_exists": notes_dir_exists,
+        "valid": exists && is_dir,
+    });
+    Ok(status.to_string())
+}
+
+#[tauri::command]
+fn ensure_workspace() -> Result<String, String> {
+    let root = knowledge_base_root();
+    let dirs = [
+        "manifest",
+        "notes/raw",
+        "notes/reviewed",
+        "notes/templates",
+        "projects",
+        "thoughts",
+        "scripts",
+        "reports",
+        "config",
+        "exports",
+        "logs",
+    ];
+    for d in &dirs {
+        fs::create_dir_all(root.join(d))
+            .map_err(|e| format!("Failed to create {}: {e}", d))?;
+    }
+    let manifest_path = root.join("manifest/videos.json");
+    if !manifest_path.exists() {
+        fs::write(&manifest_path, "[]").map_err(|e| format!("Failed to init manifest: {e}"))?;
+    }
+    let projects_path = root.join("projects/project_candidates.json");
+    if !projects_path.exists() {
+        fs::write(&projects_path, "[]").map_err(|e| format!("Failed to init projects: {e}"))?;
+    }
+    let kb_root_str = root.to_string_lossy().to_string();
+    Ok(serde_json::json!({"path": kb_root_str, "created": true}).to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -280,7 +435,9 @@ pub fn run() {
             get_config,
             save_config,
             run_script,
-            update_video_status
+            update_video_status,
+            check_workspace,
+            ensure_workspace
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

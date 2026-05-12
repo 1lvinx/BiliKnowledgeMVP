@@ -8,6 +8,7 @@ import {
   MacToolbarButton,
 } from "./MacUI";
 import { cn } from "../lib/utils";
+import { t } from "../i18n";
 
 interface Config {
   bilibili: {
@@ -30,10 +31,10 @@ interface Config {
 const defaultConfig: Config = {
   bilibili: { sessdata: "", bili_jct: "", buvid3: "", dedeuserid: "" },
   ai: {
-    provider: "anthropic",
+    provider: "deepseek",
     api_key: "",
-    base_url: "",
-    model: "claude-3-5-sonnet-20241022",
+    base_url: "https://api.deepseek.com",
+    model: "deepseek-v4-flash",
   },
   preferences: {
     language: "zh-CN",
@@ -49,19 +50,19 @@ const languageOptions = [
   { value: "ko-KR", label: "한국어", detail: "Korean" },
 ];
 
-const settingsSections = [
-  "General",
-  "Knowledge Base",
-  "Import",
-  "Validation",
-  "AI",
-  "Security",
-  "Scripts",
-  "Export & Backup",
-  "Appearance",
-];
+const settingsSectionKeys = [
+  "settings.general",
+  "settings.knowledgeBase",
+  "settings.import",
+  "settings.validation",
+  "settings.ai",
+  "settings.security",
+  "settings.scripts",
+  "settings.exportBackup",
+  "settings.appearance",
+] as const;
 
-type SettingsSection = (typeof settingsSections)[number];
+type SettingsSection = (typeof settingsSectionKeys)[number];
 
 const previewStorageKey = "biliknowledge-preview-config";
 
@@ -91,7 +92,7 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeSection, setActiveSection] = useState<SettingsSection>("General");
+  const [activeSection, setActiveSection] = useState<SettingsSection>("settings.general");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
   );
@@ -119,15 +120,15 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
       setSaving(true);
       if (!isTauriRuntime()) {
         window.localStorage.setItem(previewStorageKey, JSON.stringify(config));
-        setMessage({ type: "success", text: "Preview preferences saved" });
+        setMessage({ type: "success", text: t("settings.previewSaved") });
         setTimeout(() => setMessage(null), 3000);
         return;
       }
       await invoke("save_config", { config: JSON.stringify(config) });
-      setMessage({ type: "success", text: "Preferences saved" });
+      setMessage({ type: "success", text: t("settings.saved") });
       setTimeout(() => setMessage(null), 3000);
-    } catch {
-      setMessage({ type: "error", text: "Save failed" });
+    } catch (err) {
+      setMessage({ type: "error", text: `${t("settings.saveFailed")}: ${String(err)}` });
     } finally {
       setSaving(false);
     }
@@ -143,21 +144,21 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
   }, [config]);
 
   if (loading) {
-    return <div className="mac-empty-state">Loading preferences...</div>;
+    return <div className="mac-empty-state">{t("status.processing")}...</div>;
   }
   if (!config) return null;
 
   return (
     <div className="mac-settings-layout">
       <nav className="mac-settings-nav">
-        {settingsSections.map((section) => (
+        {settingsSectionKeys.map((key) => (
           <button
-            className={cn(activeSection === section && "is-active")}
-            key={section}
-            onClick={() => setActiveSection(section)}
+            className={cn(activeSection === key && "is-active")}
+            key={key}
+            onClick={() => setActiveSection(key)}
             type="button"
           >
-            {section}
+            {t(key)}
           </button>
         ))}
       </nav>
@@ -170,21 +171,21 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
           </MacInlineNotice>
         )}
 
-        {activeSection === "General" && (
-          <MacSettingsGroup title="General">
+        {activeSection === "settings.general" && (
+          <MacSettingsGroup title={t("settings.general")}>
             <MacSettingsRow
-              detail="Local Markdown workspace used by the app."
-              label="Knowledge Base Location"
+              detail={t("settings.knowledgeBaseLocationDesc")}
+              label={t("settings.knowledgeBaseLocation")}
             >
               <span className="mac-inspector-meta">../BiliKnowledge</span>
             </MacSettingsRow>
-            <MacSettingsRow detail="Modern light dashboard appearance." label="Appearance">
+            <MacSettingsRow detail={t("settings.appearanceDesc")} label={t("settings.appearanceLabel")}>
               <select className="mac-select" defaultValue="system">
-                <option value="system">System</option>
-                <option value="light">Light</option>
+                <option value="system">{t("settings.system")}</option>
+                <option value="light">{t("settings.light")}</option>
               </select>
             </MacSettingsRow>
-            <MacSettingsRow detail="Sets the preferred app language for supported UI text." label="Language">
+            <MacSettingsRow detail={t("settings.languageDesc")} label={t("settings.language")}>
               <select
                 className="mac-select"
                 onChange={(event) => {
@@ -206,29 +207,29 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
           </MacSettingsGroup>
         )}
 
-        {activeSection === "Knowledge Base" && (
-          <MacSettingsGroup title="Knowledge Base">
+        {activeSection === "settings.knowledgeBase" && (
+          <MacSettingsGroup title={t("settings.knowledgeBase")}>
             <MacSettingsRow
-              detail="Local Markdown workspace used by the app."
-              label="Workspace"
+              detail={t("settings.knowledgeBaseLocationDesc")}
+              label={t("settings.workspace")}
             >
               <span className="mac-inspector-meta">../BiliKnowledge</span>
             </MacSettingsRow>
-            <MacSettingsRow detail="Raw Markdown notes generated per video." label="Notes Path">
+            <MacSettingsRow detail={t("settings.notesPathDesc")} label={t("settings.notesPath")}>
               <span className="mac-inspector-meta">BiliKnowledge/notes/raw</span>
             </MacSettingsRow>
-            <MacSettingsRow detail="Project candidates extracted from notes." label="Projects Path">
+            <MacSettingsRow detail={t("settings.projectsPathDesc")} label={t("settings.projectsPath")}>
               <span className="mac-inspector-meta">BiliKnowledge/projects</span>
             </MacSettingsRow>
-            <MacSettingsRow detail="Manifests and processing status." label="Manifest Path">
+            <MacSettingsRow detail={t("settings.manifestPathDesc")} label={t("settings.manifestPath")}>
               <span className="mac-inspector-meta">BiliKnowledge/manifest</span>
             </MacSettingsRow>
           </MacSettingsGroup>
         )}
 
-        {activeSection === "Import" && (
-          <MacSettingsGroup title="Import">
-            <MacSettingsRow detail="Used by local Bilibili favorite parsing." label="SESSDATA">
+        {activeSection === "settings.import" && (
+          <MacSettingsGroup title={t("settings.import")}>
+            <MacSettingsRow detail={t("settings.sessdataDesc")} label="SESSDATA">
               <SettingInput
                 onChange={(value) =>
                   setConfig({ ...config, bilibili: { ...config.bilibili, sessdata: value } })
@@ -254,32 +255,32 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
                 value={config.bilibili.dedeuserid}
               />
             </MacSettingsRow>
-            <MacSettingsRow detail="Avoid importing duplicate BV items." label="Detect Duplicates">
+            <MacSettingsRow detail={t("settings.detectDuplicatesDesc")} label={t("settings.detectDuplicates")}>
               <span aria-label="Enabled" className="mac-switch is-on" role="switch" aria-checked="true" />
             </MacSettingsRow>
           </MacSettingsGroup>
         )}
 
-        {activeSection === "Validation" && (
-          <MacSettingsGroup title="Validation">
-            <MacSettingsRow detail="Check structure, links, and sensitive data." label="Health Check">
-              <span className="mac-status-pill tone-green">Enabled</span>
+        {activeSection === "settings.validation" && (
+          <MacSettingsGroup title={t("settings.validation")}>
+            <MacSettingsRow detail={t("settings.healthCheckDesc")} label={t("settings.healthCheck")}>
+              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
             </MacSettingsRow>
-            <MacSettingsRow detail="Flag notes not referenced by the manifest." label="Orphan Notes">
-              <span className="mac-status-pill tone-orange">Review</span>
+            <MacSettingsRow detail={t("settings.orphanNotesDesc")} label={t("settings.orphanNotes")}>
+              <span className="mac-status-pill tone-orange">{t("kb.review")}</span>
             </MacSettingsRow>
-            <MacSettingsRow detail="Avoid keeping cookies or API keys in reports." label="Sensitive Data Scan">
-              <span className="mac-status-pill tone-green">Enabled</span>
+            <MacSettingsRow detail={t("settings.sensitiveDataScanDesc")} label={t("settings.sensitiveDataScan")}>
+              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
             </MacSettingsRow>
-            <MacSettingsRow detail="Validate internal Markdown links." label="Link Check">
-              <span className="mac-status-pill tone-green">Enabled</span>
+            <MacSettingsRow detail={t("settings.linkCheckDesc")} label={t("settings.linkCheck")}>
+              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
             </MacSettingsRow>
           </MacSettingsGroup>
         )}
 
-        {activeSection === "AI" && (
-          <MacSettingsGroup title="AI">
-            <MacSettingsRow label="Provider">
+        {activeSection === "settings.ai" && (
+          <MacSettingsGroup title={t("settings.ai")}>
+            <MacSettingsRow label={t("settings.provider")}>
               <select
                 className="mac-select"
                 onChange={(event) =>
@@ -287,25 +288,26 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
                 }
                 value={config.ai.provider}
               >
-                <option value="anthropic">Anthropic</option>
-                <option value="openai">OpenAI</option>
                 <option value="deepseek">DeepSeek</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="local">Local</option>
               </select>
             </MacSettingsRow>
-            <MacSettingsRow label="API Key">
+            <MacSettingsRow label={t("settings.apiKey")}>
               <SettingInput
                 onChange={(value) => setConfig({ ...config, ai: { ...config.ai, api_key: value } })}
                 type="password"
                 value={config.ai.api_key}
               />
             </MacSettingsRow>
-            <MacSettingsRow label="Model">
+            <MacSettingsRow label={t("settings.model")}>
               <SettingInput
                 onChange={(value) => setConfig({ ...config, ai: { ...config.ai, model: value } })}
                 value={config.ai.model}
               />
             </MacSettingsRow>
-            <MacSettingsRow label="Base URL">
+            <MacSettingsRow label={t("settings.baseUrl")}>
               <SettingInput
                 onChange={(value) => setConfig({ ...config, ai: { ...config.ai, base_url: value } })}
                 value={config.ai.base_url}
@@ -314,54 +316,54 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
           </MacSettingsGroup>
         )}
 
-        {activeSection === "Security" && (
-          <MacSettingsGroup title="Security">
-            <MacSettingsRow detail="Configured in Tauri CSP." label="Content Security Policy">
-              <span className="mac-status-pill tone-green">Enabled</span>
+        {activeSection === "settings.security" && (
+          <MacSettingsGroup title={t("settings.security")}>
+            <MacSettingsRow detail={t("settings.contentSecurityPolicyDesc")} label={t("settings.contentSecurityPolicy")}>
+              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
             </MacSettingsRow>
-            <MacSettingsRow detail="Notes open in reader mode by default." label="Read-only Note Mode">
+            <MacSettingsRow detail={t("settings.readOnlyNoteModeDesc")} label={t("settings.readOnlyNoteMode")}>
               <span aria-label="Enabled" className="mac-switch is-on" role="switch" aria-checked="true" />
             </MacSettingsRow>
-            <MacSettingsRow detail="Knowledge paths are constrained in the backend." label="Path Whitelist">
-              <span className="mac-status-pill tone-green">Enabled</span>
+            <MacSettingsRow detail={t("settings.pathWhitelistDesc")} label={t("settings.pathWhitelist")}>
+              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
             </MacSettingsRow>
-            <MacSettingsRow detail="Only bundled knowledge scripts are listed." label="Script Whitelist">
-              <span className="mac-status-pill tone-green">Enabled</span>
-            </MacSettingsRow>
-          </MacSettingsGroup>
-        )}
-
-        {activeSection === "Scripts" && (
-          <MacSettingsGroup title="Scripts">
-            <MacSettingsRow detail="Import Bilibili favorites into manifest." label="parse_favorites.py">
-              <span className="mac-status-pill tone-green">Allowed</span>
-            </MacSettingsRow>
-            <MacSettingsRow detail="Scan notes for repositories and packages." label="extract_projects.py">
-              <span className="mac-status-pill tone-green">Allowed</span>
-            </MacSettingsRow>
-            <MacSettingsRow detail="Regenerate knowledge index and reports." label="build_index.py">
-              <span className="mac-status-pill tone-green">Allowed</span>
-            </MacSettingsRow>
-            <MacSettingsRow detail="Run structure and data validation." label="validate_knowledge_base.py">
-              <span className="mac-status-pill tone-green">Allowed</span>
+            <MacSettingsRow detail={t("settings.scriptWhitelistDesc")} label={t("settings.scriptWhitelist")}>
+              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
             </MacSettingsRow>
           </MacSettingsGroup>
         )}
 
-        {activeSection === "Export & Backup" && (
-          <MacSettingsGroup title="Export & Backup">
-            <MacSettingsRow label="Export Location">
+        {activeSection === "settings.scripts" && (
+          <MacSettingsGroup title={t("settings.scripts")}>
+            <MacSettingsRow detail={t("settings.importFavoritesDesc")} label="parse_favorites.py">
+              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
+            </MacSettingsRow>
+            <MacSettingsRow detail={t("settings.extractProjectsDesc")} label="extract_projects.py">
+              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
+            </MacSettingsRow>
+            <MacSettingsRow detail={t("settings.buildIndexDesc")} label="build_index.py">
+              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
+            </MacSettingsRow>
+            <MacSettingsRow detail={t("settings.validateKnowledgeBaseDesc")} label="validate_knowledge_base.py">
+              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
+            </MacSettingsRow>
+          </MacSettingsGroup>
+        )}
+
+        {activeSection === "settings.exportBackup" && (
+          <MacSettingsGroup title={t("settings.exportBackup")}>
+            <MacSettingsRow label={t("settings.exportLocation")}>
               <span className="mac-inspector-meta">BiliKnowledge/projects</span>
             </MacSettingsRow>
-            <MacSettingsRow detail="Use local files only." label="Auto Backup">
+            <MacSettingsRow detail={t("settings.autoBackupDesc")} label={t("settings.autoBackup")}>
               <span aria-label="Disabled" className="mac-switch" role="switch" aria-checked="false" />
             </MacSettingsRow>
           </MacSettingsGroup>
         )}
 
-        {activeSection === "Appearance" && (
-          <MacSettingsGroup title="Appearance">
-            <MacSettingsRow detail="Choose Chinese, English, Singapore English, Russian, Japanese, or Korean." label="Language">
+        {activeSection === "settings.appearance" && (
+          <MacSettingsGroup title={t("settings.appearance")}>
+            <MacSettingsRow detail={t("settings.chooseLanguageDesc")} label={t("settings.language")}>
               <select
                 className="mac-select"
                 onChange={(event) => {
@@ -380,26 +382,26 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
                 ))}
               </select>
             </MacSettingsRow>
-            <MacSettingsRow detail="Current language locale code." label="Locale">
+            <MacSettingsRow detail={t("settings.localeDesc")} label={t("settings.locale")}>
               <span className="mac-inspector-meta">
                 {languageOptions.find((language) => language.value === config.preferences.language)?.detail}
                 {" · "}
                 {config.preferences.language}
               </span>
             </MacSettingsRow>
-            <MacSettingsRow detail="Current optimized dashboard theme." label="Theme">
+            <MacSettingsRow detail={t("settings.themeDesc")} label={t("settings.theme")}>
               <select className="mac-select" defaultValue="modern-light">
-                <option value="modern-light">Modern Light</option>
-                <option value="system">System</option>
+                <option value="modern-light">{t("settings.modernLight")}</option>
+                <option value="system">{t("settings.system")}</option>
               </select>
             </MacSettingsRow>
-            <MacSettingsRow detail="Readable UI stack with Chinese fallbacks." label="Font">
+            <MacSettingsRow detail={t("settings.fontDesc")} label={t("settings.font")}>
               <span className="mac-inspector-meta">Inter / PingFang SC / Noto Sans SC</span>
             </MacSettingsRow>
-            <MacSettingsRow detail="Compact but readable desktop density." label="Density">
+            <MacSettingsRow detail={t("settings.densityDesc")} label={t("settings.density")}>
               <select className="mac-select" defaultValue="comfortable">
-                <option value="comfortable">Comfortable</option>
-                <option value="compact">Compact</option>
+                <option value="comfortable">{t("settings.comfortable")}</option>
+                <option value="compact">{t("settings.compact")}</option>
               </select>
             </MacSettingsRow>
           </MacSettingsGroup>
@@ -408,7 +410,7 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
         <div className="flex justify-end pb-10">
           <MacToolbarButton
             disabled={saving}
-            label={saving ? "Saving" : "Save"}
+            label={saving ? t("settings.saving") : t("settings.save")}
             onClick={saveConfig}
             primary
           />

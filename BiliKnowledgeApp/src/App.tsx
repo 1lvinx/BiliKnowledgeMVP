@@ -4,15 +4,11 @@ import { listen } from "@tauri-apps/api/event";
 import ReactMarkdown from "react-markdown";
 import {
   Activity,
-  Archive,
   BookOpen,
   Boxes,
-  Check,
-  ChevronLeft,
   ChevronRight,
   Circle,
   CloudDownload,
-  ExternalLink,
   FileText,
   FolderTree,
   HardDrive,
@@ -32,9 +28,7 @@ import {
   MacConsole,
   MacEmptyState,
   MacInlineNotice,
-  MacPanel,
   MacSearchField,
-  MacSegmentedControl,
   MacSidebar,
   MacSidebarItem,
   MacSidebarSection,
@@ -46,7 +40,12 @@ import {
 } from "./components/MacUI";
 import { LogViewer } from "./components/LogViewer";
 import { SettingsView } from "./components/SettingsView";
+import { previewVideos, previewProjects } from "./data/demo";
+import { localizeLabel, priorityTone, statusLabel, statusTone } from "./lib/video-utils";
 import { cn } from "./lib/utils";
+import { Videos } from "./pages/Videos";
+import { Notes } from "./pages/Notes";
+import { Candidates } from "./pages/Candidates";
 import { getSavedLanguage, saveLanguage, setLanguage as setI18nLanguage, t } from "./i18n";
 import "./App.css";
 
@@ -58,7 +57,8 @@ type View =
   | "projects"
   | "knowledge"
   | "scripts"
-  | "settings";
+  | "settings"
+  | "tags";
 
 type ViewMode = "list" | "detail";
 
@@ -77,8 +77,9 @@ function buildViewMeta(t: (key: string, p?: Record<string, string | number>) => 
     notes: { title: t("view.notes"), subtitle: t("view.notesSubtitle") },
     projects: { title: t("view.projects"), subtitle: t("view.projectsSubtitle") },
     knowledge: { title: t("view.knowledge"), subtitle: t("view.knowledgeSubtitle") },
-    scripts: { title: t("view.scripts"), subtitle: t("view.scriptsSubtitle") },
+    scripts: { title: t("sidebar.healthCheck"), subtitle: t("view.scriptsSubtitle") },
     settings: { title: t("view.settings"), subtitle: t("view.settingsSubtitle") },
+    tags: { title: t("sidebar.tags"), subtitle: t("view.tagsSubtitle") },
   };
 }
 
@@ -111,124 +112,6 @@ function buildScriptCatalog(t: (key: string, p?: Record<string, string | number>
   ];
 }
 
-const previewVideos: Video[] = [
-  {
-    id: "BV1aiKbase01",
-    title: "Claude Code 工作流：从 Bilibili 收藏到本地知识库",
-    url: "https://www.bilibili.com/video/BV1aiKbase01",
-    uploader: "AI 工具箱",
-    favorite_folder: "AI Workflow",
-    category: "AI",
-    tags: ["agent", "knowledge-base", "automation"],
-    duration: "1240",
-    pubdate: "2026-05-01",
-    priority: "P0",
-    status: "pending",
-    note_path: "BV1aiKbase01.md",
-    project_extracted: true,
-    remarks: "Needs review before promotion.",
-  },
-  {
-    id: "BV1local02",
-    title: "用 Tauri 构建 macOS 原生质感桌面应用",
-    url: "https://www.bilibili.com/video/BV1local02",
-    uploader: "桌面开发研究所",
-    favorite_folder: "Native App",
-    category: "Frontend",
-    tags: ["tauri", "react", "desktop"],
-    duration: "1860",
-    pubdate: "2026-04-27",
-    priority: "P1",
-    status: "reviewed",
-    note_path: "BV1local02.md",
-    project_extracted: true,
-    remarks: "Useful UI references.",
-  },
-  {
-    id: "BV1index03",
-    title: "向量索引和 Markdown 笔记的轻量检索实践",
-    url: "https://www.bilibili.com/video/BV1index03",
-    uploader: "知识工程笔记",
-    favorite_folder: "Knowledge Base",
-    category: "Knowledge",
-    tags: ["markdown", "search", "index"],
-    duration: "940",
-    pubdate: "2026-04-19",
-    priority: "P1",
-    status: "pending",
-    note_path: "BV1index03.md",
-    project_extracted: false,
-    remarks: "Extract candidate libraries.",
-  },
-  {
-    id: "BV1ops04",
-    title: "本地自动化脚本安全白名单设计",
-    url: "https://www.bilibili.com/video/BV1ops04",
-    uploader: "安全工程实践",
-    favorite_folder: "Automation",
-    category: "Security",
-    tags: ["allowlist", "script", "tauri"],
-    duration: "760",
-    pubdate: "2026-04-11",
-    priority: "P2",
-    status: "archived",
-    note_path: "BV1ops04.md",
-    project_extracted: false,
-    remarks: "Reference only.",
-  },
-];
-
-const previewProjects: Project[] = [
-  {
-    name: "markmap",
-    url: "https://github.com/markmap/markmap",
-    source_note: "BV1index03.md",
-    source_video: "BV1index03",
-    type: "Visualization",
-    tech_stack: ["TypeScript", "Markdown", "SVG"],
-    description: "Markdown-driven mind map renderer for knowledge summaries.",
-    mentioned_context: "Used as a visual layer for structured notes.",
-    reusable_value: "Can turn extracted notes into browsable topic maps.",
-    commercial_value: "Useful for knowledge product prototypes.",
-    risk: "Needs layout testing with long Chinese titles.",
-    priority: "P1",
-    status: "candidate",
-    need_verify: true,
-  },
-  {
-    name: "tantivy",
-    url: "https://github.com/quickwit-oss/tantivy",
-    source_note: "BV1index03.md",
-    source_video: "BV1index03",
-    type: "Search",
-    tech_stack: ["Rust", "Indexing"],
-    description: "Fast full-text search engine suitable for local indexing.",
-    mentioned_context: "Candidate search backend for offline knowledge bases.",
-    reusable_value: "Can improve local note search quality.",
-    commercial_value: "Strong fit for private desktop knowledge tools.",
-    risk: "Requires Rust integration work.",
-    priority: "P0",
-    status: "review",
-    need_verify: true,
-  },
-  {
-    name: "tauri-plugin-shell",
-    url: "https://github.com/tauri-apps/plugins-workspace",
-    source_note: "BV1local02.md",
-    source_video: "BV1local02",
-    type: "Desktop Plugin",
-    tech_stack: ["Rust", "Tauri"],
-    description: "Official shell plugin pattern for constrained command execution.",
-    mentioned_context: "Compared with a custom command allowlist.",
-    reusable_value: "Reference for future command permission design.",
-    commercial_value: "Reduces maintenance risk.",
-    risk: "Must keep permissions narrow.",
-    priority: "P1",
-    status: "useful",
-    need_verify: false,
-  },
-];
-
 function isTauriRuntime() {
   return isTauri() || (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);
 }
@@ -253,7 +136,7 @@ Open the native app build to read real files, run scripts, and update review sta
 
 function App() {
   const [currentView, setCurrentView] = useState<View>("dashboard");
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const viewMode: ViewMode = "list";
   const [videos, setVideos] = useState<Video[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -285,7 +168,7 @@ function App() {
 
   const viewMeta = useMemo(() => buildViewMeta(t), [language]);
   const scriptCatalog = useMemo(() => buildScriptCatalog(t), [language]);
-  const [selectedScript, setSelectedScript] = useState(scriptCatalog[0].name);
+  const [selectedScript, setSelectedScript] = useState("validate_knowledge_base.py");
 
   const onScrollToConsole = () => {
     outputAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -367,6 +250,7 @@ function App() {
     try {
       setIsRunning(true);
       setSelectedScript(name);
+      setError(null);
       setLogs((prev) => [...prev, t("error.scriptStart", { name })]);
       await invoke("run_script", { scriptName: name, args });
       setLogs((prev) => [...prev, t("error.scriptSuccess")]);
@@ -374,8 +258,11 @@ function App() {
       await fetchProjects();
       setError(null);
     } catch (err) {
-      setLogs((prev) => [...prev, t("error.scriptError", { error: String(err) })]);
-      setError(t("error.scriptFailed"));
+      const errMsg = String(err);
+      setLogs((prev) => [...prev, t("error.scriptError", { error: errMsg })]);
+      if (!errMsg.includes("exit code") && !errMsg.includes("issues")) {
+        setError(t("error.scriptFailed"));
+      }
     } finally {
       setIsRunning(false);
     }
@@ -479,10 +366,10 @@ function App() {
               onClick={() => setCurrentView("knowledge")}
             />
             <MacSidebarItem
-              active={false}
+              active={currentView === "tags"}
               icon={<Tag size={16} />}
               label={t("sidebar.tags")}
-              onClick={() => setCurrentView("knowledge")}
+              onClick={() => setCurrentView("tags")}
             />
           </MacSidebarSection>
 
@@ -490,12 +377,6 @@ function App() {
             <MacSidebarItem
               active={currentView === "scripts"}
               badge={logs.length}
-              icon={<Terminal size={16} />}
-              label={t("sidebar.scripts")}
-              onClick={() => setCurrentView("scripts")}
-            />
-            <MacSidebarItem
-              active={false}
               icon={<Activity size={16} />}
               label={t("sidebar.healthCheck")}
               onClick={() => {
@@ -529,24 +410,6 @@ function App() {
       toolbar={
         <MacToolbar
           action={toolbarAction}
-          controls={
-            currentView !== "settings" ? (
-              <MacSegmentedControl
-                onChange={setViewMode}
-                options={[
-                  { value: "list", label: t("toolbar.list") },
-                  { value: "detail", label: t("toolbar.detail") },
-                ]}
-                value={viewMode}
-              />
-            ) : null
-          }
-          leading={
-            <>
-              <MacToolbarButton ariaLabel="Back" disabled icon={<ChevronLeft size={15} />} />
-              <MacToolbarButton ariaLabel="Forward" disabled icon={<ChevronRight size={15} />} />
-            </>
-          }
           search={
             currentView !== "settings" ? (
               <MacSearchField
@@ -571,6 +434,7 @@ function App() {
           renderDashboard({
             activeVideo,
             isPreview: !tauriAvailable,
+            isRunning,
             logs,
             p0Count,
             pendingCount,
@@ -588,47 +452,49 @@ function App() {
             noteContent,
             onScrollToConsole,
           })}
-        {currentView === "favorites" &&
-          renderVideoManager({
-            activeVideo,
-            fetchNote,
-            filterPriority,
-            filterStatus,
-            setFilterPriority,
-            setFilterStatus,
-            title: t("view.favorites"),
-            updateStatus,
-            videos: filteredVideos,
-            viewMode,
-          })}
-        {currentView === "videos" &&
-          renderVideoManager({
-            activeVideo,
-            fetchNote,
-            filterPriority,
-            filterStatus,
-            setFilterPriority,
-            setFilterStatus,
-            title: t("view.videos"),
-            updateStatus,
-            videos: filteredVideos,
-            viewMode,
-          })}
-        {currentView === "notes" &&
-          renderNotes({
-            activeVideo,
-            fetchNote,
-            noteContent,
-            projects,
-            videos: filteredVideos,
-          })}
-        {currentView === "projects" &&
-          renderProjects({
-            activeProject,
-            projects: filteredProjects,
-            setSelectedProject,
-            viewMode,
-          })}
+        {currentView === "favorites" && (
+          <Videos
+            activeVideo={activeVideo}
+            fetchNote={fetchNote}
+            filterPriority={filterPriority}
+            filterStatus={filterStatus}
+            setFilterPriority={setFilterPriority}
+            setFilterStatus={setFilterStatus}
+            title={t("view.favorites")}
+            updateStatus={updateStatus}
+            videos={filteredVideos}
+          />
+        )}
+        {currentView === "videos" && (
+          <Videos
+            activeVideo={activeVideo}
+            fetchNote={fetchNote}
+            filterPriority={filterPriority}
+            filterStatus={filterStatus}
+            setFilterPriority={setFilterPriority}
+            setFilterStatus={setFilterStatus}
+            title={t("view.videos")}
+            updateStatus={updateStatus}
+            videos={filteredVideos}
+          />
+        )}
+        {currentView === "notes" && (
+          <Notes
+            activeVideo={activeVideo}
+            fetchNote={fetchNote}
+            noteContent={noteContent}
+            projects={projects}
+            videos={filteredVideos}
+          />
+        )}
+        {currentView === "projects" && (
+          <Candidates
+            activeProject={activeProject}
+            projects={filteredProjects}
+            setSelectedProject={setSelectedProject}
+            viewMode={viewMode}
+          />
+        )}
         {currentView === "knowledge" &&
           renderKnowledge({
             noteCount,
@@ -649,6 +515,15 @@ function App() {
             setSelectedScript,
             scriptCatalog,
           })}
+        {currentView === "tags" && (
+          <div className="mac-page-scroll custom-scrollbar">
+            <MacEmptyState
+              detail={t("tags.emptyHint")}
+              icon={<Tag size={32} />}
+              title={t("tags.empty")}
+            />
+          </div>
+        )}
         {currentView === "settings" && (
           <div className="mac-page-scroll custom-scrollbar">
             <SettingsView onLanguageChange={handleLanguageChange} />
@@ -693,7 +568,7 @@ function getToolbarAction({
       <MacToolbarButton
         disabled={isRunning}
         icon={<Terminal size={14} />}
-        label={isRunning ? t("toolbar.running") : t("toolbar.runSelected")}
+        label={isRunning ? t("toolbar.running") : t("dashboard.runHealthCheck")}
         onClick={() => runPythonScript(selectedScript)}
         primary
       />
@@ -732,6 +607,7 @@ function getToolbarAction({
 function renderDashboard({
   activeVideo,
   isPreview,
+  isRunning,
   logs,
   p0Count,
   pendingCount,
@@ -751,6 +627,7 @@ function renderDashboard({
 }: {
   activeVideo: Video | null;
   isPreview: boolean;
+  isRunning: boolean;
   logs: string[];
   p0Count: number;
   pendingCount: number;
@@ -771,34 +648,92 @@ function renderDashboard({
   const recentVideos = videos.slice(0, 6);
   const recentLogs = logs.slice(-5);
   const projectCards = projects.slice(0, 4);
+  const isEmpty = videos.length === 0 && projects.length === 0;
 
   return (
     <div className="mac-page-scroll custom-scrollbar">
+      {isEmpty && (
+        <section className="dashboard-onboarding">
+          <div className="dashboard-hero">
+            <div className="dashboard-hero-main">
+              <h1 className="dashboard-hero-title">{t("onboarding.title")}</h1>
+              <p className="dashboard-hero-subtitle">{t("view.overviewSubtitle")}</p>
+            </div>
+          </div>
+          <div className="onboarding-steps">
+            <div className="onboarding-step">
+              <div className="onboarding-step-num">1</div>
+              <div className="onboarding-step-text">
+                <strong>{t("onboarding.step1")}</strong>
+                <p>{t("onboarding.step1Desc")}</p>
+              </div>
+            </div>
+            <div className="onboarding-step">
+              <div className="onboarding-step-num">2</div>
+              <div className="onboarding-step-text">
+                <strong>{t("onboarding.step2")}</strong>
+                <p>{t("onboarding.step2Desc")}</p>
+              </div>
+            </div>
+            <div className="onboarding-step">
+              <div className="onboarding-step-num">3</div>
+              <div className="onboarding-step-text">
+                <strong>{t("onboarding.step3")}</strong>
+                <p>{t("onboarding.step3Desc")}</p>
+              </div>
+            </div>
+            <div className="onboarding-step">
+              <div className="onboarding-step-num">4</div>
+              <div className="onboarding-step-text">
+                <strong>{t("onboarding.step4")}</strong>
+                <p>{t("onboarding.step4Desc")}</p>
+              </div>
+            </div>
+          </div>
+          <div className="onboarding-actions">
+            <MacToolbarButton
+              disabled={isRunning}
+              icon={<HardDrive size={14} />}
+              label={isRunning ? t("toolbar.running") : t("onboarding.createWorkspace")}
+              onClick={() => runPythonScript("validate_knowledge_base.py")}
+              primary
+            />
+            <MacToolbarButton
+              disabled={isRunning}
+              icon={<CloudDownload size={14} />}
+              label={isRunning ? t("toolbar.running") : t("onboarding.runImport")}
+              onClick={() => runPythonScript("parse_favorites.py", ["--limit", "20"])}
+            />
+          </div>
+        </section>
+      )}
       {isPreview && (
         <MacInlineNotice className="dev-preview-notice" tone="neutral">
-          <Circle size={10} fill="currentColor" /> Browser preview using sample data
+          <Circle size={10} fill="currentColor" /> {t("common.browserPreview")}
         </MacInlineNotice>
       )}
 
       <section className="dashboard-focus-grid">
         <header className="dashboard-focus-head">
           <div>
-            <span className="overview-kicker">Knowledge Studio</span>
-            <h2>继续推进收藏→知识库工作流</h2>
+            <span className="overview-kicker">{t("dashboard.knowledgeStudio")}</span>
+            <h2>{t("dashboard.continueWorkflow")}</h2>
             <p>
-              {videos.length} 个视频 · {projects.length} 个候选项目 · {pendingCount} 条待审核
+              {t("dashboard.videoCount", { count: videos.length })} · {t("dashboard.projectCount", { count: projects.length })} · {t("dashboard.pendingCount", { count: pendingCount })}
             </p>
           </div>
           <div className="dashboard-focus-cta">
             <MacToolbarButton
+              disabled={isRunning}
               icon={<Sparkles size={14} />}
-              label={t("dashboard.runHealthCheck")}
+              label={isRunning ? t("toolbar.running") : t("dashboard.runHealthCheck")}
               onClick={() => runPythonScript("validate_knowledge_base.py")}
               primary
             />
             <MacToolbarButton
+              disabled={isRunning}
               icon={<CloudDownload size={14} />}
-              label={t("dashboard.quickImport")}
+              label={isRunning ? t("toolbar.running") : t("dashboard.quickImport")}
               onClick={() => runPythonScript("parse_favorites.py", ["--limit", "20"])}
             />
           </div>
@@ -806,9 +741,9 @@ function renderDashboard({
 
         <div className="dashboard-focus-strip">
           <article className="focus-card is-primary">
-            <div className="focus-card-meta">当前优先级</div>
+            <div className="focus-card-meta">{t("dashboard.focusPriority")}</div>
             <div className="focus-card-value">{activeVideo?.priority ?? "P0"}</div>
-            <p>{activeVideo?.title ?? "导入收藏后即可看到今日重点视频。"}</p>
+            <p>{activeVideo?.title ?? t("dashboard.importFavoritesHint")}</p>
             {activeVideo && (
               <div className="focus-card-tags">
                 <MacTagPill tone={priorityTone(activeVideo.priority)}>{activeVideo.priority}</MacTagPill>
@@ -817,45 +752,45 @@ function renderDashboard({
             )}
           </article>
           <article className="focus-card">
-            <div className="focus-card-meta">项目候选</div>
+            <div className="focus-card-meta">{t("dashboard.focusCandidates")}</div>
             <div className="focus-card-value">{projects.length}</div>
-            <p>提取的开源仓库，等待验证商业/复用价值。</p>
-            <MacTagPill tone="warm">标注后同步</MacTagPill>
+            <p>{t("dashboard.extractedReposHint")}</p>
+            <MacTagPill tone="warm">{t("dashboard.taggedSync")}</MacTagPill>
           </article>
           <article className="focus-card">
-            <div className="focus-card-meta">待审核视频</div>
+            <div className="focus-card-meta">{t("dashboard.focusPendingReview")}</div>
             <div className="focus-card-value">{pendingCount}</div>
-            <p>浏览并标记状态，维持知识库健康度。</p>
-            <MacTagPill tone="critical">优先处理 P0</MacTagPill>
+            <p>{t("dashboard.browseAndMarkHint")}</p>
+            <MacTagPill tone="critical">{t("dashboard.priorityP0")}</MacTagPill>
           </article>
           <article className="focus-card">
-            <div className="focus-card-meta">脚本运行</div>
+            <div className="focus-card-meta">{t("dashboard.focusScriptRuns")}</div>
             <div className="focus-card-value">{logs.length}</div>
-            <p>最近的自动化日志可在下方控制台查看。</p>
-            <MacTagPill tone="cool">检查输出</MacTagPill>
+            <p>{t("dashboard.recentLogsHint")}</p>
+            <MacTagPill tone="cool">{t("dashboard.checkOutput")}</MacTagPill>
           </article>
         </div>
       </section>
 
       <section className="dashboard-metrics-grid">
         <div className="metric-card">
-          <span>视频总量</span>
+          <span>{t("dashboard.totalVideos")}</span>
           <strong>{videos.length}</strong>
         </div>
         <div className="metric-card">
-          <span>项目总量</span>
+          <span>{t("dashboard.totalProjects")}</span>
           <strong>{projects.length}</strong>
         </div>
         <div className="metric-card">
-          <span>已审核</span>
+          <span>{t("dashboard.reviewed")}</span>
           <strong>{reviewedCount}</strong>
         </div>
         <div className="metric-card">
-          <span>待处理</span>
+          <span>{t("dashboard.pending")}</span>
           <strong>{pendingCount}</strong>
         </div>
         <div className="metric-card">
-          <span>P0 数量</span>
+          <span>{t("dashboard.p0Count")}</span>
           <strong>{p0Count}</strong>
         </div>
       </section>
@@ -865,7 +800,7 @@ function renderDashboard({
         <article className="dashboard-board">
           <header className="dashboard-board-head">
             <div>
-              <h3>继续处理</h3>
+              <h3>{t("dashboard.continueWorking")}</h3>
               {activeVideo && <span>{activeVideo.id}</span>}
             </div>
             <MacToolbarButton
@@ -906,11 +841,12 @@ function renderDashboard({
 
         <article className="dashboard-board">
           <header className="dashboard-board-head">
-            <h3>快速操作</h3>
+            <h3>{t("dashboard.quickActions")}</h3>
           </header>
           <div className="dashboard-actions">
             <button
               className="dashboard-action"
+              disabled={isRunning}
               onClick={() => runPythonScript("parse_favorites.py", ["--limit", "20"])}
               type="button"
             >
@@ -918,13 +854,14 @@ function renderDashboard({
                 <CloudDownload size={16} />
               </span>
               <div>
-                <strong>导入收藏</strong>
-                <span>刷新本地 manifest，并生成最新待办。</span>
+                <strong>{t("dashboard.importFavorites")}</strong>
+                <span>{t("dashboard.importFavoritesDesc")}</span>
               </div>
               <ChevronRight size={16} />
             </button>
             <button
               className="dashboard-action"
+              disabled={isRunning}
               onClick={() => runPythonScript("extract_projects.py")}
               type="button"
             >
@@ -932,13 +869,14 @@ function renderDashboard({
                 <Boxes size={16} />
               </span>
               <div>
-                <strong>提取项目</strong>
-                <span>从 Markdown 笔记中识别开源候选。</span>
+                <strong>{t("dashboard.extractProjects")}</strong>
+                <span>{t("dashboard.extractProjectsDesc")}</span>
               </div>
               <ChevronRight size={16} />
             </button>
             <button
               className="dashboard-action"
+              disabled={isRunning}
               onClick={() => runPythonScript("validate_knowledge_base.py")}
               type="button"
             >
@@ -946,8 +884,8 @@ function renderDashboard({
                 <ShieldCheck size={16} />
               </span>
               <div>
-                <strong>健康检查</strong>
-                <span>结构、链接与敏感信息检查。</span>
+                <strong>{t("dashboard.healthCheck")}</strong>
+                <span>{t("dashboard.healthCheckDesc")}</span>
               </div>
               <ChevronRight size={16} />
             </button>
@@ -957,7 +895,7 @@ function renderDashboard({
         <article className="dashboard-board">
           <header className="dashboard-board-head">
             <div>
-              <h3>项目候选</h3>
+              <h3>{t("dashboard.projectCandidates")}</h3>
               <span>{projects.length} 个</span>
             </div>
           </header>
@@ -974,7 +912,7 @@ function renderDashboard({
                   <div className="dashboard-feed-main">
                     <div className="dashboard-feed-title">{project.name}</div>
                     <div className="dashboard-feed-meta">
-                      <span>{project.type}</span>
+                      <span>{localizeLabel(project.type)}</span>
                       <span>{project.source_note}</span>
                     </div>
                   </div>
@@ -988,8 +926,8 @@ function renderDashboard({
         <article className="dashboard-board">
           <header className="dashboard-board-head">
             <div>
-              <h3>自动化日志</h3>
-              <span>{logs.length} 条</span>
+              <h3>{t("dashboard.automationLogs")}</h3>
+              <span>{t("dashboard.logCount", { count: logs.length })}</span>
             </div>
             <MacToolbarButton
               icon={<Terminal size={14} />}
@@ -1020,8 +958,8 @@ function renderDashboard({
         <article className="dashboard-table">
           <header className="dashboard-table-head">
             <div>
-              <h3>视频状态</h3>
-              <span>筛选并更新优先级</span>
+              <h3>{t("dashboard.videoStatus")}</h3>
+              <span>{t("dashboard.filterUpdate")}</span>
             </div>
             <div className="dashboard-table-actions">
               <select
@@ -1086,8 +1024,8 @@ function renderDashboard({
         <aside className="dashboard-detail">
           <div className="dashboard-note-card">
             <header>
-              <span>当前视频</span>
-              <strong>{activeVideo?.title ?? "等待选择"}</strong>
+              <span>{t("dashboard.currentVideo")}</span>
+              <strong>{activeVideo?.title ?? t("dashboard.waitingSelection")}</strong>
             </header>
             <div className="dashboard-note-body">
               {noteContent ? (
@@ -1095,7 +1033,7 @@ function renderDashboard({
                   <ReactMarkdown>{noteContent}</ReactMarkdown>
                 </div>
               ) : (
-                <p>选择左侧视频或导入收藏后可预览笔记。</p>
+                <p>{t("dashboard.selectVideoHint")}</p>
               )}
             </div>
             <footer>
@@ -1109,7 +1047,7 @@ function renderDashboard({
 
           <div className="dashboard-console-card">
             <header>
-              <span>脚本控制台</span>
+              <span>{t("dashboard.scriptConsole")}</span>
               <MacToolbarButton
                 icon={<Terminal size={14} />}
                 label={t("dashboard.scrollToBottom")}
@@ -1121,360 +1059,6 @@ function renderDashboard({
         </aside>
       </section>
     </div>
-  );
-}
-
-function renderVideoManager({
-  activeVideo,
-  fetchNote,
-  filterPriority,
-  filterStatus,
-  setFilterPriority,
-  setFilterStatus,
-  title,
-  updateStatus,
-  videos,
-  viewMode,
-}: {
-  activeVideo: Video | null;
-  fetchNote: (video: Video) => void;
-  filterPriority: string;
-  filterStatus: string;
-  setFilterPriority: (value: string) => void;
-  setFilterStatus: (value: string) => void;
-  title: string;
-  updateStatus: (id: string, status: string) => void;
-  videos: Video[];
-  viewMode: ViewMode;
-}) {
-  return (
-    <MacSplitView columns="minmax(430px, 1fr) 320px">
-      <section className="mac-list-pane custom-scrollbar">
-        <div className="mac-panel-header">
-          <h2>{title}</h2>
-          <div className="flex gap-2">
-            <select
-              className="mac-select"
-              onChange={(event) => setFilterPriority(event.target.value)}
-              value={filterPriority}
-            >
-              <option value="all">{t("video.allPriorities")}</option>
-              <option value="P0">P0</option>
-              <option value="P1">P1</option>
-              <option value="P2">P2</option>
-            </select>
-            <select
-              className="mac-select"
-              onChange={(event) => setFilterStatus(event.target.value)}
-              value={filterStatus}
-            >
-              <option value="all">{t("video.allStatus")}</option>
-              <option value="pending">{t("video.pending")}</option>
-              <option value="reviewed">{t("video.reviewed")}</option>
-              <option value="archived">{t("video.archived")}</option>
-            </select>
-          </div>
-        </div>
-        <div className={cn("mac-native-list", viewMode === "detail" && "is-detail")}>
-          {videos.length === 0 ? (
-            <MacEmptyState icon={<Search size={24} />} title={t("video.noMatching")} />
-          ) : (
-            videos.map((video) => (
-              <button
-                className={cn("mac-native-row", activeVideo?.id === video.id && "is-selected")}
-                key={video.id}
-                onClick={() => fetchNote(video)}
-                type="button"
-              >
-                <div>
-                  <div className="mac-row-title">{video.title}</div>
-                  <div className="mac-row-meta">
-                    <span>{video.uploader}</span>
-                    <span>{video.duration}s</span>
-                    <span>{video.pubdate}</span>
-                    <span>{video.id}</span>
-                  </div>
-                </div>
-                <MacStatusPill tone={statusTone(video.status)}>{statusLabel(video.status)}</MacStatusPill>
-              </button>
-            ))
-          )}
-        </div>
-      </section>
-      <VideoInspector activeVideo={activeVideo} fetchNote={fetchNote} updateStatus={updateStatus} />
-    </MacSplitView>
-  );
-}
-
-function VideoInspector({
-  activeVideo,
-  fetchNote,
-  updateStatus,
-}: {
-  activeVideo: Video | null;
-  fetchNote: (video: Video) => void;
-  updateStatus: (id: string, status: string) => void;
-}) {
-  if (!activeVideo) {
-    return (
-      <aside className="mac-inspector">
-        <MacEmptyState
-          detail={t("inspector.chooseVideoHint")}
-          title={t("inspector.noVideoSelected")}
-        />
-      </aside>
-    );
-  }
-
-  return (
-    <aside className="mac-inspector custom-scrollbar">
-      <div className="mac-inspector-content">
-        <div>
-          <h2 className="mac-inspector-title">{activeVideo.title}</h2>
-          <p className="mac-inspector-meta">{activeVideo.uploader}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <MacStatusPill tone={statusTone(activeVideo.status)}>
-            {statusLabel(activeVideo.status)}
-          </MacStatusPill>
-                <MacTagPill tone={priorityTone(activeVideo.priority)}>{activeVideo.priority}</MacTagPill>
-          <MacTagPill>{activeVideo.category}</MacTagPill>
-        </div>
-        <div className="mac-stat-grid">
-          <div className="mac-stat">
-            <strong>{activeVideo.duration || "-"}</strong>
-            <span>{t("inspector.duration")}</span>
-          </div>
-          <div className="mac-stat">
-            <strong>{activeVideo.tags.length}</strong>
-            <span>{t("inspector.tags")}</span>
-          </div>
-        </div>
-        <MacPanel title={t("inspector.aiSummary")}>
-          <div className="mac-inspector-content">
-            <p className="mac-inspector-meta">
-              {t("inspector.transcriptNote")}
-            </p>
-          </div>
-        </MacPanel>
-        <MacPanel title={t("inspector.actions")}>
-          <div className="mac-native-list">
-            <button className="mac-native-row" onClick={() => fetchNote(activeVideo)} type="button">
-              <span className="mac-row-title">{t("inspector.openNote")}</span>
-              <BookOpen size={14} />
-            </button>
-            <button
-              className="mac-native-row"
-              onClick={() => updateStatus(activeVideo.id, "reviewed")}
-              type="button"
-            >
-              <span className="mac-row-title">{t("inspector.markReviewed")}</span>
-              <Check size={14} />
-            </button>
-            <button
-              className="mac-native-row"
-              onClick={() => updateStatus(activeVideo.id, "archived")}
-              type="button"
-            >
-              <span className="mac-row-title">{t("inspector.archive")}</span>
-              <Archive size={14} />
-            </button>
-            <a className="mac-native-row" href={activeVideo.url} rel="noreferrer" target="_blank">
-              <span className="mac-row-title">{t("inspector.openInBilibili")}</span>
-              <ExternalLink size={14} />
-            </a>
-          </div>
-        </MacPanel>
-      </div>
-    </aside>
-  );
-}
-
-function renderNotes({
-  activeVideo,
-  fetchNote,
-  noteContent,
-  projects,
-  videos,
-}: {
-  activeVideo: Video | null;
-  fetchNote: (video: Video) => void;
-  noteContent: string | null;
-  projects: Project[];
-  videos: Video[];
-}) {
-  return (
-    <MacSplitView columns="280px minmax(0, 1fr) 300px">
-      <section className="mac-list-pane custom-scrollbar">
-        <div className="mac-panel-header">
-          <h2>{t("view.notes")}</h2>
-          <span>{videos.length}</span>
-        </div>
-        <div className="mac-native-list">
-          {videos.map((video) => (
-            <button
-              className={cn("mac-native-row", activeVideo?.id === video.id && "is-selected")}
-              key={video.id}
-              onClick={() => fetchNote(video)}
-              type="button"
-            >
-              <div>
-                <div className="mac-row-title">{video.title}</div>
-                <div className="mac-row-meta">
-                  <span>{video.category}</span>
-                  <span>{video.pubdate}</span>
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
-      <section className="mac-detail-pane">
-        <div className="mac-note-reader custom-scrollbar">
-          {activeVideo ? (
-            <article>
-              <h1>{activeVideo.title}</h1>
-              <div className="mac-row-meta mb-6">
-                <span>{activeVideo.uploader}</span>
-                <span>{activeVideo.id}</span>
-                <span>{activeVideo.category}</span>
-              </div>
-              <div className="mac-markdown">
-                <ReactMarkdown>{noteContent ?? t("notes.chooseNoteHint")}</ReactMarkdown>
-              </div>
-            </article>
-          ) : (
-            <MacEmptyState
-              detail={t("notes.chooseNoteHint")}
-              icon={<FileText size={28} />}
-              title={t("notes.noNoteSelected")}
-            />
-          )}
-        </div>
-      </section>
-      <aside className="mac-inspector custom-scrollbar">
-        <div className="mac-inspector-content">
-          <h2 className="mac-inspector-title">{t("notes.context")}</h2>
-          <MacPanel title={t("notes.relatedVideo")}>
-            <div className="mac-inspector-content">
-              <p className="mac-inspector-meta">{activeVideo?.url ?? t("notes.noVideoSelected")}</p>
-            </div>
-          </MacPanel>
-          <MacPanel title={t("notes.extractedProjects")} meta={t("notes.candidates", { count: projects.length })}>
-            <div className="mac-native-list">
-              {projects.slice(0, 4).map((project) => (
-                <div className="mac-native-row" key={project.url}>
-                  <div>
-                    <div className="mac-row-title">{project.name}</div>
-                    <div className="mac-row-meta">{project.source_note}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </MacPanel>
-          <MacPanel title={t("notes.documentStatus")}>
-            <div className="mac-inspector-content">
-              <div className="mac-row-meta">
-                <span>{t("inspector.markdownNotes")}</span>
-                <span>{t("notes.characters", { count: noteContent?.length ?? 0 })}</span>
-              </div>
-            </div>
-          </MacPanel>
-        </div>
-      </aside>
-    </MacSplitView>
-  );
-}
-
-function renderProjects({
-  activeProject,
-  projects,
-  setSelectedProject,
-  viewMode,
-}: {
-  activeProject: Project | null;
-  projects: Project[];
-  setSelectedProject: (project: Project) => void;
-  viewMode: ViewMode;
-}) {
-  return (
-    <MacSplitView columns={viewMode === "list" ? "380px minmax(0, 1fr) 300px" : "minmax(0, 1fr) 300px"}>
-      {viewMode === "list" && (
-        <section className="mac-list-pane custom-scrollbar">
-          <div className="mac-panel-header">
-            <h2>{t("sidebar.projects")}</h2>
-            <span>{projects.length}</span>
-          </div>
-          <div className="mac-native-list">
-            {projects.map((project) => (
-              <button
-                className={cn("mac-native-row", activeProject?.url === project.url && "is-selected")}
-                key={project.url}
-                onClick={() => setSelectedProject(project)}
-                type="button"
-              >
-                <div>
-                  <div className="mac-row-title">{project.name}</div>
-                  <div className="mac-row-meta">
-                    <span>{project.type}</span>
-                    <span>{project.source_note}</span>
-                  </div>
-                </div>
-                <MacStatusPill tone="blue">{project.status || "candidate"}</MacStatusPill>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-      <section className="mac-detail-pane custom-scrollbar">
-        <div className="mac-page-scroll custom-scrollbar">
-          {activeProject ? (
-            <div className="mac-settings-stack">
-              <MacPanel title={activeProject.name} meta={activeProject.type}>
-                <div className="mac-inspector-content">
-                  <p>{activeProject.description || "从视频笔记中提取出来的开源项目候选。"}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {(activeProject.tech_stack.length ? activeProject.tech_stack : ["to-review"]).map((item) => (
-                      <MacTagPill key={item}>{item}</MacTagPill>
-                    ))}
-                  </div>
-                </div>
-              </MacPanel>
-              <MacPanel title={t("projects.sourceReferences")}>
-                <div className="mac-native-list">
-                  <a className="mac-native-row" href={activeProject.url} rel="noreferrer" target="_blank">
-                    <span className="mac-row-title">{activeProject.url}</span>
-                    <ExternalLink size={14} />
-                  </a>
-                  <div className="mac-native-row">
-                    <div>
-                      <div className="mac-row-title">{t("projects.sourceNote")}</div>
-                      <div className="mac-row-meta">{activeProject.source_note}</div>
-                    </div>
-                  </div>
-                </div>
-              </MacPanel>
-            </div>
-          ) : (
-            <MacEmptyState icon={<Boxes size={28} />} title={t("projects.noProjectSelected")} />
-          )}
-        </div>
-      </section>
-      <aside className="mac-inspector custom-scrollbar">
-        <div className="mac-inspector-content">
-          <h2 className="mac-inspector-title">{t("projects.reviewState")}</h2>
-          <MacStatusPill tone={activeProject?.need_verify ? "orange" : "green"}>
-            {activeProject?.need_verify ? t("projects.toReview") : t("projects.useful")}
-          </MacStatusPill>
-          <MacPanel title={t("projects.metadata")}>
-            <div className="mac-inspector-content">
-              <p className="mac-inspector-meta">{t("projects.repo")}: {activeProject?.name ?? "-"}</p>
-              <p className="mac-inspector-meta">{t("projects.priority")}: {activeProject?.priority ?? "-"}</p>
-            </div>
-          </MacPanel>
-        </div>
-      </aside>
-    </MacSplitView>
   );
 }
 
@@ -1513,7 +1097,7 @@ function renderKnowledge({
             <div className="kb-folder-row" key={folder.name}>
               <FolderTree size={14} className="kb-folder-icon" />
               <div>
-                <div className="mac-row-title">{folder.name}</div>
+                <div className="mac-row-title">{localizeLabel(folder.name)}</div>
                 <div className="mac-row-meta">{t("kb.items", { count: folder.count })}</div>
               </div>
             </div>
@@ -1576,7 +1160,7 @@ function renderKnowledge({
               <div className="kb-folder-summary">
                 {folders.map((folder) => (
                   <div key={folder.name}>
-                    <span>{folder.name}</span>
+                    <span>{localizeLabel(folder.name)}</span>
                     <strong>{t("kb.items", { count: folder.count })}</strong>
                   </div>
                 ))}
@@ -1761,29 +1345,6 @@ function renderScripts({
       </div>
     </div>
   );
-}
-
-function statusTone(status: string): "blue" | "green" | "orange" | "red" | "neutral" {
-  if (status === "pending") return "orange";
-  if (status === "reviewed") return "green";
-  if (status === "failed") return "red";
-  if (status === "archived") return "neutral";
-  return "blue";
-}
-
-function priorityTone(priority: string): "critical" | "warm" | "cool" | "neutral" {
-  if (priority === "P0") return "critical";
-  if (priority === "P1") return "warm";
-  if (priority === "P2") return "cool";
-  return "neutral";
-}
-
-function statusLabel(status: string) {
-  if (status === "pending") return t("status.pending");
-  if (status === "reviewed") return t("status.reviewed");
-  if (status === "archived") return t("status.archived");
-  if (status === "failed") return t("status.failed");
-  return t("status.unknown");
 }
 
 export default App;
