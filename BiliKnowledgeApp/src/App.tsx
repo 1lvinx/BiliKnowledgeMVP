@@ -4,10 +4,8 @@ import { listen } from "@tauri-apps/api/event";
 import ReactMarkdown from "react-markdown";
 import {
   Activity,
-  Archive,
   BookOpen,
   Boxes,
-  Check,
   ChevronRight,
   Circle,
   CloudDownload,
@@ -45,40 +43,11 @@ import {
 import { LogViewer } from "./components/LogViewer";
 import { SettingsView } from "./components/SettingsView";
 import { previewVideos, previewProjects } from "./data/demo";
+import { localizeLabel, priorityTone, statusLabel, statusTone } from "./lib/video-utils";
 import { cn } from "./lib/utils";
+import { Videos } from "./pages/Videos";
 import { getSavedLanguage, saveLanguage, setLanguage as setI18nLanguage, t } from "./i18n";
 import "./App.css";
-
-function localizeLabel(raw: string): string {
-  const map: Record<string, string> = {
-    /* status */
-    candidate: t("status.pending"),
-    review: t("status.needsReview"),
-    useful: t("status.ready"),
-    pending: t("status.pending"),
-    reviewed: t("status.reviewed"),
-    archived: t("status.archived"),
-    failed: t("status.failed"),
-    /* categories */
-    Visualization: "可视化",
-    "Search Engine": "搜索工具",
-    "Desktop Plugin": "桌面插件",
-    "Native App": "原生应用",
-    Automation: "自动化",
-    "Knowledge Base": "知识库",
-    Security: "安全",
-    AI: "AI",
-    Frontend: "前端",
-    Knowledge: "知识",
-    /* folders */
-    manifest: t("kb.manifest"),
-    "notes/raw": t("kb.notesRaw"),
-    projects: t("kb.projects"),
-    reports: t("kb.reports"),
-    thoughts: t("kb.thoughts"),
-  };
-  return map[raw] ?? raw;
-}
 
 type View =
   | "dashboard"
@@ -489,32 +458,32 @@ function App() {
             noteContent,
             onScrollToConsole,
           })}
-        {currentView === "favorites" &&
-          renderVideoManager({
-            activeVideo,
-            fetchNote,
-            filterPriority,
-            filterStatus,
-            setFilterPriority,
-            setFilterStatus,
-            title: t("view.favorites"),
-            updateStatus,
-            videos: filteredVideos,
-            viewMode,
-          })}
-        {currentView === "videos" &&
-          renderVideoManager({
-            activeVideo,
-            fetchNote,
-            filterPriority,
-            filterStatus,
-            setFilterPriority,
-            setFilterStatus,
-            title: t("view.videos"),
-            updateStatus,
-            videos: filteredVideos,
-            viewMode,
-          })}
+        {currentView === "favorites" && (
+          <Videos
+            activeVideo={activeVideo}
+            fetchNote={fetchNote}
+            filterPriority={filterPriority}
+            filterStatus={filterStatus}
+            setFilterPriority={setFilterPriority}
+            setFilterStatus={setFilterStatus}
+            title={t("view.favorites")}
+            updateStatus={updateStatus}
+            videos={filteredVideos}
+          />
+        )}
+        {currentView === "videos" && (
+          <Videos
+            activeVideo={activeVideo}
+            fetchNote={fetchNote}
+            filterPriority={filterPriority}
+            filterStatus={filterStatus}
+            setFilterPriority={setFilterPriority}
+            setFilterStatus={setFilterStatus}
+            title={t("view.videos")}
+            updateStatus={updateStatus}
+            videos={filteredVideos}
+          />
+        )}
         {currentView === "notes" &&
           renderNotes({
             activeVideo,
@@ -1097,172 +1066,6 @@ function renderDashboard({
   );
 }
 
-function renderVideoManager({
-  activeVideo,
-  fetchNote,
-  filterPriority,
-  filterStatus,
-  setFilterPriority,
-  setFilterStatus,
-  title,
-  updateStatus,
-  videos,
-  viewMode,
-}: {
-  activeVideo: Video | null;
-  fetchNote: (video: Video) => void;
-  filterPriority: string;
-  filterStatus: string;
-  setFilterPriority: (value: string) => void;
-  setFilterStatus: (value: string) => void;
-  title: string;
-  updateStatus: (id: string, status: string) => void;
-  videos: Video[];
-  viewMode: ViewMode;
-}) {
-  return (
-    <MacSplitView columns="minmax(430px, 1fr) 320px">
-      <section className="mac-list-pane custom-scrollbar">
-        <div className="mac-panel-header">
-          <h2>{title}</h2>
-          <div className="flex gap-2">
-            <select
-              className="mac-select"
-              onChange={(event) => setFilterPriority(event.target.value)}
-              value={filterPriority}
-            >
-              <option value="all">{t("video.allPriorities")}</option>
-              <option value="P0">P0</option>
-              <option value="P1">P1</option>
-              <option value="P2">P2</option>
-            </select>
-            <select
-              className="mac-select"
-              onChange={(event) => setFilterStatus(event.target.value)}
-              value={filterStatus}
-            >
-              <option value="all">{t("video.allStatus")}</option>
-              <option value="pending">{t("video.pending")}</option>
-              <option value="reviewed">{t("video.reviewed")}</option>
-              <option value="archived">{t("video.archived")}</option>
-            </select>
-          </div>
-        </div>
-        <div className={cn("mac-native-list", viewMode === "detail" && "is-detail")}>
-          {videos.length === 0 ? (
-            <MacEmptyState icon={<Search size={24} />} title={t("video.noMatching")} />
-          ) : (
-            videos.map((video) => (
-              <button
-                className={cn("mac-native-row", activeVideo?.id === video.id && "is-selected")}
-                key={video.id}
-                onClick={() => fetchNote(video)}
-                type="button"
-              >
-                <div>
-                  <div className="mac-row-title">{video.title}</div>
-                  <div className="mac-row-meta">
-                    <span>{video.uploader}</span>
-                    <span>{video.duration}s</span>
-                    <span>{video.pubdate}</span>
-                    <span>{video.id}</span>
-                  </div>
-                </div>
-                <MacStatusPill tone={statusTone(video.status)}>{statusLabel(video.status)}</MacStatusPill>
-              </button>
-            ))
-          )}
-        </div>
-      </section>
-      <VideoInspector activeVideo={activeVideo} fetchNote={fetchNote} updateStatus={updateStatus} />
-    </MacSplitView>
-  );
-}
-
-function VideoInspector({
-  activeVideo,
-  fetchNote,
-  updateStatus,
-}: {
-  activeVideo: Video | null;
-  fetchNote: (video: Video) => void;
-  updateStatus: (id: string, status: string) => void;
-}) {
-  if (!activeVideo) {
-    return (
-      <aside className="mac-inspector">
-        <MacEmptyState
-          detail={t("inspector.chooseVideoHint")}
-          title={t("inspector.noVideoSelected")}
-        />
-      </aside>
-    );
-  }
-
-  return (
-    <aside className="mac-inspector custom-scrollbar">
-      <div className="mac-inspector-content">
-        <div>
-          <h2 className="mac-inspector-title">{activeVideo.title}</h2>
-          <p className="mac-inspector-meta">{activeVideo.uploader}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <MacStatusPill tone={statusTone(activeVideo.status)}>
-            {statusLabel(activeVideo.status)}
-          </MacStatusPill>
-                <MacTagPill tone={priorityTone(activeVideo.priority)}>{activeVideo.priority}</MacTagPill>
-          <MacTagPill>{localizeLabel(activeVideo.category)}</MacTagPill>
-        </div>
-        <div className="mac-stat-grid">
-          <div className="mac-stat">
-            <strong>{activeVideo.duration || "-"}</strong>
-            <span>{t("inspector.duration")}</span>
-          </div>
-          <div className="mac-stat">
-            <strong>{activeVideo.tags.length}</strong>
-            <span>{t("inspector.tags")}</span>
-          </div>
-        </div>
-        <MacPanel title={t("inspector.aiSummary")}>
-          <div className="mac-inspector-content">
-            <p className="mac-inspector-meta">
-              {t("inspector.transcriptNote")}
-            </p>
-          </div>
-        </MacPanel>
-        <MacPanel title={t("inspector.actions")}>
-          <div className="mac-native-list">
-            <button className="mac-native-row" onClick={() => fetchNote(activeVideo)} type="button">
-              <span className="mac-row-title">{t("inspector.openNote")}</span>
-              <BookOpen size={14} />
-            </button>
-            <button
-              className="mac-native-row"
-              onClick={() => updateStatus(activeVideo.id, "reviewed")}
-              type="button"
-            >
-              <span className="mac-row-title">{t("inspector.markReviewed")}</span>
-              <Check size={14} />
-            </button>
-            <button
-              className="mac-native-row"
-              onClick={() => updateStatus(activeVideo.id, "archived")}
-              type="button"
-            >
-              <span className="mac-row-title">{t("inspector.archive")}</span>
-              <Archive size={14} />
-            </button>
-            <a className="mac-native-row" href={activeVideo.url} rel="noreferrer" target="_blank">
-              <span className="mac-row-title">{t("inspector.openInBilibili")}</span>
-              <ExternalLink size={14} />
-            </a>
-          </div>
-        </MacPanel>
-      </div>
-    </aside>
-  );
-}
-
 function renderNotes({
   activeVideo,
   fetchNote,
@@ -1734,29 +1537,6 @@ function renderScripts({
       </div>
     </div>
   );
-}
-
-function statusTone(status: string): "blue" | "green" | "orange" | "red" | "neutral" {
-  if (status === "pending") return "orange";
-  if (status === "reviewed") return "green";
-  if (status === "failed") return "red";
-  if (status === "archived") return "neutral";
-  return "blue";
-}
-
-function priorityTone(priority: string): "critical" | "warm" | "cool" | "neutral" {
-  if (priority === "P0") return "critical";
-  if (priority === "P1") return "warm";
-  if (priority === "P2") return "cool";
-  return "neutral";
-}
-
-function statusLabel(status: string) {
-  if (status === "pending") return t("status.pending");
-  if (status === "reviewed") return t("status.reviewed");
-  if (status === "archived") return t("status.archived");
-  if (status === "failed") return t("status.failed");
-  return t("status.unknown");
 }
 
 export default App;
