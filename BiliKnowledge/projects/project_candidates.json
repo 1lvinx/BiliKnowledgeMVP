@@ -176,8 +176,8 @@
     "need_verify": true
   },
   {
-    "name": "rany2/edge-tts",
-    "url": "https://github.com/rany2/edge-tts",
+    "name": "openai/whisper",
+    "url": "https://github.com/openai/whisper",
     "source_note": "BV1tU1h0N6dE.md",
     "source_video": "https://www.bilibili.com/video/BV1tU1h0N6dE",
     "type": "github",
@@ -224,26 +224,10 @@
     "need_verify": true
   },
   {
-    "name": "openai/whisper",
-    "url": "https://github.com/openai/whisper",
+    "name": "rany2/edge-tts",
+    "url": "https://github.com/rany2/edge-tts",
     "source_note": "BV1tU1h0N6dE.md",
     "source_video": "https://www.bilibili.com/video/BV1tU1h0N6dE",
-    "type": "github",
-    "tech_stack": [],
-    "description": "",
-    "mentioned_context": "",
-    "reusable_value": "",
-    "commercial_value": "",
-    "risk": "",
-    "priority": "P1",
-    "status": "candidate",
-    "need_verify": true
-  },
-  {
-    "name": "chroma-core/chroma",
-    "url": "https://github.com/chroma-core/chroma",
-    "source_note": "BV1yL3z2F8sT.md",
-    "source_video": "https://www.bilibili.com/video/BV1yL3z2F8sT",
     "type": "github",
     "tech_stack": [],
     "description": "",
@@ -288,10 +272,10 @@
     "need_verify": true
   },
   {
-    "name": "langchain-ai/langgraph",
-    "url": "https://github.com/langchain-ai/langgraph",
-    "source_note": "BV1zM4a3G9uV.md",
-    "source_video": "https://www.bilibili.com/video/BV1zM4a3G9uV",
+    "name": "chroma-core/chroma",
+    "url": "https://github.com/chroma-core/chroma",
+    "source_note": "BV1yL3z2F8sT.md",
+    "source_video": "https://www.bilibili.com/video/BV1yL3z2F8sT",
     "type": "github",
     "tech_stack": [],
     "description": "",
@@ -306,6 +290,22 @@
   {
     "name": "ollama/ollama",
     "url": "https://github.com/ollama/ollama",
+    "source_note": "BV1zM4a3G9uV.md",
+    "source_video": "https://www.bilibili.com/video/BV1zM4a3G9uV",
+    "type": "github",
+    "tech_stack": [],
+    "description": "",
+    "mentioned_context": "",
+    "reusable_value": "",
+    "commercial_value": "",
+    "risk": "",
+    "priority": "P1",
+    "status": "candidate",
+    "need_verify": true
+  },
+  {
+    "name": "Unstructured-IO/unstructured",
+    "url": "https://github.com/Unstructured-IO/unstructured",
     "source_note": "BV1zM4a3G9uV.md",
     "source_video": "https://www.bilibili.com/video/BV1zM4a3G9uV",
     "type": "github",
@@ -336,8 +336,8 @@
     "need_verify": true
   },
   {
-    "name": "run-llama/llama_index",
-    "url": "https://github.com/run-llama/llama_index",
+    "name": "langchain-ai/langgraph",
+    "url": "https://github.com/langchain-ai/langgraph",
     "source_note": "BV1zM4a3G9uV.md",
     "source_video": "https://www.bilibili.com/video/BV1zM4a3G9uV",
     "type": "github",
@@ -352,8 +352,8 @@
     "need_verify": true
   },
   {
-    "name": "Unstructured-IO/unstructured",
-    "url": "https://github.com/Unstructured-IO/unstructured",
+    "name": "run-llama/llama_index",
+    "url": "https://github.com/run-llama/llama_index",
     "source_note": "BV1zM4a3G9uV.md",
     "source_video": "https://www.bilibili.com/video/BV1zM4a3G9uV",
     "type": "github",

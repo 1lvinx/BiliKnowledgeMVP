@@ -145,11 +145,16 @@ def main():
     # Summary
     print(f"\n--- Summary ---")
     print(f"  Total issues: {len(all_issues)}")
+
+    from update_processing_status import update_processing_status
+
     if all_issues:
         print(f"  Status: NEEDS ATTENTION")
+        update_processing_status(root, validated=False)
         sys.exit(1)
     else:
         print(f"  Status: PASS")
+        update_processing_status(root, validated=True)
         sys.exit(0)
 
 

@@ -15,7 +15,7 @@
     "duration": "1245",
     "pubdate": "2026-04-20",
     "priority": "P0",
-    "status": "pending",
+    "status": "reviewed",
     "note_path": "",
     "project_extracted": false,
     "remarks": ""
@@ -36,7 +36,7 @@
     "duration": "1890",
     "pubdate": "2026-04-18",
     "priority": "P0",
-    "status": "pending",
+    "status": "reviewed",
     "note_path": "",
     "project_extracted": false,
     "remarks": ""
@@ -57,7 +57,7 @@
     "duration": "960",
     "pubdate": "2026-04-15",
     "priority": "P0",
-    "status": "pending",
+    "status": "reviewed",
     "note_path": "",
     "project_extracted": false,
     "remarks": ""
@@ -78,7 +78,7 @@
     "duration": "1560",
     "pubdate": "2026-04-12",
     "priority": "P0",
-    "status": "pending",
+    "status": "reviewed",
     "note_path": "",
     "project_extracted": false,
     "remarks": ""
@@ -99,7 +99,7 @@
     "duration": "1320",
     "pubdate": "2026-04-10",
     "priority": "P0",
-    "status": "pending",
+    "status": "reviewed",
     "note_path": "",
     "project_extracted": false,
     "remarks": ""
@@ -120,7 +120,7 @@
     "duration": "2100",
     "pubdate": "2026-04-08",
     "priority": "P0",
-    "status": "pending",
+    "status": "reviewed",
     "note_path": "",
     "project_extracted": false,
     "remarks": ""
@@ -141,7 +141,7 @@
     "duration": "1680",
     "pubdate": "2026-04-05",
     "priority": "P0",
-    "status": "pending",
+    "status": "reviewed",
     "note_path": "",
     "project_extracted": false,
     "remarks": ""
@@ -162,7 +162,7 @@
     "duration": "840",
     "pubdate": "2026-04-02",
     "priority": "P1",
-    "status": "pending",
+    "status": "reviewed",
     "note_path": "",
     "project_extracted": false,
     "remarks": ""
@@ -183,7 +183,7 @@
     "duration": "1440",
     "pubdate": "2026-03-28",
     "priority": "P0",
-    "status": "pending",
+    "status": "reviewed",
     "note_path": "",
     "project_extracted": false,
     "remarks": ""
@@ -204,7 +204,7 @@
     "duration": "1920",
     "pubdate": "2026-03-25",
     "priority": "P0",
-    "status": "pending",
+    "status": "reviewed",
     "note_path": "",
     "project_extracted": false,
     "remarks": ""
