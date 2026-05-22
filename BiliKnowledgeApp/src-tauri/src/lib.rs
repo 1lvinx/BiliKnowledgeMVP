@@ -423,6 +423,19 @@ fn ensure_workspace() -> Result<String, String> {
     Ok(serde_json::json!({"path": kb_root_str, "created": true}).to_string())
 }
 
+#[tauri::command]
+fn get_processing_status() -> Result<String, String> {
+    let path = knowledge_path("manifest/processing_status.json")?;
+    if !path.exists() {
+        return Err("processing_status.json not found. Run validate_knowledge_base.py first.".into());
+    }
+    let content = fs::read_to_string(&path).map_err(|e| format!("Failed to read status: {e}"))?;
+    // Validate it's valid JSON
+    serde_json::from_str::<serde_json::Value>(&content)
+        .map_err(|e| format!("Invalid JSON in processing_status.json: {e}"))?;
+    Ok(content)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -437,7 +450,8 @@ pub fn run() {
             run_script,
             update_video_status,
             check_workspace,
-            ensure_workspace
+            ensure_workspace,
+            get_processing_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -562,6 +576,65 @@ mod tests {
     }
 
     // ── Manifest read / update round-trip ──
+
+    // ── get_processing_status ──
+
+    #[test]
+    fn processing_status_reads_valid_json() {
+        let base = temp_base("status-read");
+        let manifest_dir = base.join("manifest");
+        fs::create_dir_all(&manifest_dir).unwrap();
+        let status_path = manifest_dir.join("processing_status.json");
+        let status = serde_json::json!({
+            "last_updated": "2026-05-23",
+            "total_videos": 10,
+            "pending": 0,
+            "note_created": 10,
+            "projects_extracted": 23,
+            "reviewed": 10,
+            "pipeline": {
+                "manifest_generated": true,
+                "notes_generated": true,
+                "projects_extracted": true,
+                "index_built": true,
+                "validated": true
+            }
+        });
+        fs::write(&status_path, serde_json::to_string_pretty(&status).unwrap()).unwrap();
+
+        let content = fs::read_to_string(&status_path).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert_eq!(parsed["total_videos"], 10);
+        assert_eq!(parsed["pipeline"]["validated"], true);
+
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn processing_status_missing_file_handled() {
+        let base = temp_base("status-missing");
+        let manifest_dir = base.join("manifest");
+        fs::create_dir_all(&manifest_dir).unwrap();
+        let status_path = manifest_dir.join("processing_status.json");
+        assert!(!status_path.exists());
+
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn processing_status_malformed_json_handled() {
+        let base = temp_base("status-bad");
+        let manifest_dir = base.join("manifest");
+        fs::create_dir_all(&manifest_dir).unwrap();
+        let status_path = manifest_dir.join("processing_status.json");
+        fs::write(&status_path, "not valid json").unwrap();
+
+        let content = fs::read_to_string(&status_path).unwrap();
+        let result = serde_json::from_str::<serde_json::Value>(&content);
+        assert!(result.is_err());
+
+        fs::remove_dir_all(&base).ok();
+    }
 
     #[test]
     fn video_manifest_read_update_roundtrip() {

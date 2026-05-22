@@ -15,6 +15,25 @@ export interface Video {
   remarks: string;
 }
 
+export interface PipelineFlags {
+  manifest_generated: boolean;
+  notes_generated: boolean;
+  projects_extracted: boolean;
+  index_built: boolean;
+  validated: boolean;
+}
+
+export interface ProcessingStatus {
+  last_updated: string;
+  total_videos: number;
+  pending: number;
+  note_created: number;
+  projects_extracted: number;
+  reviewed: number;
+  sample_limit?: number;
+  pipeline: PipelineFlags;
+}
+
 export interface Project {
   name: string;
   url: string;

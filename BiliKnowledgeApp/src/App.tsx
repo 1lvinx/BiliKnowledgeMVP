@@ -22,7 +22,7 @@ import {
   Tag,
   Terminal,
 } from "lucide-react";
-import { Project, Video } from "./types";
+import { ProcessingStatus, Project, Video } from "./types";
 import {
   MacAppShell,
   MacConsole,
@@ -151,6 +151,10 @@ function App() {
   const outputAnchorRef = useRef<HTMLDivElement>(null);
   const tauriAvailable = isTauriRuntime();
 
+  const [pipelineStatus, setPipelineStatus] = useState<ProcessingStatus | null>(null);
+  const [pipelineLoading, setPipelineLoading] = useState(false);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
+
   const [language, setLanguage] = useState<"zh-CN" | "en-US">(() => {
     const saved = getSavedLanguage();
     const lang = saved === "zh-CN" || saved === "en-US" ? saved : "zh-CN";
@@ -199,6 +203,21 @@ function App() {
       setProjects(JSON.parse(data));
     } catch {
       setProjects([]);
+    }
+  }
+
+  async function fetchProcessingStatus() {
+    if (!tauriAvailable) return;
+    setPipelineLoading(true);
+    setPipelineError(null);
+    try {
+      const data: string = await invoke("get_processing_status");
+      setPipelineStatus(JSON.parse(data));
+    } catch (err) {
+      setPipelineError(String(err));
+      setPipelineStatus(null);
+    } finally {
+      setPipelineLoading(false);
     }
   }
 
@@ -256,6 +275,7 @@ function App() {
       setLogs((prev) => [...prev, t("error.scriptSuccess")]);
       await fetchVideos();
       await fetchProjects();
+      await fetchProcessingStatus();
       setError(null);
     } catch (err) {
       const errMsg = String(err);
@@ -271,6 +291,7 @@ function App() {
   useEffect(() => {
     fetchVideos();
     fetchProjects();
+    fetchProcessingStatus();
     if (!tauriAvailable) return undefined;
     const unlisten = listen<string>("script-log", (event) => {
       setLogs((prev) => [...prev, event.payload]);
@@ -451,6 +472,10 @@ function App() {
             updateStatus,
             noteContent,
             onScrollToConsole,
+            pipelineStatus,
+            pipelineLoading,
+            pipelineError,
+            fetchProcessingStatus,
           })}
         {currentView === "favorites" && (
           <Videos
@@ -624,6 +649,10 @@ function renderDashboard({
   updateStatus,
   noteContent,
   onScrollToConsole,
+  pipelineStatus,
+  pipelineLoading,
+  pipelineError,
+  fetchProcessingStatus,
 }: {
   activeVideo: Video | null;
   isPreview: boolean;
@@ -644,6 +673,10 @@ function renderDashboard({
   updateStatus: (id: string, status: string) => void;
   noteContent: string | null;
   onScrollToConsole: () => void;
+  pipelineStatus: ProcessingStatus | null;
+  pipelineLoading: boolean;
+  pipelineError: string | null;
+  fetchProcessingStatus: () => void;
 }) {
   const recentVideos = videos.slice(0, 6);
   const recentLogs = logs.slice(-5);
@@ -793,6 +826,91 @@ function renderDashboard({
           <span>{t("dashboard.p0Count")}</span>
           <strong>{p0Count}</strong>
         </div>
+      </section>
+
+      {/* Pipeline Status */}
+      <section className="dashboard-board" style={{ margin: "0 0 20px" }}>
+        <header className="dashboard-board-head">
+          <div>
+            <h3>Pipeline Status</h3>
+            <span>Real knowledge pipeline state</span>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <MacToolbarButton
+              disabled={pipelineLoading || isRunning}
+              icon={<Activity size={14} />}
+              label={pipelineLoading ? "Loading..." : "Refresh"}
+              onClick={() => fetchProcessingStatus()}
+            />
+            <MacToolbarButton
+              disabled={isRunning}
+              icon={<ShieldCheck size={14} />}
+              label={isRunning ? t("toolbar.running") : "Run Validation"}
+              onClick={() => runPythonScript("validate_knowledge_base.py")}
+              primary
+            />
+          </div>
+        </header>
+        {pipelineLoading && (
+          <div style={{ padding: "16px 20px", color: "var(--text-secondary, #888)" }}>
+            Loading pipeline status...
+          </div>
+        )}
+        {pipelineError && !pipelineLoading && (
+          <div style={{ padding: "16px 20px" }}>
+            <MacInlineNotice tone="error">
+              <Circle size={10} fill="currentColor" /> Pipeline Status unavailable: {pipelineError}
+            </MacInlineNotice>
+          </div>
+        )}
+        {pipelineStatus && !pipelineLoading && !pipelineError && (
+          <>
+            <div className="dashboard-metrics-grid" style={{ margin: 0, padding: "0 20px" }}>
+              <div className="metric-card">
+                <span>Videos</span>
+                <strong>{pipelineStatus.total_videos}</strong>
+              </div>
+              <div className="metric-card">
+                <span>Pending</span>
+                <strong>{pipelineStatus.pending}</strong>
+              </div>
+              <div className="metric-card">
+                <span>Notes</span>
+                <strong>{pipelineStatus.note_created}</strong>
+              </div>
+              <div className="metric-card">
+                <span>Projects</span>
+                <strong>{pipelineStatus.projects_extracted}</strong>
+              </div>
+              <div className="metric-card">
+                <span>Reviewed</span>
+                <strong>{pipelineStatus.reviewed}</strong>
+              </div>
+              <div className="metric-card">
+                <span>Last Updated</span>
+                <strong>{pipelineStatus.last_updated}</strong>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, padding: "12px 20px 16px", flexWrap: "wrap" }}>
+              {([
+                ["Manifest", pipelineStatus.pipeline.manifest_generated],
+                ["Notes", pipelineStatus.pipeline.notes_generated],
+                ["Projects", pipelineStatus.pipeline.projects_extracted],
+                ["Index", pipelineStatus.pipeline.index_built],
+                ["Validated", pipelineStatus.pipeline.validated],
+              ] as const).map(([label, ok]) => (
+                <MacTagPill key={label} tone={ok ? "success" : "critical"}>
+                  {ok ? `${label} ✓` : `${label} ✗`}
+                </MacTagPill>
+              ))}
+            </div>
+            {!Object.values(pipelineStatus.pipeline).every(Boolean) && (
+              <MacInlineNotice tone="neutral">
+                <Circle size={10} fill="currentColor" /> Pipeline status may be stale. Some flags are not complete.
+              </MacInlineNotice>
+            )}
+          </>
+        )}
       </section>
 
       {/* Continue Working */}
