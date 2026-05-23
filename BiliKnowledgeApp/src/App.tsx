@@ -196,6 +196,8 @@ function App() {
   const [pipelineStatus, setPipelineStatus] = useState<ProcessingStatus | null>(null);
   const [pipelineLoading, setPipelineLoading] = useState(false);
   const [pipelineError, setPipelineError] = useState<string | null>(null);
+  const [pipelineRunning, setPipelineRunning] = useState(false);
+  const [pipelineStep, setPipelineStep] = useState<string | null>(null);
 
   const [language, setLanguage] = useState<"zh-CN" | "en-US">(() => {
     const saved = getSavedLanguage();
@@ -260,6 +262,39 @@ function App() {
       setPipelineStatus(null);
     } finally {
       setPipelineLoading(false);
+    }
+  }
+
+  const PIPELINE_STEPS = [
+    "parse_favorites.py",
+    "extract_projects.py",
+    "build_index.py",
+    "validate_knowledge_base.py",
+  ] as const;
+
+  async function runFullPipeline() {
+    if (pipelineRunning || isRunning) return;
+    if (!tauriAvailable) return;
+    setPipelineRunning(true);
+    setPipelineError(null);
+    setLogs((prev) => [...prev, "Pipeline: starting full run"]);
+    try {
+      for (const script of PIPELINE_STEPS) {
+        setPipelineStep(script);
+        setLogs((prev) => [...prev, `Pipeline: running ${script}`]);
+        await invoke("run_script", { scriptName: script, args: [] });
+        setLogs((prev) => [...prev, `Pipeline: ${script} done`]);
+      }
+      setLogs((prev) => [...prev, "Pipeline: all steps complete"]);
+      await fetchVideos();
+      await fetchProjects();
+      await fetchProcessingStatus();
+    } catch (err) {
+      setPipelineError(String(err));
+      setLogs((prev) => [...prev, `Pipeline error: ${String(err)}`]);
+    } finally {
+      setPipelineStep(null);
+      setPipelineRunning(false);
     }
   }
 
@@ -521,6 +556,9 @@ function App() {
             pipelineLoading,
             pipelineError,
             fetchProcessingStatus,
+            pipelineRunning,
+            pipelineStep,
+            runFullPipeline,
           })}
         {currentView === "favorites" && (
           <Videos
@@ -674,6 +712,14 @@ function getToolbarAction({
   );
 }
 
+function getStaleness(lastUpdated: string | undefined): { stale: boolean; hours: number } {
+  if (!lastUpdated) return { stale: false, hours: 0 };
+  const updated = new Date(lastUpdated);
+  const now = new Date();
+  const hours = (now.getTime() - updated.getTime()) / (1000 * 60 * 60);
+  return { stale: hours > 24, hours: Math.round(hours) };
+}
+
 function renderDashboard({
   activeVideo,
   isPreview,
@@ -698,6 +744,9 @@ function renderDashboard({
   pipelineLoading,
   pipelineError,
   fetchProcessingStatus,
+  pipelineRunning,
+  pipelineStep,
+  runFullPipeline,
 }: {
   activeVideo: Video | null;
   isPreview: boolean;
@@ -722,6 +771,9 @@ function renderDashboard({
   pipelineLoading: boolean;
   pipelineError: string | null;
   fetchProcessingStatus: () => void;
+  pipelineRunning: boolean;
+  pipelineStep: string | null;
+  runFullPipeline: () => void;
 }) {
   const recentVideos = videos.slice(0, 6);
   const recentLogs = logs.slice(-5);
@@ -882,20 +934,33 @@ function renderDashboard({
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <MacToolbarButton
-              disabled={pipelineLoading || isRunning}
+              disabled={pipelineLoading || isRunning || pipelineRunning}
               icon={<Activity size={14} />}
               label={pipelineLoading ? "Loading..." : "Refresh"}
               onClick={() => fetchProcessingStatus()}
             />
             <MacToolbarButton
-              disabled={isRunning}
+              disabled={isRunning || pipelineRunning}
               icon={<ShieldCheck size={14} />}
               label={isRunning ? t("toolbar.running") : "Run Validation"}
               onClick={() => runPythonScript("validate_knowledge_base.py")}
+            />
+            <MacToolbarButton
+              disabled={isRunning || pipelineRunning}
+              icon={<Activity size={14} />}
+              label={pipelineRunning ? `Running: ${pipelineStep ?? "..."}` : "Run Full Pipeline"}
+              onClick={() => runFullPipeline()}
               primary
             />
           </div>
         </header>
+        {pipelineRunning && pipelineStep && (
+          <div style={{ padding: "12px 20px", color: "var(--text-secondary, #888)" }}>
+            <MacInlineNotice tone="neutral">
+              <Activity size={12} /> Running pipeline: {pipelineStep}
+            </MacInlineNotice>
+          </div>
+        )}
         {pipelineLoading && (
           <div style={{ padding: "16px 20px", color: "var(--text-secondary, #888)" }}>
             Loading pipeline status...
@@ -949,11 +1014,24 @@ function renderDashboard({
                 </MacTagPill>
               ))}
             </div>
-            {!Object.values(pipelineStatus.pipeline).every(Boolean) && (
-              <MacInlineNotice tone="neutral">
-                <Circle size={10} fill="currentColor" /> Pipeline status may be stale. Some flags are not complete.
-              </MacInlineNotice>
-            )}
+            {(() => {
+              const { stale, hours } = getStaleness(pipelineStatus.last_updated);
+              if (stale) {
+                return (
+                  <MacInlineNotice tone="neutral">
+                    <Circle size={10} fill="currentColor" /> Data is {hours}h old. Consider running the pipeline to refresh.
+                  </MacInlineNotice>
+                );
+              }
+              if (!Object.values(pipelineStatus.pipeline).every(Boolean)) {
+                return (
+                  <MacInlineNotice tone="neutral">
+                    <Circle size={10} fill="currentColor" /> Pipeline status may be stale. Some flags are not complete.
+                  </MacInlineNotice>
+                );
+              }
+              return null;
+            })()}
             <div style={{ padding: "0 20px 16px" }}>
               <div
                 style={{
