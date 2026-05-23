@@ -41,6 +41,7 @@ import {
 import { LogViewer } from "./components/LogViewer";
 import { SettingsView } from "./components/SettingsView";
 import { previewVideos, previewProjects } from "./data/demo";
+import { runtimeEvidenceStatus } from "./data/runtimeEvidenceStatus";
 import { localizeLabel, priorityTone, statusLabel, statusTone } from "./lib/video-utils";
 import { cn } from "./lib/utils";
 import { Videos } from "./pages/Videos";
@@ -91,15 +92,6 @@ const RUNTIME_EVIDENCE_CAPTURE_GUIDE = [
     value: "PASS requires runtime evidence + visible result; build/test PASS alone is not enough.",
   },
 ] as const;
-
-const RUNTIME_EVIDENCE_LOG = {
-  status: "PASS",
-  lastRouteUrl: "http://127.0.0.1:1420/",
-  lastScreenshotPath: "/private/tmp/bili-runtime-evidence-capture.png",
-  lastReportPath: "reports/runtime-evidence-capture-stabilization-2026-05-23.md",
-  lastVerifiedAt: "2026-05-23 14:56 SGT",
-  evidenceRule: "Build/test PASS alone is insufficient for UI-visible tasks.",
-} as const;
 
 function buildPreviewPipelineStatus(): ProcessingStatus {
   return {
@@ -1028,8 +1020,8 @@ function renderDashboard({
                       Latest runtime verification evidence for UI-visible tasks.
                     </span>
                   </div>
-                  <MacTagPill tone={RUNTIME_EVIDENCE_LOG.status === "PASS" ? "success" : RUNTIME_EVIDENCE_LOG.status === "MISSING" ? "critical" : "warm"}>
-                    {RUNTIME_EVIDENCE_LOG.status}
+                  <MacTagPill tone={runtimeEvidenceStatus.status === "PASS" ? "success" : runtimeEvidenceStatus.status === "MISSING" ? "critical" : "warm"}>
+                    {runtimeEvidenceStatus.status}
                   </MacTagPill>
                 </div>
                 <div
@@ -1040,10 +1032,10 @@ function renderDashboard({
                   }}
                 >
                   {[
-                    ["Last route URL", RUNTIME_EVIDENCE_LOG.lastRouteUrl],
-                    ["Last screenshot path", RUNTIME_EVIDENCE_LOG.lastScreenshotPath],
-                    ["Last report path", RUNTIME_EVIDENCE_LOG.lastReportPath],
-                    ["Last verified at", RUNTIME_EVIDENCE_LOG.lastVerifiedAt],
+                    ["Last route URL", runtimeEvidenceStatus.lastRouteUrl],
+                    ["Last screenshot path", runtimeEvidenceStatus.lastScreenshotPath],
+                    ["Last report path", runtimeEvidenceStatus.lastReportPath],
+                    ["Last verified at", runtimeEvidenceStatus.lastVerifiedAt],
                   ].map(([label, value]) => (
                     <div
                       key={label}
@@ -1066,8 +1058,8 @@ function renderDashboard({
                     </div>
                   ))}
                 </div>
-                <MacInlineNotice tone={RUNTIME_EVIDENCE_LOG.status === "PASS" ? "neutral" : RUNTIME_EVIDENCE_LOG.status === "MISSING" ? "error" : "neutral"}>
-                  <Circle size={10} fill="currentColor" /> {RUNTIME_EVIDENCE_LOG.evidenceRule}
+                <MacInlineNotice tone={runtimeEvidenceStatus.status === "PASS" ? "neutral" : runtimeEvidenceStatus.status === "MISSING" ? "error" : "neutral"}>
+                  <Circle size={10} fill="currentColor" /> {runtimeEvidenceStatus.evidenceRule}
                 </MacInlineNotice>
               </div>
             </div>
