@@ -13,6 +13,7 @@ Upgrade the static `Runtime Evidence Log` panel into a minimal data-source-backe
 
 ## Why This Helps
 This makes the runtime evidence status easier to update and review without touching the UI panel implementation every time.
+It also gives the team a single local source of truth for evidence metadata, so future updates only need to touch the data module unless the UI shape changes.
 
 ## Guarded Checks
 - `npm run build` in `BiliKnowledgeApp/` - PASS
