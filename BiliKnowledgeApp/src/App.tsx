@@ -92,6 +92,15 @@ const RUNTIME_EVIDENCE_CAPTURE_GUIDE = [
   },
 ] as const;
 
+const RUNTIME_EVIDENCE_LOG = {
+  status: "PASS",
+  lastRouteUrl: "http://127.0.0.1:1420/",
+  lastScreenshotPath: "/private/tmp/bili-runtime-evidence-capture.png",
+  lastReportPath: "reports/runtime-evidence-capture-stabilization-2026-05-23.md",
+  lastVerifiedAt: "2026-05-23 14:56 SGT",
+  evidenceRule: "Build/test PASS alone is insufficient for UI-visible tasks.",
+} as const;
+
 function buildPreviewPipelineStatus(): ProcessingStatus {
   return {
     last_updated: "preview mode",
@@ -999,6 +1008,67 @@ function renderDashboard({
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+            <div style={{ padding: "0 20px 16px" }}>
+              <div
+                style={{
+                  border: "1px solid var(--border-subtle, rgba(0, 0, 0, 0.08))",
+                  borderRadius: 16,
+                  padding: 16,
+                  background: "rgba(248, 250, 252, 0.72)",
+                  display: "grid",
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <strong style={{ fontSize: 14 }}>Runtime Evidence Log</strong>
+                    <span style={{ color: "var(--text-secondary, #666)", fontSize: 12 }}>
+                      Latest runtime verification evidence for UI-visible tasks.
+                    </span>
+                  </div>
+                  <MacTagPill tone={RUNTIME_EVIDENCE_LOG.status === "PASS" ? "success" : RUNTIME_EVIDENCE_LOG.status === "MISSING" ? "critical" : "warm"}>
+                    {RUNTIME_EVIDENCE_LOG.status}
+                  </MacTagPill>
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: 12,
+                  }}
+                >
+                  {[
+                    ["Last route URL", RUNTIME_EVIDENCE_LOG.lastRouteUrl],
+                    ["Last screenshot path", RUNTIME_EVIDENCE_LOG.lastScreenshotPath],
+                    ["Last report path", RUNTIME_EVIDENCE_LOG.lastReportPath],
+                    ["Last verified at", RUNTIME_EVIDENCE_LOG.lastVerifiedAt],
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      style={{
+                        borderRadius: 12,
+                        padding: "10px 12px",
+                        background: "rgba(255, 255, 255, 0.72)",
+                        border: "1px solid rgba(0, 0, 0, 0.06)",
+                        display: "grid",
+                        gap: 4,
+                        minHeight: 72,
+                      }}
+                    >
+                      <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-secondary, #666)" }}>
+                        {label}
+                      </span>
+                      <span style={{ fontSize: 13, lineHeight: 1.45, wordBreak: "break-word" }}>
+                        {value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <MacInlineNotice tone={RUNTIME_EVIDENCE_LOG.status === "PASS" ? "neutral" : RUNTIME_EVIDENCE_LOG.status === "MISSING" ? "error" : "neutral"}>
+                  <Circle size={10} fill="currentColor" /> {RUNTIME_EVIDENCE_LOG.evidenceRule}
+                </MacInlineNotice>
               </div>
             </div>
           </>
