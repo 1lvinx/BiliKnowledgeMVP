@@ -69,6 +69,24 @@ interface ScriptItem {
   status: "Idle" | "Running" | "Success" | "Failed";
 }
 
+function buildPreviewPipelineStatus(): ProcessingStatus {
+  return {
+    last_updated: "preview mode",
+    total_videos: previewVideos.length,
+    pending: previewVideos.filter((video) => video.status === "pending").length,
+    note_created: previewVideos.length,
+    projects_extracted: previewProjects.length,
+    reviewed: previewVideos.filter((video) => video.status === "reviewed").length,
+    pipeline: {
+      manifest_generated: true,
+      notes_generated: true,
+      projects_extracted: true,
+      index_built: true,
+      validated: false,
+    },
+  };
+}
+
 function buildViewMeta(t: (key: string, p?: Record<string, string | number>) => string): Record<View, { title: string; subtitle: string }> {
   return {
     dashboard: { title: t("view.overview"), subtitle: t("view.overviewSubtitle") },
@@ -292,6 +310,9 @@ function App() {
     fetchVideos();
     fetchProjects();
     fetchProcessingStatus();
+    if (!tauriAvailable) {
+      setPipelineStatus(buildPreviewPipelineStatus());
+    }
     if (!tauriAvailable) return undefined;
     const unlisten = listen<string>("script-log", (event) => {
       setLogs((prev) => [...prev, event.payload]);
