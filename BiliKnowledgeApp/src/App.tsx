@@ -69,6 +69,29 @@ interface ScriptItem {
   status: "Idle" | "Running" | "Success" | "Failed";
 }
 
+const RUNTIME_EVIDENCE_CAPTURE_GUIDE = [
+  {
+    label: "Route URL",
+    value: "http://localhost:1420",
+  },
+  {
+    label: "Screenshot path",
+    value: "/private/tmp/bili-pipeline-status-playwright.png",
+  },
+  {
+    label: "Runtime evidence path",
+    value: "agent-room/runtime/evidence/20260523-003116-biliknowledgemvp-runtime-verification-hard-gate-second-controlled-trial.md",
+  },
+  {
+    label: "Report linkage",
+    value: "reports/pipeline-status-ui-integration-acceptance-summary-2026-05-23.md",
+  },
+  {
+    label: "Capture rule",
+    value: "PASS requires runtime evidence + visible result; build/test PASS alone is not enough.",
+  },
+] as const;
+
 function buildPreviewPipelineStatus(): ProcessingStatus {
   return {
     last_updated: "preview mode",
@@ -930,6 +953,54 @@ function renderDashboard({
                 <Circle size={10} fill="currentColor" /> Pipeline status may be stale. Some flags are not complete.
               </MacInlineNotice>
             )}
+            <div style={{ padding: "0 20px 16px" }}>
+              <div
+                style={{
+                  border: "1px solid var(--border-subtle, rgba(0, 0, 0, 0.08))",
+                  borderRadius: 16,
+                  padding: 16,
+                  background: "var(--panel-elevated, rgba(255, 255, 255, 0.6))",
+                  display: "grid",
+                  gap: 10,
+                }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <strong style={{ fontSize: 14 }}>Runtime Evidence Capture</strong>
+                  <span style={{ color: "var(--text-secondary, #666)", fontSize: 12 }}>
+                    Fixed evidence targets for UI-visible tasks. Capture these paths during runtime verification.
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: 12,
+                  }}
+                >
+                  {RUNTIME_EVIDENCE_CAPTURE_GUIDE.map((item) => (
+                    <div
+                      key={item.label}
+                      style={{
+                        borderRadius: 12,
+                        padding: "10px 12px",
+                        background: "rgba(255, 255, 255, 0.55)",
+                        border: "1px solid rgba(0, 0, 0, 0.06)",
+                        display: "grid",
+                        gap: 4,
+                        minHeight: 72,
+                      }}
+                    >
+                      <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-secondary, #666)" }}>
+                        {item.label}
+                      </span>
+                      <span style={{ fontSize: 13, lineHeight: 1.45, wordBreak: "break-word" }}>
+                        {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </>
         )}
       </section>
