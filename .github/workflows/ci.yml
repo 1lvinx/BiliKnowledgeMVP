@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - "feature/**"
+      - "codex/**"
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: BiliKnowledgeApp/package-lock.json
+
+      - name: Setup Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: BiliKnowledgeApp/src-tauri
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: BiliKnowledgeApp
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: BiliKnowledgeApp
+
+      - name: Run Rust tests
+        run: cargo test
+        working-directory: BiliKnowledgeApp/src-tauri
+
+      - name: Run Python script tests
+        run: |
+          python3 BiliKnowledge/scripts/test_validate_knowledge_base.py
+          python3 BiliKnowledge/scripts/test_update_processing_status.py
+
+      - name: Validate knowledge base structure
+        run: python3 BiliKnowledge/scripts/validate_knowledge_base.py --root BiliKnowledge
