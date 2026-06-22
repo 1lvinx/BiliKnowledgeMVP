@@ -21,6 +21,9 @@ export interface FavoriteFolder {
   id: string;
   title: string;
   media_count: number;
+  sync_status?: "complete" | "partial" | "failed";
+  synced_count?: number;
+  error?: string;
 }
 
 export interface SubtitleSegment {

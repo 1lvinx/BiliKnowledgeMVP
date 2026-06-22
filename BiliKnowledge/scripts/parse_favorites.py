@@ -158,14 +158,35 @@ def normalize_live_media_items(folder_info: dict, medias: list[dict]) -> list[di
     return normalized
 
 
-def write_folder_manifest(folders: list[dict], output_dir: Path) -> None:
+def write_folder_manifest(
+    folders: list[dict],
+    output_dir: Path,
+    *,
+    failed_folders: Optional[list[dict]] = None,
+    partial_folders: Optional[list[dict]] = None,
+) -> None:
+    failed_map = {
+        str(folder.get("id", "")): folder
+        for folder in (failed_folders or [])
+    }
+    partial_map = {
+        str(folder.get("id", "")): folder
+        for folder in (partial_folders or [])
+    }
     payload = []
     for folder in folders:
+        folder_id = str(folder.get("id", ""))
+        partial = partial_map.get(folder_id) or {}
+        failed = failed_map.get(folder_id) or {}
+        sync_status = "failed" if failed else "partial" if partial else "complete"
         payload.append(
             {
-                "id": str(folder.get("id", "")),
+                "id": folder_id,
                 "title": folder.get("title", DEFAULT_FOLDER_TITLE),
                 "media_count": int(folder.get("media_count") or folder.get("count") or 0),
+                "sync_status": sync_status,
+                "synced_count": int(partial.get("actual_count") or folder.get("media_count") or folder.get("count") or 0),
+                "error": failed.get("error", ""),
             }
         )
     path = output_dir / "favorite_folders.json"
@@ -253,6 +274,12 @@ def maybe_sync_live_favorites(source_dir: Path, limit: int) -> list[dict]:
                     f"[警告] 收藏夹未完整：{folder.get('title', '')} - "
                     f"{folder.get('actual_count', 0)} / {folder.get('expected_count', 0)}"
                 )
+        write_folder_manifest(
+            folders,
+            source_dir.parent,
+            failed_folders=failed_folders,
+            partial_folders=partial_folders,
+        )
         return folders
     except (RuntimeError, urllib.error.URLError, TimeoutError) as exc:
         raise RuntimeError(f"在线同步失败：{exc}") from exc
@@ -438,7 +465,8 @@ def main():
     write_json(entries, out / "videos.json")
     write_csv(entries, out / "videos.csv")
     if live_folders:
-        write_folder_manifest(live_folders, out)
+        if not (out / "favorite_folders.json").exists():
+            write_folder_manifest(live_folders, out)
     else:
         write_favorite_folders(entries, out / "favorite_folders.json")
     print(f"\n[完成] 视频清单已生成到 {out}/")

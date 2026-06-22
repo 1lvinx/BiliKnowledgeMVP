@@ -198,6 +198,29 @@ export function Videos({
                     已导入 {group.items.length} / 当前显示 {Math.min(group.visibleCount, group.items.length)} / 全部 {group.total}
                   </span>
                 </button>
+                {(() => {
+                  const folderMeta = favoriteFolders.find((folder) => folder.title === group.title);
+                  if (!folderMeta || folderMeta.sync_status === "complete" || group.title === UNASSIGNED_FOLDER) {
+                    return null;
+                  }
+                  const isFailed = folderMeta.sync_status === "failed";
+                  return (
+                    <div className="px-4 pb-3">
+                      <div
+                        className={cn(
+                          "rounded-2xl border px-3 py-2 text-xs",
+                          isFailed
+                            ? "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                            : "border-amber-500/30 bg-amber-500/10 text-amber-100",
+                        )}
+                      >
+                        {isFailed
+                          ? `该收藏夹本次同步失败${folderMeta.error ? `：${folderMeta.error}` : ""}`
+                          : `该收藏夹本次仅同步 ${folderMeta.synced_count ?? group.items.length} / ${folderMeta.media_count} 条，建议后续重试补齐。`}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {!collapsedFolders[group.title] ? group.visibleItems.map((video) => (
                   <button
                     className={cn("mac-native-row", activeVideo?.id === video.id && "is-selected")}
