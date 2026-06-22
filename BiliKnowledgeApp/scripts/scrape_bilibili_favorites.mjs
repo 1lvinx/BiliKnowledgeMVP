@@ -16,6 +16,8 @@ function parseArgs(argv) {
     maxFolders: 0,
     maxItemsPerFolder: 0,
     headless: true,
+    folderId: "",
+    folderTitle: "",
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -34,6 +36,12 @@ function parseArgs(argv) {
       i += 1;
     } else if (token === "--headed") {
       args.headless = false;
+    } else if (token === "--folder-id") {
+      args.folderId = argv[i + 1] || "";
+      i += 1;
+    } else if (token === "--folder-title") {
+      args.folderTitle = argv[i + 1] || "";
+      i += 1;
     }
   }
 
@@ -445,12 +453,21 @@ async function scrapeFolder(context, folder, options, cookieHeader) {
 }
 
 function normalizeFolders(folders, mid) {
-  return folders.map((folder) => ({
-    id: String(folder.id || ""),
-    title: folder.title || "默认收藏夹",
-    media_count: Number(folder.media_count || folder.count || 0),
-    mid: String(mid),
-  }));
+  return folders
+    .map((folder) => ({
+      id: String(folder.id || ""),
+      title: folder.title || "默认收藏夹",
+      media_count: Number(folder.media_count || folder.count || 0),
+      mid: String(mid),
+    }))
+    .sort((a, b) => {
+      const aDefault = a.title === "默认收藏夹";
+      const bDefault = b.title === "默认收藏夹";
+      if (aDefault !== bDefault) {
+        return aDefault ? 1 : -1;
+      }
+      return a.media_count - b.media_count;
+    });
 }
 
 async function main() {
@@ -466,6 +483,11 @@ async function main() {
   console.log(`[浏览器同步] 当前账号：${profile.uname} (${profile.mid})`);
 
   let folders = normalizeFolders(await fetchFavoriteFolders(cookieHeader, profile.mid), profile.mid);
+  if (args.folderId) {
+    folders = folders.filter((folder) => folder.id === String(args.folderId));
+  } else if (args.folderTitle) {
+    folders = folders.filter((folder) => folder.title === args.folderTitle);
+  }
   if (args.maxFolders > 0) {
     folders = folders.slice(0, args.maxFolders);
   }
@@ -486,12 +508,36 @@ async function main() {
     await seedPage.close();
 
     const items = [];
+    const failedFolders = [];
+    const partialFolders = [];
     for (const folder of folders) {
-      const folderItems = await scrapeFolder(context, folder, {
-        maxItemsPerFolder: args.maxItemsPerFolder,
-      }, cookieHeader);
-      for (const item of folderItems) {
-        items.push(item);
+      try {
+        const folderItems = await scrapeFolder(context, folder, {
+          maxItemsPerFolder: args.maxItemsPerFolder,
+        }, cookieHeader);
+        const expectedCount = Number(folder.media_count || 0);
+        if (expectedCount > 0 && folderItems.length < expectedCount && args.maxItemsPerFolder <= 0) {
+          partialFolders.push({
+            id: folder.id,
+            title: folder.title,
+            expected_count: expectedCount,
+            actual_count: folderItems.length,
+          });
+          console.warn(
+            `[浏览器同步] ${folder.title} 未完整抓取：${folderItems.length} / ${expectedCount}`,
+          );
+        }
+        for (const item of folderItems) {
+          items.push(item);
+        }
+      } catch (error) {
+        failedFolders.push({
+          id: folder.id,
+          title: folder.title,
+          media_count: folder.media_count,
+          error: error.message || String(error),
+        });
+        console.warn(`[浏览器同步] ${folder.title} 同步失败：${error.message || error}`);
       }
     }
 
@@ -508,6 +554,9 @@ async function main() {
         "当前仅配置了 SESSDATA 等基础字段，未拿到完整 Cookie Header。B 站收藏页不会返回真实列表，请在设置页粘贴整段浏览器 Cookie 后重试。",
       );
     }
+    if (!items.length && failedFolders.length) {
+      throw new Error(failedFolders[0].error || "收藏夹同步失败");
+    }
 
     const payload = {
       profile: {
@@ -516,12 +565,16 @@ async function main() {
       },
       folders: folders.map(({ id, title, media_count }) => ({ id, title, media_count })),
       items,
+      failed_folders: failedFolders,
+      partial_folders: partialFolders,
     };
 
     const outputPath = path.resolve(args.output);
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     fs.writeFileSync(outputPath, JSON.stringify(payload, null, 2), "utf8");
-    console.log(`[浏览器同步] 写入结果：${outputPath}（${items.length} 条）`);
+    console.log(
+      `[浏览器同步] 写入结果：${outputPath}（${items.length} 条，失败收藏夹 ${failedFolders.length} 个，未完整收藏夹 ${partialFolders.length} 个）`,
+    );
   } finally {
     await browser.close();
   }

@@ -177,7 +177,7 @@ def project_root_from_source_dir(source_dir: Path) -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def run_browser_sync(source_dir: Path) -> tuple[list[dict], list[dict]]:
+def run_browser_sync(source_dir: Path) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
     project_root = project_root_from_source_dir(source_dir)
     app_root = project_root / "BiliKnowledgeApp"
     script_path = app_root / "scripts" / "scrape_bilibili_favorites.mjs"
@@ -216,7 +216,9 @@ def run_browser_sync(source_dir: Path) -> tuple[list[dict], list[dict]]:
         payload = json.loads(output_path.read_text(encoding="utf-8"))
         folders = payload.get("folders") or []
         items = payload.get("items") or []
-        return folders, items
+        failed_folders = payload.get("failed_folders") or []
+        partial_folders = payload.get("partial_folders") or []
+        return folders, items, failed_folders, partial_folders
     except subprocess.CalledProcessError as exc:
         raise RuntimeError(f"浏览器态同步失败（退出码 {exc.returncode}）。") from exc
     finally:
@@ -229,7 +231,7 @@ def maybe_sync_live_favorites(source_dir: Path, limit: int) -> list[dict]:
     if not cookie_header:
         raise RuntimeError("未配置完整的 Bilibili Cookie，请先在设置中粘贴并保存整段 Cookie Header。")
     try:
-        folders, normalized = run_browser_sync(source_dir)
+        folders, normalized, failed_folders, partial_folders = run_browser_sync(source_dir)
         if not folders:
             raise RuntimeError("No favorite folders found in this account.")
         normalized = merge_video_records(normalized)
@@ -240,6 +242,17 @@ def maybe_sync_live_favorites(source_dir: Path, limit: int) -> list[dict]:
             encoding="utf-8",
         )
         print(f"[已写入] {output_path}（共 {len(normalized)} 条收藏）")
+        if failed_folders:
+            print(f"[警告] 有 {len(failed_folders)} 个收藏夹同步失败，将保留已成功同步的数据。")
+            for folder in failed_folders[:10]:
+                print(f"[警告] 收藏夹失败：{folder.get('title', '')} - {folder.get('error', '')}")
+        if partial_folders:
+            print(f"[警告] 有 {len(partial_folders)} 个收藏夹未完整抓取。")
+            for folder in partial_folders[:10]:
+                print(
+                    f"[警告] 收藏夹未完整：{folder.get('title', '')} - "
+                    f"{folder.get('actual_count', 0)} / {folder.get('expected_count', 0)}"
+                )
         return folders
     except (RuntimeError, urllib.error.URLError, TimeoutError) as exc:
         raise RuntimeError(f"在线同步失败：{exc}") from exc
