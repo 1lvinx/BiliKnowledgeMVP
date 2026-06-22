@@ -336,13 +336,57 @@ async function clickNextPage(page, previousFirstBvid) {
   return false;
 }
 
+async function resolveFolderUrl(page, folder) {
+  const baseUrl = `https://space.bilibili.com/${folder.mid}/favlist`;
+  const fallbackUrl = `${baseUrl}?fid=${folder.id}&ftype=create`;
+
+  try {
+    await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(2000);
+    const match = await page.evaluate(({ folderId, folderTitle }) => {
+      const normalize = (value) => (value || "").replace(/\s+/g, " ").trim();
+      const anchors = Array.from(document.querySelectorAll('a[href*="favlist"]'));
+      for (const anchor of anchors) {
+        const href = anchor.getAttribute("href") || "";
+        const text = normalize(anchor.textContent || "");
+        if (!href) {
+          continue;
+        }
+        if (href.includes(`fid=${folderId}`)) {
+          return href;
+        }
+        if (folderTitle && text === folderTitle) {
+          return href;
+        }
+      }
+      return "";
+    }, { folderId: String(folder.id), folderTitle: folder.title || "" });
+
+    if (match) {
+      if (match.startsWith("http://") || match.startsWith("https://")) {
+        return match;
+      }
+      if (match.startsWith("//")) {
+        return `https:${match}`;
+      }
+      if (match.startsWith("/")) {
+        return `https://space.bilibili.com${match}`;
+      }
+      return `https://space.bilibili.com/${match.replace(/^\/+/, "")}`;
+    }
+  } catch (error) {
+    console.warn(`[浏览器同步] 解析收藏夹链接失败，回退直达地址：${error.message}`);
+  }
+
+  return fallbackUrl;
+}
+
 async function scrapeFolder(context, folder, options, cookieHeader) {
   const folderTitle = folder.title || "默认收藏夹";
-  const folderUrl = `https://space.bilibili.com/${folder.mid}/favlist?fid=${folder.id}&ftype=create`;
-  console.log(`[浏览器同步] 打开收藏夹：${folderTitle}`);
-
   const page = await context.newPage();
   try {
+    const folderUrl = await resolveFolderUrl(page, folder);
+    console.log(`[浏览器同步] 打开收藏夹：${folderTitle} -> ${folderUrl}`);
     await page.goto(folderUrl, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(2500);
     const targetCount = Number(folder.media_count || folder.count || 0);
@@ -351,77 +395,42 @@ async function scrapeFolder(context, folder, options, cookieHeader) {
 
     let fetchedItems = [];
     try {
-      fetchedItems = await page.evaluate(
-        async ({ mediaId, folderTitle: currentFolderTitle, batchLimit: currentBatchLimit, targetCount: currentTargetCount }) => {
-          const pageSize = 20;
-          const items = [];
-          const seen = new Set();
-
-          for (let pageNumber = 1; pageNumber <= 500; pageNumber += 1) {
-            const query = new URLSearchParams({
-              media_id: String(mediaId),
-              pn: String(pageNumber),
-              ps: String(pageSize),
-              platform: "web",
-            });
-            const response = await fetch(`https://api.bilibili.com/x/v3/fav/resource/list?${query.toString()}`, {
-              credentials: "include",
-              headers: {
-                Accept: "application/json, text/plain, */*",
-              },
-            });
-            const payload = await response.json();
-            if (!payload || payload.code !== 0) {
-              throw new Error(payload?.message || `收藏夹接口返回异常（${currentFolderTitle}）`);
-            }
-
-            const medias = payload.data?.medias || [];
-            for (const media of medias) {
-              const bvid = media?.bvid || media?.bv_id || "";
-              if (!bvid || seen.has(bvid)) {
-                continue;
-              }
-              seen.add(bvid);
-              items.push({
-                bvid,
-                title: media?.title || "",
-                url: `https://www.bilibili.com/video/${bvid}`,
-                uploader: media?.upper?.name || "",
-                collected_at: "",
-                duration: String(media?.duration || ""),
-                favorite_folder: currentFolderTitle,
-                desc: media?.intro || "",
-              });
-              if (currentBatchLimit > 0 && items.length >= currentBatchLimit) {
-                break;
-              }
-            }
-
-            if (!medias.length) {
-              break;
-            }
-            if (currentBatchLimit > 0 && items.length >= currentBatchLimit) {
-              break;
-            }
-            if (currentTargetCount > 0 && items.length >= currentTargetCount) {
-              break;
-            }
-            if (!payload.data?.has_more) {
-              break;
-            }
+      const seen = new Set();
+      for (let pageNumber = 1; pageNumber <= 500; pageNumber += 1) {
+        const pageItems = await extractFolderPage(page, folderTitle);
+        for (const item of pageItems) {
+          if (!item.bvid || seen.has(item.bvid)) {
+            continue;
           }
+          seen.add(item.bvid);
+          fetchedItems.push(item);
+          if (batchLimit > 0 && fetchedItems.length >= batchLimit) {
+            break;
+          }
+        }
 
-          return items;
-        },
-        {
-          mediaId: folder.id,
-          folderTitle,
-          batchLimit,
-          targetCount,
-        },
-      );
+        if (batchLimit > 0 && fetchedItems.length >= batchLimit) {
+          break;
+        }
+        if (targetCount > 0 && fetchedItems.length >= targetCount) {
+          break;
+        }
+
+        const firstBvid = pageItems[0]?.bvid || "";
+        if (!firstBvid) {
+          break;
+        }
+        const moved = await clickNextPage(page, firstBvid);
+        if (!moved) {
+          break;
+        }
+      }
+
+      if (!fetchedItems.length && targetCount > 0) {
+        throw new Error(`页面中未抓到任何视频卡片（${folderTitle}）`);
+      }
     } catch (error) {
-      console.warn(`[浏览器同步] ${folderTitle} 浏览器态抓取失败，回退接口同步：${error.message}`);
+      console.warn(`[浏览器同步] ${folderTitle} 页面抓取失败，回退接口同步：${error.message}`);
       fetchedItems = await fetchFolderResourcesWithCookie(cookieHeader, folder, options);
     }
 
