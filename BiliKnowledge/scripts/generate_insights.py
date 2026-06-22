@@ -1,0 +1,267 @@
+#!/usr/bin/env python3
+"""Generate per-video AI insights from imported favorites using the configured AI provider."""
+
+import argparse
+import json
+import sys
+import urllib.error
+import urllib.request
+from datetime import datetime
+from pathlib import Path
+
+
+def load_json(path: Path, default):
+    if not path.exists():
+        return default
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return default
+
+
+def save_json(path: Path, payload) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def load_config(root: Path) -> dict:
+    return load_json(root / "config" / "config.json", {})
+
+
+def call_chat_completion(base_url: str, api_key: str, model: str, prompt: str) -> str:
+    url = base_url.rstrip("/") + "/chat/completions"
+    payload = {
+        "model": model,
+        "temperature": 0.3,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "你是一个中文视频知识分析助手。"
+                    "请严格返回 JSON，对视频做真实、克制、可落地的分析。"
+                ),
+            },
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ],
+        "response_format": {"type": "json_object"},
+    }
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=90) as response:
+        body = json.loads(response.read().decode("utf-8"))
+    return body["choices"][0]["message"]["content"]
+
+
+def build_prompt(video: dict, source_item: dict) -> str:
+    return json.dumps(
+        {
+            "task": "分析这个 Bilibili 收藏视频，输出适合本地知识库沉淀的结构化洞察。",
+            "requirements": {
+                "summary": "2-4句中文，概括视频讲了什么",
+                "key_points": "3-5条，提炼关键观点或方法",
+                "action_items": "2-4条，后续值得跟进的动作",
+                "insight_tags": "3-6个简短标签，适合本地知识库检索",
+                "use_cases": "2-4条，说明在什么场景使用会提升效率或解决什么问题",
+                "core_assets": "1-6个对象，列出视频中最核心的仓库、插件、Agent、Skill、工具、框架或方法",
+                "category_paths": "1-3条，给这条笔记归类，如 AI开发/Agent/Codex",
+                "problem_statements": "1-3条，说明视频主要解决什么痛点",
+            },
+            "video": {
+                "bvid": video.get("id", ""),
+                "title": video.get("title", ""),
+                "uploader": video.get("uploader", ""),
+                "favorite_folder": video.get("favorite_folder", ""),
+                "category": video.get("category", ""),
+                "duration": video.get("duration", ""),
+                "pubdate": video.get("pubdate", ""),
+                "description": source_item.get("desc", ""),
+                "tags": source_item.get("tags", []),
+            },
+            "output_schema": {
+                "summary": "string",
+                "key_points": ["string"],
+                "action_items": ["string"],
+                "insight_tags": ["string"],
+                "use_cases": ["string"],
+                "problem_statements": ["string"],
+                "category_paths": ["string"],
+                "core_assets": [
+                    {
+                        "name": "string",
+                        "asset_type": "string",
+                        "url": "string",
+                        "role": "string",
+                        "solves": "string",
+                        "notes": ["string"],
+                    }
+                ],
+            },
+            "rules": [
+                "不要空话，不要写'提升效率'这类泛泛描述，必须点明在哪种工作场景下提升什么效率。",
+                "如果视频提到 GitHub 仓库、插件、Agent、Skill、工具或框架，优先识别出来放入 core_assets。",
+                "core_assets.name 必须优先使用视频中出现的真实名称、原始产品名或英文名，例如 Codex、Claude Code、Skill、Agent、Prettier、Black。",
+                "不要自己发明泛化名称，例如'调试助手插件'、'自动补全插件'，除非视频里就是这么称呼它。",
+                "如果无法确认具体名称，就不要输出这条 core_assets。",
+                "如果没有明确链接，不要编造 URL，填空字符串。",
+                "category_paths 要体现归属范畴，比如：AI开发/代码助手/Codex，或 知识管理/本地知识库/Bilibili。",
+                "所有输出必须是中文，且严格返回 JSON。",
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+
+def normalize_insight(video_id: str, raw_text: str) -> dict:
+    payload = json.loads(raw_text)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    core_assets = []
+    for asset in payload.get("core_assets", []):
+        if not isinstance(asset, dict):
+            continue
+        core_assets.append(
+            {
+                "name": str(asset.get("name", "")).strip(),
+                "asset_type": str(asset.get("asset_type", "")).strip(),
+                "url": str(asset.get("url", "")).strip(),
+                "role": str(asset.get("role", "")).strip(),
+                "solves": str(asset.get("solves", "")).strip(),
+                "notes": [str(x).strip() for x in asset.get("notes", []) if str(x).strip()],
+            }
+        )
+    return {
+        "video_id": video_id,
+        "summary": str(payload.get("summary", "")).strip(),
+        "key_points": [str(x).strip() for x in payload.get("key_points", []) if str(x).strip()],
+        "action_items": [str(x).strip() for x in payload.get("action_items", []) if str(x).strip()],
+        "insight_tags": [str(x).strip() for x in payload.get("insight_tags", []) if str(x).strip()],
+        "use_cases": [str(x).strip() for x in payload.get("use_cases", []) if str(x).strip()],
+        "problem_statements": [str(x).strip() for x in payload.get("problem_statements", []) if str(x).strip()],
+        "category_paths": [str(x).strip() for x in payload.get("category_paths", []) if str(x).strip()],
+        "core_assets": [asset for asset in core_assets if asset.get("name")],
+        "created_at": now,
+        "updated_at": now,
+    }
+
+
+def upgrade_existing_insight(payload: dict) -> dict:
+    if not isinstance(payload, dict):
+        return {}
+    return {
+        "video_id": str(payload.get("video_id", "")).strip(),
+        "summary": str(payload.get("summary", "")).strip(),
+        "key_points": [str(x).strip() for x in payload.get("key_points", []) if str(x).strip()],
+        "action_items": [str(x).strip() for x in payload.get("action_items", []) if str(x).strip()],
+        "insight_tags": [str(x).strip() for x in payload.get("insight_tags", []) if str(x).strip()],
+        "use_cases": [str(x).strip() for x in payload.get("use_cases", []) if str(x).strip()],
+        "problem_statements": [str(x).strip() for x in payload.get("problem_statements", []) if str(x).strip()],
+        "category_paths": [str(x).strip() for x in payload.get("category_paths", []) if str(x).strip()],
+        "core_assets": [
+            {
+                "name": str(asset.get("name", "")).strip(),
+                "asset_type": str(asset.get("asset_type", "")).strip(),
+                "url": str(asset.get("url", "")).strip(),
+                "role": str(asset.get("role", "")).strip(),
+                "solves": str(asset.get("solves", "")).strip(),
+                "notes": [str(x).strip() for x in asset.get("notes", []) if str(x).strip()],
+            }
+            for asset in payload.get("core_assets", [])
+            if isinstance(asset, dict) and str(asset.get("name", "")).strip()
+        ],
+        "created_at": str(payload.get("created_at", "")).strip(),
+        "updated_at": str(payload.get("updated_at", "")).strip(),
+    }
+
+
+def build_source_lookup(source_dir: Path) -> dict:
+    lookup = {}
+    for source_file in sorted(source_dir.glob("*.json")):
+        data = load_json(source_file, [])
+        if not isinstance(data, list):
+            continue
+        for item in data:
+            bvid = item.get("bvid")
+            if bvid and bvid not in lookup:
+                lookup[bvid] = item
+    return lookup
+
+
+def main():
+    parser = argparse.ArgumentParser(description="生成视频洞察")
+    parser.add_argument("--root", default=".", help="Knowledge base root directory")
+    parser.add_argument("--video-id", help="Specific BVID to analyze")
+    parser.add_argument("--limit", type=int, default=30, help="Max videos to analyze")
+    args = parser.parse_args()
+
+    root = Path(args.root).resolve()
+    config = load_config(root)
+    ai = config.get("ai") or {}
+    api_key = (ai.get("api_key") or "").strip()
+    base_url = (ai.get("base_url") or "https://api.deepseek.com").strip()
+    model = (ai.get("model") or "deepseek-chat").strip()
+
+    if not api_key:
+        print("[错误] 未配置 AI 密钥。")
+        sys.exit(1)
+
+    videos_path = root / "manifest" / "videos.json"
+    videos = load_json(videos_path, [])
+    if not isinstance(videos, list) or not videos:
+        print("[错误] 未找到视频，请先导入收藏。")
+        sys.exit(1)
+
+    source_lookup = build_source_lookup(root / "manifest" / "source")
+    existing_insights = load_json(root / "manifest" / "insights.json", [])
+    existing_insights = [upgrade_existing_insight(item) for item in existing_insights if isinstance(item, dict)]
+    existing_by_id = {
+        item.get("video_id"): item for item in existing_insights if isinstance(item, dict) and item.get("video_id")
+    }
+
+    target_ids = {args.video_id} if args.video_id else None
+    target_videos = [video for video in videos if not target_ids or video.get("id") in target_ids][: args.limit]
+
+    results = [item for item in existing_insights if item.get("video_id") not in {video.get("id") for video in target_videos}]
+    for video in target_videos:
+        video_id = video.get("id", "")
+        source_item = source_lookup.get(video_id, {})
+        print(f"[视频洞察] 正在分析 {video_id} {video.get('title', '')}")
+        try:
+            raw_text = call_chat_completion(
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+                prompt=build_prompt(video, source_item),
+            )
+            insight = normalize_insight(video_id, raw_text)
+        except (urllib.error.URLError, KeyError, json.JSONDecodeError) as exc:
+            print(f"[警告] 视频洞察生成失败 {video_id}：{exc}")
+            insight = existing_by_id.get(video_id) or {
+                "video_id": video_id,
+                "summary": "",
+                "key_points": [],
+                "action_items": [],
+                "insight_tags": [],
+                "use_cases": [],
+                "problem_statements": [],
+                "category_paths": [],
+                "core_assets": [],
+                "created_at": "",
+                "updated_at": "",
+            }
+        results.append(insight)
+
+    save_json(root / "manifest" / "insights.json", results)
+    print(f"[已写入] {root / 'manifest' / 'insights.json'}（共 {len(results)} 条）")
+
+
+if __name__ == "__main__":
+    main()

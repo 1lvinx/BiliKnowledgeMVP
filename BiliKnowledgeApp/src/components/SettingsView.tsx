@@ -9,9 +9,11 @@ import {
 } from "./MacUI";
 import { cn } from "../lib/utils";
 import { t } from "../i18n";
+import { BilibiliLogin } from "./BilibiliLogin";
 
 interface Config {
   bilibili: {
+    cookie: string;
     sessdata: string;
     bili_jct: string;
     buvid3: string;
@@ -29,7 +31,7 @@ interface Config {
 }
 
 const defaultConfig: Config = {
-  bilibili: { sessdata: "", bili_jct: "", buvid3: "", dedeuserid: "" },
+  bilibili: { cookie: "", sessdata: "", bili_jct: "", buvid3: "", dedeuserid: "" },
   ai: {
     provider: "deepseek",
     api_key: "",
@@ -44,10 +46,6 @@ const defaultConfig: Config = {
 const languageOptions = [
   { value: "zh-CN", label: "中文（简体）", detail: "Chinese Simplified" },
   { value: "en-US", label: "English", detail: "English" },
-  { value: "en-SG", label: "English (Singapore)", detail: "Singapore English" },
-  { value: "ru-RU", label: "Русский", detail: "Russian" },
-  { value: "ja-JP", label: "日本語", detail: "Japanese" },
-  { value: "ko-KR", label: "한국어", detail: "Korean" },
 ];
 
 const settingsSectionKeys = [
@@ -114,18 +112,20 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
     }
   }
 
+  async function persistConfig(nextConfig: Config) {
+    if (!isTauriRuntime()) {
+      window.localStorage.setItem(previewStorageKey, JSON.stringify(nextConfig));
+      return;
+    }
+    await invoke("save_config", { config: JSON.stringify(nextConfig) });
+  }
+
   async function saveConfig() {
     if (!config) return;
     try {
       setSaving(true);
-      if (!isTauriRuntime()) {
-        window.localStorage.setItem(previewStorageKey, JSON.stringify(config));
-        setMessage({ type: "success", text: t("settings.previewSaved") });
-        setTimeout(() => setMessage(null), 3000);
-        return;
-      }
-      await invoke("save_config", { config: JSON.stringify(config) });
-      setMessage({ type: "success", text: t("settings.saved") });
+      await persistConfig(config);
+      setMessage({ type: "success", text: isTauriRuntime() ? t("settings.saved") : t("settings.previewSaved") });
       setTimeout(() => setMessage(null), 3000);
     } catch (err) {
       setMessage({ type: "error", text: `${t("settings.saveFailed")}: ${String(err)}` });
@@ -229,6 +229,26 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
 
         {activeSection === "settings.import" && (
           <MacSettingsGroup title={t("settings.import")}>
+            <div className="settings-qr-section">
+              <BilibiliLogin
+                onLoginSuccess={async (cookies) => {
+                  const nextConfig = {
+                    ...config,
+                    bilibili: {
+                      ...config.bilibili,
+                      sessdata: cookies.sessdata,
+                      bili_jct: cookies.bili_jct,
+                      dedeuserid: cookies.dedeuserid,
+                      buvid3: cookies.buvid3,
+                    },
+                  };
+                  setConfig(nextConfig);
+                  await persistConfig(nextConfig);
+                  setMessage({ type: "success", text: t("bilibili.loginSuccess") });
+                }}
+              />
+            </div>
+
             <MacSettingsRow detail={t("settings.sessdataDesc")} label="SESSDATA">
               <SettingInput
                 onChange={(value) =>
@@ -335,16 +355,25 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
 
         {activeSection === "settings.scripts" && (
           <MacSettingsGroup title={t("settings.scripts")}>
-            <MacSettingsRow detail={t("settings.importFavoritesDesc")} label="parse_favorites.py">
+            <MacSettingsRow detail={t("settings.importFavoritesDesc")} label={t("settings.importFavorites")}>
               <span className="mac-status-pill tone-green">{t("status.ready")}</span>
             </MacSettingsRow>
-            <MacSettingsRow detail={t("settings.extractProjectsDesc")} label="extract_projects.py">
+            <MacSettingsRow detail={t("settings.fetchSubtitlesDesc")} label={t("scripts.fetchSubtitles")}>
               <span className="mac-status-pill tone-green">{t("status.ready")}</span>
             </MacSettingsRow>
-            <MacSettingsRow detail={t("settings.buildIndexDesc")} label="build_index.py">
+            <MacSettingsRow detail={t("settings.generateInsightsDesc")} label={t("scripts.generateInsights")}>
               <span className="mac-status-pill tone-green">{t("status.ready")}</span>
             </MacSettingsRow>
-            <MacSettingsRow detail={t("settings.validateKnowledgeBaseDesc")} label="validate_knowledge_base.py">
+            <MacSettingsRow detail={t("settings.generateNotesDesc")} label={t("scripts.generateNotes")}>
+              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
+            </MacSettingsRow>
+            <MacSettingsRow detail={t("settings.extractProjectsDesc")} label={t("settings.extractProjects")}>
+              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
+            </MacSettingsRow>
+            <MacSettingsRow detail={t("settings.buildIndexDesc")} label={t("settings.buildIndex")}>
+              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
+            </MacSettingsRow>
+            <MacSettingsRow detail={t("settings.validateKnowledgeBaseDesc")} label={t("settings.validateKnowledgeBase")}>
               <span className="mac-status-pill tone-green">{t("status.ready")}</span>
             </MacSettingsRow>
           </MacSettingsGroup>

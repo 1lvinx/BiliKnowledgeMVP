@@ -3,6 +3,7 @@ export interface Video {
   title: string;
   url: string;
   uploader: string;
+  collected_at?: string;
   favorite_folder: string;
   category: string;
   tags: string[];
@@ -11,8 +12,51 @@ export interface Video {
   priority: "P0" | "P1" | "P2";
   status: string;
   note_path: string;
+  note_ready?: boolean;
   project_extracted: boolean;
   remarks: string;
+}
+
+export interface FavoriteFolder {
+  id: string;
+  title: string;
+  media_count: number;
+}
+
+export interface SubtitleSegment {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface VideoSubtitle {
+  video_id: string;
+  language: string;
+  source: "cc" | "ai";
+  segments: SubtitleSegment[];
+  raw_text: string;
+  created_at: string;
+}
+
+export interface VideoInsight {
+  video_id: string;
+  summary: string;
+  key_points: string[];
+  action_items: string[];
+  insight_tags: string[];
+  use_cases: string[];
+  problem_statements: string[];
+  category_paths: string[];
+  core_assets: Array<{
+    name: string;
+    asset_type: string;
+    url: string;
+    role: string;
+    solves: string;
+    notes: string[];
+  }>;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface PipelineFlags {
@@ -49,4 +93,14 @@ export interface Project {
   priority: string;
   status: string;
   need_verify: boolean;
+  homepage?: string;
+  stars?: number;
+  forks?: number;
+  watchers?: number;
+  open_issues?: number;
+  language?: string;
+  license?: string;
+  archived?: boolean;
+  default_branch?: string;
+  pushed_at?: string;
 }

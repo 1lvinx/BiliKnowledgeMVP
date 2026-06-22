@@ -30,3 +30,26 @@ external/
 # caches
 .cache/
 .vite/
+
+# generated knowledge artifacts
+BiliKnowledge/index.md
+BiliKnowledge/notes/raw/
+BiliKnowledge/notes/reviewed/
+BiliKnowledge/reports/
+
+# generated manifests
+BiliKnowledge/manifest/source/*.json
+BiliKnowledge/manifest/source/*.md
+BiliKnowledge/manifest/videos.json
+BiliKnowledge/manifest/videos.csv
+BiliKnowledge/manifest/processing_status.json
+BiliKnowledge/manifest/favorite_folders.json
+BiliKnowledge/manifest/insights.json
+BiliKnowledge/manifest/subtitles.json
+
+# generated exports
+BiliKnowledge/projects/*.csv
+BiliKnowledge/projects/*.bak_*
+BiliKnowledge/projects/github_projects.md
+BiliKnowledge/projects/open_source_tools.md
+BiliKnowledge/projects/project_candidates.json

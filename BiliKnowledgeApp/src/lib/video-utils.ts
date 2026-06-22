@@ -50,3 +50,75 @@ export function localizeLabel(raw: string): string {
   };
   return map[raw] ?? raw;
 }
+
+export function formatVideoDuration(raw: string): string {
+  if (!raw) return "-";
+  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(raw)) return raw;
+  const seconds = Number(raw);
+  if (!Number.isFinite(seconds) || seconds <= 0) return raw;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) {
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+export function formatVideoTime(raw?: string): string {
+  return raw || "-";
+}
+
+export function formatPubdate(raw: string): string {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    return raw || "-";
+  }
+  const normalized = value > 10_000_000_000 ? value : value * 1000;
+  return new Date(normalized).toLocaleDateString();
+}
+
+export function getVideoTimestamp(video: { pubdate?: string; collected_at?: string }): number {
+  const pubdateValue = Number(video.pubdate || "");
+  if (Number.isFinite(pubdateValue) && pubdateValue > 0) {
+    return pubdateValue > 10_000_000_000 ? pubdateValue : pubdateValue * 1000;
+  }
+
+  const collectedAt = (video.collected_at || "").trim();
+  if (!collectedAt) return 0;
+
+  const hourMatch = collectedAt.match(/^(\d+)\s*小时[前內内]?$/);
+  if (hourMatch) {
+    return Date.now() - Number(hourMatch[1]) * 60 * 60 * 1000;
+  }
+
+  const dayMatch = collectedAt.match(/^(\d+)\s*天[前內内]?$/);
+  if (dayMatch) {
+    return Date.now() - Number(dayMatch[1]) * 24 * 60 * 60 * 1000;
+  }
+
+  if (collectedAt === "昨天") {
+    return Date.now() - 24 * 60 * 60 * 1000;
+  }
+
+  const monthDayMatch = collectedAt.match(/^(\d{2})-(\d{2})$/);
+  if (monthDayMatch) {
+    const now = new Date();
+    const month = Number(monthDayMatch[1]) - 1;
+    const day = Number(monthDayMatch[2]);
+    const candidate = new Date(now.getFullYear(), month, day).getTime();
+    return candidate > Date.now() ? new Date(now.getFullYear() - 1, month, day).getTime() : candidate;
+  }
+
+  const parsed = Date.parse(collectedAt);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function compareVideosByRecency(
+  a: { pubdate?: string; collected_at?: string; title?: string },
+  b: { pubdate?: string; collected_at?: string; title?: string },
+): number {
+  const diff = getVideoTimestamp(b) - getVideoTimestamp(a);
+  if (diff !== 0) return diff;
+  return (a.title || "").localeCompare(b.title || "", "zh-CN");
+}

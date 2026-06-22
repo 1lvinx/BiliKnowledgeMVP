@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import ReactMarkdown from "react-markdown";
 import {
   Activity,
@@ -9,6 +10,7 @@ import {
   ChevronRight,
   Circle,
   CloudDownload,
+  ExternalLink,
   FileText,
   FolderTree,
   HardDrive,
@@ -19,10 +21,12 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   Sparkles,
+  Star,
+  Subtitles,
   Tag,
   Terminal,
 } from "lucide-react";
-import { ProcessingStatus, Project, Video } from "./types";
+import { FavoriteFolder, ProcessingStatus, Project, Video, VideoInsight, VideoSubtitle } from "./types";
 import {
   MacAppShell,
   MacConsole,
@@ -40,9 +44,12 @@ import {
 } from "./components/MacUI";
 import { LogViewer } from "./components/LogViewer";
 import { SettingsView } from "./components/SettingsView";
+import { ActionCenter } from "./components/ActionCenter";
 import { previewVideos, previewProjects } from "./data/demo";
+import { previewInsights } from "./data/demo-insights";
+import { previewSubtitles } from "./data/demo-subtitles";
 import { runtimeEvidenceStatus } from "./data/runtimeEvidenceStatus";
-import { localizeLabel, priorityTone, statusLabel, statusTone } from "./lib/video-utils";
+import { compareVideosByRecency, formatVideoTime, localizeLabel, priorityTone, statusLabel, statusTone } from "./lib/video-utils";
 import { cn } from "./lib/utils";
 import { Videos } from "./pages/Videos";
 import { Notes } from "./pages/Notes";
@@ -134,6 +141,24 @@ function buildScriptCatalog(t: (key: string, p?: Record<string, string | number>
       status: "Idle" as const,
     },
     {
+      name: "generate_insights.py",
+      title: t("scripts.generateInsights"),
+      detail: t("scripts.generateInsightsDesc"),
+      status: "Idle" as const,
+    },
+    {
+      name: "fetch_subtitles.py",
+      title: t("scripts.fetchSubtitles"),
+      detail: t("scripts.fetchSubtitlesDesc"),
+      status: "Idle" as const,
+    },
+    {
+      name: "generate_notes.py",
+      title: t("scripts.generateNotes"),
+      detail: t("scripts.generateNotesDesc"),
+      status: "Idle" as const,
+    },
+    {
       name: "extract_projects.py",
       title: t("scripts.extractProjects"),
       detail: t("scripts.extractProjectsDesc"),
@@ -152,6 +177,22 @@ function buildScriptCatalog(t: (key: string, p?: Record<string, string | number>
       status: "Idle" as const,
     },
   ];
+}
+
+function getScriptDisplayName(
+  scriptName: string,
+  t: (key: string, p?: Record<string, string | number>) => string,
+) {
+  const labels: Record<string, string> = {
+    "parse_favorites.py": t("scripts.parseFavorites"),
+    "generate_insights.py": t("scripts.generateInsights"),
+    "fetch_subtitles.py": t("scripts.fetchSubtitles"),
+    "generate_notes.py": t("scripts.generateNotes"),
+    "extract_projects.py": t("scripts.extractProjects"),
+    "build_index.py": t("scripts.buildIndex"),
+    "validate_knowledge_base.py": t("scripts.healthCheck"),
+  };
+  return labels[scriptName] ?? t("toolbar.runSelected");
 }
 
 function isTauriRuntime() {
@@ -173,16 +214,36 @@ This browser preview uses local sample data because Tauri backend commands are o
 
 ## Next Action
 
-Open the native app build to read real files, run scripts, and update review status.`;
+Open the native app build to read real files, run local flows, and update review status.`;
+}
+
+interface BilibiliCookieValidationResult {
+  valid: boolean;
+  message: string;
+  mid?: number | null;
+  uname?: string | null;
+}
+
+interface ToastMessage {
+  id: number;
+  tone: "neutral" | "success" | "error";
+  text: string;
 }
 
 function App() {
   const [currentView, setCurrentView] = useState<View>("dashboard");
   const viewMode: ViewMode = "list";
   const [videos, setVideos] = useState<Video[]>([]);
+  const [favoriteFolders, setFavoriteFolders] = useState<FavoriteFolder[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [insights, setInsights] = useState<VideoInsight[]>([]);
+  const [subtitles, setSubtitles] = useState<VideoSubtitle[]>([]);
+  const [subtitleExtracting, setSubtitleExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
+  const MAX_LOGS = 500;
+  const appendLog = (msg: string) =>
+    setLogs((prev) => [...prev.slice(-(MAX_LOGS - 1)), msg]);
   const [isRunning, setIsRunning] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -191,6 +252,7 @@ function App() {
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const outputAnchorRef = useRef<HTMLDivElement>(null);
+  const hiddenRefreshRef = useRef(false);
   const tauriAvailable = isTauriRuntime();
 
   const [pipelineStatus, setPipelineStatus] = useState<ProcessingStatus | null>(null);
@@ -217,10 +279,27 @@ function App() {
   const viewMeta = useMemo(() => buildViewMeta(t), [language]);
   const scriptCatalog = useMemo(() => buildScriptCatalog(t), [language]);
   const [selectedScript, setSelectedScript] = useState("validate_knowledge_base.py");
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
 
   const onScrollToConsole = () => {
     outputAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+
+  function showToast(text: string, tone: ToastMessage["tone"] = "neutral") {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    setToast({
+      id: Date.now(),
+      tone,
+      text,
+    });
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 2600);
+  }
 
   async function fetchVideos() {
     if (!tauriAvailable) {
@@ -237,6 +316,26 @@ function App() {
     }
   }
 
+  async function fetchFavoriteFolders() {
+    if (!tauriAvailable) {
+      const counts = previewVideos.reduce<Record<string, number>>((acc, video) => {
+        const title = video.favorite_folder || "默认收藏夹";
+        acc[title] = (acc[title] || 0) + 1;
+        return acc;
+      }, {});
+      setFavoriteFolders(
+        Object.entries(counts).map(([title, media_count]) => ({ id: title, title, media_count })),
+      );
+      return;
+    }
+    try {
+      const data: string = await invoke("get_favorite_folders");
+      setFavoriteFolders(JSON.parse(data));
+    } catch {
+      setFavoriteFolders([]);
+    }
+  }
+
   async function fetchProjects() {
     if (!tauriAvailable) {
       setProjects(previewProjects);
@@ -247,6 +346,32 @@ function App() {
       setProjects(JSON.parse(data));
     } catch {
       setProjects([]);
+    }
+  }
+
+  async function fetchInsights() {
+    if (!tauriAvailable) {
+      setInsights(previewInsights);
+      return;
+    }
+    try {
+      const data: string = await invoke("get_insights");
+      setInsights(JSON.parse(data));
+    } catch {
+      setInsights([]);
+    }
+  }
+
+  async function fetchSubtitles() {
+    if (!tauriAvailable) {
+      setSubtitles(previewSubtitles);
+      return;
+    }
+    try {
+      const data: string = await invoke("get_subtitles");
+      setSubtitles(JSON.parse(data));
+    } catch {
+      setSubtitles([]);
     }
   }
 
@@ -267,6 +392,9 @@ function App() {
 
   const PIPELINE_STEPS = [
     "parse_favorites.py",
+    "fetch_subtitles.py",
+    "generate_insights.py",
+    "generate_notes.py",
     "extract_projects.py",
     "build_index.py",
     "validate_knowledge_base.py",
@@ -277,24 +405,50 @@ function App() {
     if (!tauriAvailable) return;
     setPipelineRunning(true);
     setPipelineError(null);
-    setLogs((prev) => [...prev, "Pipeline: starting full run"]);
+    appendLog("流程执行：开始完整处理");
     try {
+      const cookieCheck = await validateBilibiliCookie({
+        requiredFor: "完整流程",
+        silentOnSuccess: true,
+      });
+      if (!cookieCheck.valid) {
+        throw new Error(cookieCheck.message);
+      }
       for (const script of PIPELINE_STEPS) {
         setPipelineStep(script);
-        setLogs((prev) => [...prev, `Pipeline: running ${script}`]);
+        appendLog(`流程执行：正在处理 ${getScriptDisplayName(script, t)}`);
         await invoke("run_script", { scriptName: script, args: [] });
-        setLogs((prev) => [...prev, `Pipeline: ${script} done`]);
+        appendLog(`流程执行：${getScriptDisplayName(script, t)} 已完成`);
       }
-      setLogs((prev) => [...prev, "Pipeline: all steps complete"]);
+      appendLog("流程执行：全部步骤已完成");
       await fetchVideos();
+      await fetchFavoriteFolders();
       await fetchProjects();
+      await fetchInsights();
+      await fetchSubtitles();
       await fetchProcessingStatus();
     } catch (err) {
       setPipelineError(String(err));
-      setLogs((prev) => [...prev, `Pipeline error: ${String(err)}`]);
+      appendLog(`流程执行失败：${String(err)}`);
     } finally {
       setPipelineStep(null);
       setPipelineRunning(false);
+    }
+  }
+
+  async function runHiddenKnowledgeRefresh() {
+    if (!tauriAvailable || hiddenRefreshRef.current || isRunning || pipelineRunning) return;
+    hiddenRefreshRef.current = true;
+    try {
+      await invoke("run_script", { scriptName: "extract_projects.py", args: [] });
+      await invoke("run_script", { scriptName: "build_index.py", args: [] });
+      await invoke("run_script", { scriptName: "validate_knowledge_base.py", args: [] });
+      await fetchProjects();
+      await fetchProcessingStatus();
+    } catch (err) {
+      appendLog(`后台整理失败：${String(err)}`);
+    } finally {
+      hiddenRefreshRef.current = false;
     }
   }
 
@@ -315,16 +469,29 @@ function App() {
     }
   }
 
+  function openVideoInNotes(video: Video) {
+    setSelectedVideo(video);
+    setCurrentView("notes");
+    void fetchNote(video);
+  }
+
+  function openVideoInFavorites(video: Video) {
+    setSelectedVideo(video);
+    setCurrentView("favorites");
+    setNoteContent(null);
+  }
+
   async function updateStatus(id: string, status: string) {
     if (!tauriAvailable) {
       setVideos((prev) => prev.map((video) => (video.id === id ? { ...video, status } : video)));
-      setLogs((prev) => [...prev, t("error.previewMarked", { id, status })]);
+      appendLog(t("error.previewMarked", { id, status }));
       return;
     }
     try {
       await invoke("update_video_status", { id, status });
-      setLogs((prev) => [...prev, t("error.systemMarked", { id, status })]);
+      appendLog(t("error.systemMarked", { id, status }));
       await fetchVideos();
+      await fetchFavoriteFolders();
     } catch (err) {
       setError(t("error.updateFailed", { error: String(err) }));
     }
@@ -332,14 +499,12 @@ function App() {
 
   async function runPythonScript(name: string, args: string[] = []) {
     if (isRunning) return;
+    const displayName = getScriptDisplayName(name, t);
     if (!tauriAvailable) {
       setIsRunning(true);
       setSelectedScript(name);
-      setLogs((prev) => [
-        ...prev,
-        t("error.scriptPreview", { name, args: args.length ? ` ${args.join(" ")}` : "" }),
-        t("error.scriptPreviewHint"),
-      ]);
+      appendLog(t("error.scriptPreview", { name: displayName, args: args.length ? ` ${args.join(" ")}` : "" }));
+      appendLog(t("error.scriptPreviewHint"));
       window.setTimeout(() => setIsRunning(false), 500);
       return;
     }
@@ -347,16 +512,29 @@ function App() {
       setIsRunning(true);
       setSelectedScript(name);
       setError(null);
-      setLogs((prev) => [...prev, t("error.scriptStart", { name })]);
+      if (name === "parse_favorites.py" || name === "fetch_subtitles.py") {
+        const cookieCheck = await validateBilibiliCookie({
+          requiredFor: name === "parse_favorites.py" ? "导入收藏夹" : "抓取字幕",
+        });
+        if (!cookieCheck.valid) {
+          appendLog(cookieCheck.message);
+          setError(cookieCheck.message);
+          return;
+        }
+      }
+      appendLog(t("error.scriptStart", { name: displayName }));
       await invoke("run_script", { scriptName: name, args });
-      setLogs((prev) => [...prev, t("error.scriptSuccess")]);
+      appendLog(t("error.scriptSuccess", { name: displayName }));
       await fetchVideos();
+      await fetchFavoriteFolders();
       await fetchProjects();
+      await fetchInsights();
+      await fetchSubtitles();
       await fetchProcessingStatus();
       setError(null);
     } catch (err) {
       const errMsg = String(err);
-      setLogs((prev) => [...prev, t("error.scriptError", { error: errMsg })]);
+      appendLog(t("error.scriptError", { name: displayName, error: errMsg }));
       if (!errMsg.includes("exit code") && !errMsg.includes("issues")) {
         setError(t("error.scriptFailed"));
       }
@@ -365,32 +543,165 @@ function App() {
     }
   }
 
+  async function extractSubtitle(videoId: string) {
+    if (!tauriAvailable || subtitleExtracting) return;
+    try {
+      setSubtitleExtracting(true);
+      appendLog(`字幕提取：正在处理 ${videoId}`);
+      showToast(`开始抓取字幕：${videoId}`, "neutral");
+      await invoke("run_script", {
+        scriptName: "fetch_subtitles.py",
+        args: ["--root", ".", "--video-id", videoId],
+      });
+      await fetchSubtitles();
+      appendLog(`字幕提取：已完成 ${videoId}`);
+      showToast(`字幕抓取完成：${videoId}`, "success");
+    } catch (err) {
+      appendLog(`字幕提取失败：${String(err)}`);
+      setError(String(err));
+      showToast(`字幕抓取失败：${videoId}`, "error");
+    } finally {
+      setSubtitleExtracting(false);
+    }
+  }
+
+  async function generateInsightForVideo(videoId: string) {
+    if (!tauriAvailable || isRunning) return;
+    try {
+      setIsRunning(true);
+      appendLog(`视频洞察：正在生成 ${videoId}`);
+      showToast(`开始分析笔记：${videoId}`, "neutral");
+      await invoke("run_script", {
+        scriptName: "generate_insights.py",
+        args: ["--root", ".", "--video-id", videoId, "--limit", "1"],
+      });
+      await fetchInsights();
+      appendLog(`视频洞察：已生成 ${videoId}`);
+      showToast(`笔记分析完成：${videoId}`, "success");
+    } catch (err) {
+      appendLog(`视频洞察失败：${String(err)}`);
+      setError(String(err));
+      showToast(`笔记分析失败：${videoId}`, "error");
+    } finally {
+      setIsRunning(false);
+    }
+  }
+
+  async function generateNoteForVideo(videoId: string) {
+    if (!tauriAvailable || isRunning) return;
+    try {
+      setIsRunning(true);
+      appendLog(`笔记生成：正在处理 ${videoId}`);
+      showToast(`开始生成基础笔记：${videoId}`, "neutral");
+      await invoke("run_script", {
+        scriptName: "generate_notes.py",
+        args: ["--root", ".", "--video-id", videoId, "--limit", "1"],
+      });
+      await fetchVideos();
+      appendLog(`笔记生成：已完成 ${videoId}`);
+      showToast(`基础笔记生成完成：${videoId}`, "success");
+    } catch (err) {
+      appendLog(`笔记生成失败：${String(err)}`);
+      setError(String(err));
+      showToast(`基础笔记生成失败：${videoId}`, "error");
+    } finally {
+      setIsRunning(false);
+    }
+  }
+
+  async function validateBilibiliCookie(options?: {
+    requiredFor?: string;
+    silentOnSuccess?: boolean;
+  }): Promise<BilibiliCookieValidationResult> {
+    if (!tauriAvailable) {
+      return { valid: true, message: "preview mode" };
+    }
+    try {
+      const raw: string = await invoke("validate_bilibili_cookie");
+      const result = JSON.parse(raw) as BilibiliCookieValidationResult;
+      if (result.valid && !options?.silentOnSuccess) {
+        appendLog(`Bilibili 登录校验通过：${result.message}`);
+      }
+      if (!result.valid && options?.requiredFor) {
+        return {
+          ...result,
+          message: `${options.requiredFor}前校验失败：${result.message}`,
+        };
+      }
+      return result;
+    } catch (err) {
+      const message = `${options?.requiredFor ?? "Bilibili 登录"}校验失败：${String(err)}`;
+      return { valid: false, message };
+    }
+  }
+
   useEffect(() => {
     fetchVideos();
+    fetchFavoriteFolders();
     fetchProjects();
+    fetchInsights();
+    fetchSubtitles();
     fetchProcessingStatus();
     if (!tauriAvailable) {
       setPipelineStatus(buildPreviewPipelineStatus());
+      setInsights(previewInsights);
+      setSubtitles(previewSubtitles);
     }
     if (!tauriAvailable) return undefined;
     const unlisten = listen<string>("script-log", (event) => {
-      setLogs((prev) => [...prev, event.payload]);
+      appendLog(event.payload);
     });
     return () => {
       unlisten.then((remove) => remove());
     };
   }, []);
 
+  useEffect(() => {
+    if (!tauriAvailable) return;
+    if (currentView !== "projects" && currentView !== "knowledge") return;
+
+    const needsRefresh =
+      projects.length === 0 ||
+      !pipelineStatus?.pipeline.projects_extracted ||
+      !pipelineStatus?.pipeline.index_built ||
+      !pipelineStatus?.pipeline.validated;
+
+    if (needsRefresh) {
+      void runHiddenKnowledgeRefresh();
+    }
+  }, [
+    currentView,
+    tauriAvailable,
+    projects.length,
+    pipelineStatus?.pipeline.projects_extracted,
+    pipelineStatus?.pipeline.index_built,
+    pipelineStatus?.pipeline.validated,
+  ]);
+
   const filteredVideos = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    return videos.filter((video) => {
-      const text = `${video.title} ${video.uploader} ${video.category} ${video.id}`.toLowerCase();
-      const matchesSearch = !query || text.includes(query);
-      const matchesPriority = filterPriority === "all" || video.priority === filterPriority;
-      const matchesStatus = filterStatus === "all" || video.status === filterStatus;
-      return matchesSearch && matchesPriority && matchesStatus;
-    });
+    return videos
+      .filter((video) => {
+        const text = `${video.title} ${video.uploader} ${video.category} ${video.favorite_folder} ${video.id}`.toLowerCase();
+        const matchesSearch = !query || text.includes(query);
+        const matchesPriority = filterPriority === "all" || video.priority === filterPriority;
+        const matchesStatus = filterStatus === "all" || video.status === filterStatus;
+        return matchesSearch && matchesPriority && matchesStatus;
+      })
+      .sort(compareVideosByRecency);
   }, [filterPriority, filterStatus, searchTerm, videos]);
+
+  const favoriteVideos = useMemo(() => {
+    const folderOrder = new Map(favoriteFolders.map((folder, index) => [folder.title, index]));
+    return [...filteredVideos].sort((a, b) => {
+      const aFolder = a.favorite_folder || "未归属";
+      const bFolder = b.favorite_folder || "未归属";
+      const aRank = folderOrder.has(aFolder) ? folderOrder.get(aFolder)! : Number.MAX_SAFE_INTEGER;
+      const bRank = folderOrder.has(bFolder) ? folderOrder.get(bFolder)! : Number.MAX_SAFE_INTEGER;
+      if (aRank !== bRank) return aRank - bRank;
+      return compareVideosByRecency(a, b);
+    });
+  }, [favoriteFolders, filteredVideos]);
 
   const filteredProjects = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -401,7 +712,12 @@ function App() {
     });
   }, [projects, searchTerm]);
 
-  const activeVideo = selectedVideo ?? filteredVideos[0] ?? videos[0] ?? null;
+  const viewScopedVideos = currentView === "favorites" ? favoriteVideos : filteredVideos;
+  const activeVideo =
+    (selectedVideo && viewScopedVideos.find((video) => video.id === selectedVideo.id)) ||
+    viewScopedVideos[0] ||
+    videos[0] ||
+    null;
   const activeProject = selectedProject ?? filteredProjects[0] ?? projects[0] ?? null;
   const reviewedCount = videos.filter((video) => video.status === "reviewed").length;
   const pendingCount = videos.filter((video) => video.status === "pending").length;
@@ -414,6 +730,12 @@ function App() {
     isRunning,
     selectedScript,
     fetchNote,
+    runPythonScript,
+  });
+  const toolbarControls = getToolbarControls({
+    currentView,
+    isRunning,
+    subtitleExtracting,
     runPythonScript,
   });
 
@@ -474,19 +796,6 @@ function App() {
             />
           </MacSidebarSection>
 
-          <MacSidebarSection title={t("sidebar.automation")}>
-            <MacSidebarItem
-              active={currentView === "scripts"}
-              badge={logs.length}
-              icon={<Activity size={16} />}
-              label={t("sidebar.healthCheck")}
-              onClick={() => {
-                setCurrentView("scripts");
-                setSelectedScript("validate_knowledge_base.py");
-              }}
-            />
-          </MacSidebarSection>
-
           <MacSidebarSection title={t("sidebar.settings")}>
             <MacSidebarItem
               active={currentView === "settings"}
@@ -510,6 +819,7 @@ function App() {
       }
       toolbar={
         <MacToolbar
+          controls={toolbarControls}
           action={toolbarAction}
           search={
             currentView !== "settings" ? (
@@ -526,59 +836,100 @@ function App() {
       }
     >
       <div className="mac-content">
+        {toast && (
+          <div className="mac-toast-stack" key={toast.id}>
+            <MacInlineNotice className="mac-toast" tone={toast.tone}>
+              <Circle size={10} fill="currentColor" /> {toast.text}
+            </MacInlineNotice>
+          </div>
+        )}
         {error && (
           <MacInlineNotice tone="error">
             <Circle size={10} fill="currentColor" /> {error}
           </MacInlineNotice>
         )}
-        {currentView === "dashboard" &&
-          renderDashboard({
-            activeVideo,
-            isPreview: !tauriAvailable,
-            isRunning,
-            logs,
-            p0Count,
-            pendingCount,
-            projects,
-            reviewedCount,
-            runPythonScript,
-            videos,
-            fetchNote,
-            filterPriority,
-            setFilterPriority,
-            filterStatus,
-            setFilterStatus,
-            filteredVideos,
-            updateStatus,
-            noteContent,
-            onScrollToConsole,
-            pipelineStatus,
-            pipelineLoading,
-            pipelineError,
-            fetchProcessingStatus,
-            pipelineRunning,
-            pipelineStep,
-            runFullPipeline,
-          })}
+        {currentView === "dashboard" && (
+          <div className="mac-page-scroll custom-scrollbar">
+            {isTauriRuntime() ? (
+              <ActionCenter
+                videos={videos}
+                projects={projects}
+                onOpenNote={openVideoInNotes}
+                onStartLearning={(video) => {
+                  if (video.note_path) {
+                    openVideoInNotes(video);
+                  } else {
+                    openVideoInFavorites(video);
+                  }
+                }}
+              />
+            ) : (
+              renderDashboard({
+                activeVideo,
+                isPreview: !tauriAvailable,
+                isRunning,
+                logs,
+                openVideoInNotes,
+                p0Count,
+                pendingCount,
+                projects,
+                reviewedCount,
+                runPythonScript,
+                videos,
+                fetchNote,
+                filterPriority,
+                setFilterPriority,
+                filterStatus,
+                setFilterStatus,
+                filteredVideos,
+                updateStatus,
+                noteContent,
+                onScrollToConsole,
+                pipelineStatus,
+                pipelineLoading,
+                pipelineError,
+                fetchProcessingStatus,
+                pipelineRunning,
+                pipelineStep,
+                runFullPipeline,
+              })
+            )}
+          </div>
+        )}
         {currentView === "favorites" && (
           <Videos
             activeVideo={activeVideo}
             fetchNote={fetchNote}
+            favoriteFolders={favoriteFolders}
             filterPriority={filterPriority}
             filterStatus={filterStatus}
+            groupByFolder
+            onExtractSubtitle={extractSubtitle}
+            onGenerateInsight={generateInsightForVideo}
+            onGenerateNote={generateNoteForVideo}
+            onRunBatchSubtitle={() => runPythonScript("fetch_subtitles.py", ["--root", ".", "--limit", "30"])}
+            onRunBatchInsight={() => runPythonScript("generate_insights.py", ["--root", ".", "--limit", "30"])}
+            onRunBatchNote={() => runPythonScript("generate_notes.py", ["--root", ".", "--limit", "30"])}
             setFilterPriority={setFilterPriority}
             setFilterStatus={setFilterStatus}
             title={t("view.favorites")}
             updateStatus={updateStatus}
-            videos={filteredVideos}
+            videos={favoriteVideos}
           />
         )}
         {currentView === "videos" && (
           <Videos
             activeVideo={activeVideo}
             fetchNote={fetchNote}
+            favoriteFolders={favoriteFolders}
             filterPriority={filterPriority}
             filterStatus={filterStatus}
+            onExtractSubtitle={extractSubtitle}
+            onGenerateInsight={generateInsightForVideo}
+            onGenerateNote={generateNoteForVideo}
+            onRunBatchSubtitle={() => runPythonScript("fetch_subtitles.py", ["--root", ".", "--limit", "30"])}
+            onRunBatchInsight={() => runPythonScript("generate_insights.py", ["--root", ".", "--limit", "30"])}
+            onRunBatchNote={() => runPythonScript("generate_notes.py", ["--root", ".", "--limit", "30"])}
             setFilterPriority={setFilterPriority}
             setFilterStatus={setFilterStatus}
             title={t("view.videos")}
@@ -591,8 +942,11 @@ function App() {
             activeVideo={activeVideo}
             fetchNote={fetchNote}
             noteContent={noteContent}
-            projects={projects}
+            onExtractSubtitle={extractSubtitle}
+            subtitleExtracting={subtitleExtracting}
             videos={filteredVideos}
+            insights={insights}
+            subtitles={subtitles}
           />
         )}
         {currentView === "projects" && (
@@ -605,7 +959,13 @@ function App() {
         )}
         {currentView === "knowledge" &&
           renderKnowledge({
+            openVideoInNotes,
+            openVideoInFavorites,
             noteCount,
+            onOpenCandidates: () => setCurrentView("projects"),
+            onRefreshKnowledge: () => void runHiddenKnowledgeRefresh(),
+            onOpenScripts: () => setCurrentView("scripts"),
+            onOpenTags: () => setCurrentView("tags"),
             pendingCount,
             projects,
             reviewedCount,
@@ -624,13 +984,11 @@ function App() {
             scriptCatalog,
           })}
         {currentView === "tags" && (
-          <div className="mac-page-scroll custom-scrollbar">
-            <MacEmptyState
-              detail={t("tags.emptyHint")}
-              icon={<Tag size={32} />}
-              title={t("tags.empty")}
-            />
-          </div>
+          renderThoughts({
+            insights,
+            openVideoInNotes,
+            videos,
+          })
         )}
         {currentView === "settings" && (
           <div className="mac-page-scroll custom-scrollbar">
@@ -683,6 +1041,10 @@ function getToolbarAction({
     );
   }
 
+  if (currentView === "favorites" || currentView === "videos") {
+    return undefined;
+  }
+
   const actionByView: Partial<Record<View, { label: string; script: string; icon: ReactNode }>> = {
     dashboard: { label: t("action.import"), script: "parse_favorites.py", icon: <CloudDownload size={14} /> },
     favorites: {
@@ -706,9 +1068,55 @@ function getToolbarAction({
       disabled={isRunning}
       icon={action.icon}
       label={isRunning ? t("toolbar.running") : action.label}
-      onClick={() => runPythonScript(action.script, action.script === "parse_favorites.py" ? ["--limit", "20"] : [])}
+              onClick={() => runPythonScript(action.script)}
       primary
     />
+  );
+}
+
+function getToolbarControls({
+  currentView,
+  isRunning,
+  subtitleExtracting,
+  runPythonScript,
+}: {
+  currentView: View;
+  isRunning: boolean;
+  subtitleExtracting: boolean;
+  runPythonScript: (name: string, args?: string[]) => void;
+}) {
+  if (currentView !== "favorites" && currentView !== "videos") {
+    return undefined;
+  }
+
+  return (
+    <div className="flex gap-2 flex-wrap justify-center">
+      <MacToolbarButton
+        disabled={isRunning}
+        icon={<CloudDownload size={14} />}
+        label={t("action.importFromBilibili")}
+        onClick={() => runPythonScript("parse_favorites.py")}
+        primary={currentView === "favorites"}
+      />
+      <MacToolbarButton
+        disabled={isRunning || subtitleExtracting}
+        icon={<Subtitles size={14} />}
+        label={t("scripts.fetchSubtitles")}
+        onClick={() => runPythonScript("fetch_subtitles.py")}
+      />
+      <MacToolbarButton
+        disabled={isRunning}
+        icon={<Sparkles size={14} />}
+        label={t("scripts.generateInsights")}
+        onClick={() => runPythonScript("generate_insights.py")}
+      />
+      <MacToolbarButton
+        disabled={isRunning}
+        icon={<FileText size={14} />}
+        label={t("scripts.generateNotes")}
+        onClick={() => runPythonScript("generate_notes.py")}
+      />
+    </div>
   );
 }
 
@@ -725,6 +1133,7 @@ function renderDashboard({
   isPreview,
   isRunning,
   logs,
+  openVideoInNotes,
   p0Count,
   pendingCount,
   projects,
@@ -752,6 +1161,7 @@ function renderDashboard({
   isPreview: boolean;
   isRunning: boolean;
   logs: string[];
+  openVideoInNotes: (video: Video) => void;
   p0Count: number;
   pendingCount: number;
   projects: Project[];
@@ -832,7 +1242,7 @@ function renderDashboard({
               disabled={isRunning}
               icon={<CloudDownload size={14} />}
               label={isRunning ? t("toolbar.running") : t("onboarding.runImport")}
-              onClick={() => runPythonScript("parse_favorites.py", ["--limit", "20"])}
+              onClick={() => runPythonScript("parse_favorites.py")}
             />
           </div>
         </section>
@@ -864,7 +1274,7 @@ function renderDashboard({
               disabled={isRunning}
               icon={<CloudDownload size={14} />}
               label={isRunning ? t("toolbar.running") : t("dashboard.quickImport")}
-              onClick={() => runPythonScript("parse_favorites.py", ["--limit", "20"])}
+              onClick={() => runPythonScript("parse_favorites.py")}
             />
           </div>
         </header>
@@ -1156,7 +1566,7 @@ function renderDashboard({
             <MacToolbarButton
               icon={<BookOpen size={14} />}
               label={t("inspector.openNote")}
-              onClick={() => activeVideo && fetchNote(activeVideo)}
+              onClick={() => activeVideo && openVideoInNotes(activeVideo)}
             />
           </header>
           <div className="dashboard-board-feed custom-scrollbar">
@@ -1168,22 +1578,25 @@ function renderDashboard({
               />
             ) : (
               recentVideos.map((video) => (
-                <div className={cn("dashboard-feed-row", activeVideo?.id === video.id && "is-active")}
+                <button
+                  className={cn("dashboard-feed-row", activeVideo?.id === video.id && "is-active")}
                   key={video.id}
+                  onClick={() => openVideoInNotes(video)}
+                  type="button"
                 >
                   <div className="dashboard-feed-main">
                     <div className="dashboard-feed-title">{video.title}</div>
                     <div className="dashboard-feed-meta">
-                      <span>{video.uploader}</span>
+                      <span>{video.uploader || "-"}</span>
                       <span>{video.favorite_folder || "Favorites"}</span>
-                      <span>{video.pubdate}</span>
+                      <span>{formatVideoTime(video.collected_at || video.pubdate)}</span>
                     </div>
                   </div>
                   <div className="dashboard-feed-tags">
                     <MacTagPill tone={priorityTone(video.priority)}>{video.priority}</MacTagPill>
                     <MacStatusPill tone={statusTone(video.status)}>{statusLabel(video.status)}</MacStatusPill>
                   </div>
-                </div>
+                </button>
               ))
             )}
           </div>
@@ -1197,7 +1610,7 @@ function renderDashboard({
             <button
               className="dashboard-action"
               disabled={isRunning}
-              onClick={() => runPythonScript("parse_favorites.py", ["--limit", "20"])}
+              onClick={() => runPythonScript("parse_favorites.py")}
               type="button"
             >
               <span className="dashboard-action-icon">
@@ -1258,7 +1671,7 @@ function renderDashboard({
               />
             ) : (
               projectCards.map((project) => (
-                <div className="dashboard-feed-row" key={project.url}>
+                <a className="dashboard-feed-row" href={project.url} key={project.url} rel="noreferrer" target="_blank">
                   <div className="dashboard-feed-main">
                     <div className="dashboard-feed-title">{project.name}</div>
                     <div className="dashboard-feed-meta">
@@ -1267,7 +1680,7 @@ function renderDashboard({
                     </div>
                   </div>
                   <MacTagPill tone={priorityTone(project.priority)}>{project.priority}</MacTagPill>
-                </div>
+                </a>
               ))
             )}
           </div>
@@ -1347,9 +1760,9 @@ function renderDashboard({
                   <div className="dashboard-table-main">
                     <div className="dashboard-table-title">{video.title}</div>
                     <div className="dashboard-table-meta">
-                      <span>{video.uploader}</span>
+                      <span>{video.uploader || "-"}</span>
                       <span>{video.favorite_folder || "Favorites"}</span>
-                      <span>{video.pubdate}</span>
+                      <span>{formatVideoTime(video.collected_at || video.pubdate)}</span>
                     </div>
                   </div>
                   <div className="dashboard-table-controls">
@@ -1413,27 +1826,58 @@ function renderDashboard({
 }
 
 function renderKnowledge({
+  openVideoInNotes,
+  openVideoInFavorites,
   noteCount,
+  onOpenCandidates,
+  onRefreshKnowledge,
+  onOpenScripts,
+  onOpenTags,
   pendingCount,
   projects,
   reviewedCount,
   videos,
 }: {
+  openVideoInNotes: (video: Video) => void;
+  openVideoInFavorites: (video: Video) => void;
   noteCount: number;
+  onOpenCandidates: () => void;
+  onRefreshKnowledge: () => void;
+  onOpenScripts: () => void;
+  onOpenTags: () => void;
   pendingCount: number;
   projects: Project[];
   reviewedCount: number;
   videos: Video[];
 }) {
   const folders = [
-    { name: "manifest", count: videos.length },
-    { name: "notes/raw", count: noteCount },
-    { name: "projects", count: projects.length },
-    { name: "reports", count: 2 },
-    { name: "thoughts", count: 3 },
+    { name: "manifest", count: videos.length, onClick: onOpenVideoFavorites },
+    { name: "notes/raw", count: noteCount, onClick: onOpenNotes },
+    { name: "projects", count: projects.length, onClick: onOpenCandidates },
+    { name: "reports", count: 2, onClick: onOpenScripts },
+    { name: "thoughts", count: 3, onClick: onOpenTags },
   ];
 
+  function onOpenVideoFavorites() {
+    if (videos[0]) {
+      openVideoInFavorites(videos[0]);
+      return;
+    }
+    onRefreshKnowledge();
+  }
+
+  function onOpenNotes() {
+    if (videos[0]) {
+      openVideoInNotes(videos[0]);
+      return;
+    }
+    onRefreshKnowledge();
+  }
+
   const p0Count = videos.filter((video) => video.priority === "P0").length;
+  const topProjects = [...projects]
+    .sort((a, b) => (b.stars ?? 0) - (a.stars ?? 0))
+    .slice(0, 6);
 
   return (
     <MacSplitView columns="260px minmax(0, 1fr) 340px">
@@ -1444,13 +1888,13 @@ function renderKnowledge({
         </div>
         <div className="mac-native-list">
           {folders.map((folder) => (
-            <div className="kb-folder-row" key={folder.name}>
+            <button className="kb-folder-row" key={folder.name} onClick={folder.onClick} type="button">
               <FolderTree size={14} className="kb-folder-icon" />
               <div>
                 <div className="mac-row-title">{localizeLabel(folder.name)}</div>
                 <div className="mac-row-meta">{t("kb.items", { count: folder.count })}</div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </section>
@@ -1462,6 +1906,14 @@ function renderKnowledge({
                 <h2>{t("kb.knowledgeBasePath")}</h2>
                 <span>../BiliKnowledge</span>
               </header>
+              <div className="mb-4 flex flex-wrap gap-2">
+                <MacToolbarButton label={t("kb.openCandidates")} onClick={onOpenCandidates} primary />
+                <MacToolbarButton
+                  label={t("kb.openTopRepo")}
+                  onClick={() => topProjects[0] && openUrl(topProjects[0].url)}
+                />
+                <MacToolbarButton label={t("kb.refreshKnowledge")} onClick={onRefreshKnowledge} />
+              </div>
               <div className="kb-meta-list">
                 <div className="kb-meta-row">
                   <span className="kb-meta-label">{t("kb.location")}</span>
@@ -1489,7 +1941,12 @@ function renderKnowledge({
               </header>
               <div className="kb-note-list">
                 {videos.slice(0, 7).map((video) => (
-                  <div className="kb-note-row" key={video.id}>
+                  <button
+                    className="kb-note-row w-full text-left"
+                    key={video.id}
+                    onClick={() => openVideoInNotes(video)}
+                    type="button"
+                  >
                     <div className="kb-note-main">
                       <div className="kb-note-title">{video.id}.md</div>
                       <div className="kb-note-subtitle">{video.title}</div>
@@ -1497,7 +1954,7 @@ function renderKnowledge({
                     <div className="kb-note-status">
                       <MacTagPill tone={priorityTone(video.priority)}>{video.priority}</MacTagPill>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </section>
@@ -1514,6 +1971,46 @@ function renderKnowledge({
                     <strong>{t("kb.items", { count: folder.count })}</strong>
                   </div>
                 ))}
+              </div>
+            </section>
+
+            <section className="bk-panel kb-secondary-panel">
+              <header className="panel-header">
+                <h2>{t("kb.recentRepos")}</h2>
+                <span>{projects.length}</span>
+              </header>
+              <div className="kb-note-list">
+                {topProjects.map((project) => (
+                  <a
+                    className="kb-note-row"
+                    href={project.url}
+                    key={project.url}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <div className="kb-note-main">
+                      <div className="kb-note-title">{project.name}</div>
+                      <div className="kb-note-subtitle">
+                        {[project.language, project.source_note].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                    <div className="kb-note-status flex items-center gap-3">
+                      <span className="inline-flex items-center gap-1 text-slate-400">
+                        <Star size={13} />
+                        {project.stars ?? 0}
+                      </span>
+                      <ExternalLink size={14} />
+                    </div>
+                  </a>
+                ))}
+                {topProjects.length === 0 ? (
+                  <div className="kb-note-row">
+                    <div className="kb-note-main">
+                      <div className="kb-note-title">-</div>
+                      <div className="kb-note-subtitle">{t("dashboard.noCandidatesHint")}</div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </section>
           </div>
@@ -1567,6 +2064,88 @@ function renderKnowledge({
   );
 }
 
+function renderThoughts({
+  insights,
+  openVideoInNotes,
+  videos,
+}: {
+  insights: VideoInsight[];
+  openVideoInNotes: (video: Video) => void;
+  videos: Video[];
+}) {
+  const insightMap = new Map(insights.map((item) => [item.video_id, item]));
+  const cards = [...videos]
+    .sort(compareVideosByRecency)
+    .slice(0, 24)
+    .map((video) => ({
+      video,
+      insight: insightMap.get(video.id) ?? null,
+    }));
+
+  return (
+    <div className="mac-page-scroll custom-scrollbar">
+      <div className="dashboard-page">
+        <section className="dashboard-hero">
+          <div className="dashboard-hero-main">
+            <div className="dashboard-hero-badge">{t("kb.thoughts")}</div>
+            <h1 className="dashboard-hero-title">按最新内容整理的思考卡片</h1>
+            <p className="dashboard-hero-text">这里展示最近收藏内容的核心判断、适用场景与下一步跟进入口。</p>
+          </div>
+        </section>
+        <section className="dashboard-body-grid">
+          {cards.map(({ video, insight }) => (
+            <article className="dashboard-board" key={video.id}>
+              <header className="dashboard-board-head">
+                <div>
+                  <h3>{video.title}</h3>
+                  <span>
+                    {video.uploader || "-"} · {video.favorite_folder || "默认收藏夹"} · {formatVideoTime(video.collected_at || video.pubdate)}
+                  </span>
+                </div>
+                <MacToolbarButton
+                  label={t("inspector.openNote")}
+                  onClick={() => openVideoInNotes(video)}
+                  primary
+                />
+              </header>
+              <div className="dashboard-board-feed custom-scrollbar">
+                <div className="dashboard-feed-row">
+                  <div className="dashboard-feed-main">
+                    <div className="dashboard-feed-title">核心摘要</div>
+                    <div className="dashboard-feed-meta">
+                      <span>{insight?.summary || "暂未生成 AI 洞察，点击打开笔记继续处理。"}</span>
+                    </div>
+                  </div>
+                </div>
+                {(insight?.problem_statements?.slice(0, 3) || []).map((item, index) => (
+                  <div className="dashboard-feed-row" key={`${video.id}-problem-${index}`}>
+                    <div className="dashboard-feed-main">
+                      <div className="dashboard-feed-title">解决的问题</div>
+                      <div className="dashboard-feed-meta">
+                        <span>{item}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {(insight?.use_cases?.slice(0, 3) || []).map((item, index) => (
+                  <div className="dashboard-feed-row" key={`${video.id}-usecase-${index}`}>
+                    <div className="dashboard-feed-main">
+                      <div className="dashboard-feed-title">适用场景</div>
+                      <div className="dashboard-feed-meta">
+                        <span>{item}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function renderScripts({
   isRunning,
   logs,
@@ -1609,7 +2188,7 @@ function renderScripts({
               >
                 <div>
                   <div className="script-row-title">{script.title}</div>
-                  <div className="script-row-subtitle">{script.name}</div>
+                  <div className="script-row-subtitle">{script.detail}</div>
                 </div>
                 <MacStatusPill tone={isRunning && selectedScript === script.name ? "orange" : "neutral"}>
                   {isRunning && selectedScript === script.name ? t("scripts.running") : script.status}
@@ -1625,7 +2204,6 @@ function renderScripts({
                 <h2>{activeScript.title}</h2>
                 <p>{activeScript.detail}</p>
               </div>
-              <code>{activeScript.name}</code>
             </div>
 
             <div className="script-meta-grid">
