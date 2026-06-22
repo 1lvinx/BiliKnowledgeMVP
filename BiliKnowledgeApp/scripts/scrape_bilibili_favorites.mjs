@@ -322,6 +322,38 @@ async function currentFirstBvid(page) {
   return items[0] ? items[0].bvid : "";
 }
 
+async function waitForFolderCards(page, folderTitle, options = {}) {
+  const attempts = Number(options.attempts || 8);
+  const delayMs = Number(options.delayMs || 800);
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const items = await extractFolderPage(page, folderTitle);
+    if (items.length) {
+      return items;
+    }
+
+    const hasEmptyState = await page.evaluate(() =>
+      (document.body.innerText || "").includes("这里还什么都没有呢"),
+    );
+
+    if (!hasEmptyState) {
+      await page.waitForTimeout(delayMs);
+      continue;
+    }
+
+    if (attempt < attempts - 1) {
+      try {
+        await page.reload({ waitUntil: "domcontentloaded" });
+      } catch {
+        // ignore and continue waiting
+      }
+      await page.waitForTimeout(delayMs);
+    }
+  }
+
+  return [];
+}
+
 async function clickNextPage(page, previousFirstBvid) {
   const next = page.getByText("下一页", { exact: true }).first();
   if ((await next.count()) === 0) {
@@ -389,7 +421,7 @@ async function resolveFolderUrl(page, folder) {
   return fallbackUrl;
 }
 
-async function scrapeFolder(context, folder, options, cookieHeader) {
+async function scrapeFolderOnce(context, folder, options, cookieHeader) {
   const folderTitle = folder.title || "默认收藏夹";
   const page = await context.newPage();
   try {
@@ -405,7 +437,10 @@ async function scrapeFolder(context, folder, options, cookieHeader) {
     try {
       const seen = new Set();
       for (let pageNumber = 1; pageNumber <= 500; pageNumber += 1) {
-        const pageItems = await extractFolderPage(page, folderTitle);
+        const pageItems = await waitForFolderCards(page, folderTitle, {
+          attempts: pageNumber === 1 ? 10 : 5,
+          delayMs: targetCount > 1000 ? 1200 : 700,
+        });
         for (const item of pageItems) {
           if (!item.bvid || seen.has(item.bvid)) {
             continue;
@@ -426,11 +461,16 @@ async function scrapeFolder(context, folder, options, cookieHeader) {
 
         const firstBvid = pageItems[0]?.bvid || "";
         if (!firstBvid) {
+          console.warn(`[浏览器同步] ${folderTitle} 第 ${pageNumber} 页未解析到视频卡片，停止翻页`);
           break;
         }
         const moved = await clickNextPage(page, firstBvid);
         if (!moved) {
+          console.warn(`[浏览器同步] ${folderTitle} 第 ${pageNumber} 页后无法继续翻页，停止抓取`);
           break;
+        }
+        if (targetCount > 1000 && pageNumber % 25 === 0) {
+          await page.waitForTimeout(1200);
         }
       }
 
@@ -450,6 +490,60 @@ async function scrapeFolder(context, folder, options, cookieHeader) {
   } finally {
     await page.close();
   }
+}
+
+function dedupeFolderItems(items) {
+  const byBvid = new Map();
+  for (const item of items) {
+    if (!item?.bvid) {
+      continue;
+    }
+    const existing = byBvid.get(item.bvid);
+    if (!existing || String(item.title || "").length >= String(existing.title || "").length) {
+      byBvid.set(item.bvid, item);
+    }
+  }
+  return Array.from(byBvid.values());
+}
+
+async function scrapeFolder(context, folder, options, cookieHeader) {
+  const targetCount = Number(folder.media_count || folder.count || 0);
+  const batchLimit = Number(options.maxItemsPerFolder || 0);
+  const shouldRetryLargeFolder = batchLimit <= 0 && targetCount >= 500;
+  const maxAttempts = shouldRetryLargeFolder ? 3 : 1;
+  let mergedItems = [];
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const passItems = await scrapeFolderOnce(context, folder, options, cookieHeader);
+      mergedItems = dedupeFolderItems([...mergedItems, ...passItems]);
+      if (!shouldRetryLargeFolder) {
+        return mergedItems;
+      }
+      if (targetCount > 0 && mergedItems.length >= targetCount) {
+        break;
+      }
+      if (mergedItems.length > 0) {
+        break;
+      }
+      if (attempt < maxAttempts) {
+        console.log(
+          `[浏览器同步] ${folder.title} 第 ${attempt} 轮完成，累计 ${mergedItems.length} / ${targetCount}，准备重试补齐`,
+        );
+      }
+    } catch (error) {
+      lastError = error;
+      if (!mergedItems.length && attempt === maxAttempts) {
+        throw error;
+      }
+    }
+  }
+
+  if (!mergedItems.length && lastError) {
+    throw lastError;
+  }
+  return mergedItems;
 }
 
 function normalizeFolders(folders, mid) {
