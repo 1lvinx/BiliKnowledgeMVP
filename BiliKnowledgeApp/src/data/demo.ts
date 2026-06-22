@@ -51,7 +51,7 @@ export const previewVideos: Video[] = [
   },
   {
     id: "BV1ops04",
-    title: "本地自动化脚本安全白名单设计",
+    title: "本地处理流程安全机制设计",
     url: "https://www.bilibili.com/video/BV1ops04",
     uploader: "安全工程实践",
     favorite_folder: "Automation",

@@ -155,53 +155,53 @@ BiliKnowledge/
 │   └── reviewed/     # 人工复核笔记
 ├── projects/         # 项目提取
 ├── thoughts/         # 想法整理
-├── scripts/          # 数据处理脚本
+├── scripts/          # 数据处理流程
 ├── reports/          # 执行报告
 └── index.md          # 知识库索引
 ```
 
-## 已完成脚本
+## 已完成流程
 
-| 脚本 | 用途 | 状态 |
+| 流程 | 用途 | 状态 |
 |---|---|---|
-| parse_favorites.py | 解析收藏夹 → manifest | 已验证 |
-| extract_projects.py | 从笔记提取项目 | 待验证 |
-| build_index.py | 生成索引 | 待验证 |
-| validate_knowledge_base.py | 质量检查 | 待验证 |
+| 导入收藏 | 解析收藏夹 → manifest | 已验证 |
+| 提取项目 | 从笔记提取项目 | 待验证 |
+| 构建索引 | 生成索引 | 待验证 |
+| 健康检查 | 质量检查 | 待验证 |
 
 ## 下一步
 
-1. 提供真实 B 站 Cookie 运行 fetch/analyze/classify
-2. 用 extract_projects.py 提取真实项目
+1. 提供真实 B 站 Cookie 运行导入、分析与分类流程
+2. 运行项目提取流程获取真实项目
 3. 人工复核笔记
-4. 运行 validate_knowledge_base.py 质检
+4. 运行健康检查流程质检
 5. 导入 Karakeep
 """
     return report
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Build index.md and report")
+    parser = argparse.ArgumentParser(description="构建索引与报告")
     parser.add_argument("--root", default=".", help="Knowledge base root directory")
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
-    print(f"[ROOT] {root}")
+    print(f"[工作区] {root}")
 
     # Build index
     index_content = build_index(root)
     index_path = root / "index.md"
     index_path.write_text(index_content, encoding="utf-8")
-    print(f"[WRITE] {index_path}")
+    print(f"[已写入] {index_path}")
 
     # Build report
     report_content = build_report(root, index_content)
     report_path = root / "reports" / "execution_report.md"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(report_content, encoding="utf-8")
-    print(f"[WRITE] {report_path}")
+    print(f"[已写入] {report_path}")
 
-    print(f"\n[DONE] Index and report generated.")
+    print("\n[完成] 索引与报告已生成。")
 
 
 if __name__ == "__main__":

@@ -24,12 +24,21 @@ export function MacAppShell({ sidebar, toolbar, children }: ShellProps) {
 export function MacSidebar({ children }: { children: ReactNode }) {
   return (
     <aside className="mac-sidebar">
+      <div className="mac-sidebar-rail" aria-hidden="true">
+        <span className="is-active" />
+        <span />
+        <span />
+      </div>
       <div className="mac-sidebar-brand">
         <div className="mac-sidebar-brand-mark">BK</div>
         <div className="mac-sidebar-brand-copy">
           <strong>BiliKnowledge</strong>
           <span>{t("sidebar.localIntelligenceStudio")}</span>
         </div>
+      </div>
+      <div className="mac-sidebar-vault">
+        <span className="mac-sidebar-vault-label">Workspace</span>
+        <strong>Personal Vault</strong>
       </div>
       {children}
     </aside>

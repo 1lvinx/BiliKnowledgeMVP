@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
-"""Parse bilibili-favorites output into unified manifest (videos.json + videos.csv)."""
+"""Sync Bilibili favorites and parse them into unified manifest files."""
 
 import argparse
 import csv
 import json
+import os
+import shutil
+import subprocess
 import sys
+import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
+from typing import List, Optional, Tuple, Union
 
 
 HIGH_VALUE_KEYWORDS = [
@@ -15,15 +23,245 @@ HIGH_VALUE_KEYWORDS = [
     "Python", "FastAPI", "Next.js", "Docker",
 ]
 
+DEFAULT_SOURCE_FILE = "收藏视频数据.json"
+DEFAULT_FOLDER_TITLE = "默认收藏夹"
+DEFAULT_LIMIT = 0
 
-def scan_source_files(source_dir: str) -> list[dict]:
+
+def load_local_config(config_path: Path) -> dict:
+    if not config_path.exists():
+        return {}
+    try:
+        return json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        print(f"[警告] 配置文件格式无效：{config_path}，{exc}")
+        return {}
+
+
+def build_cookie_header(config: dict) -> str:
+    bilibili = config.get("bilibili") or {}
+    raw_cookie = str(bilibili.get("cookie") or "").strip()
+    if raw_cookie:
+        return raw_cookie
+
+    segments = []
+    mapping = [
+        ("SESSDATA", bilibili.get("sessdata")),
+        ("bili_jct", bilibili.get("bili_jct")),
+        ("DedeUserID", bilibili.get("dedeuserid")),
+        ("buvid3", bilibili.get("buvid3")),
+    ]
+    for key, value in mapping:
+        normalized = str(value or "").strip()
+        if normalized:
+            segments.append(f"{key}={normalized}")
+    return "; ".join(segments)
+
+
+def api_get_json(url: str, cookie_header: str) -> dict:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Cookie": cookie_header,
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+            ),
+            "Referer": "https://www.bilibili.com/",
+            "Accept": "application/json, text/plain, */*",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def fetch_login_profile(cookie_header: str) -> dict:
+    payload = api_get_json("https://api.bilibili.com/x/web-interface/nav", cookie_header)
+    data = payload.get("data") or {}
+    if not data.get("isLogin"):
+        raise RuntimeError("SESSDATA is invalid or expired. Please log in again.")
+    return data
+
+
+def fetch_favorite_folders(cookie_header: str, mid: Union[int, str]) -> list[dict]:
+    query = urllib.parse.urlencode({"up_mid": str(mid)})
+    payload = api_get_json(
+        f"https://api.bilibili.com/x/v3/fav/folder/created/list-all?{query}",
+        cookie_header,
+    )
+    if payload.get("code") != 0:
+        raise RuntimeError(payload.get("message") or "Failed to fetch favorite folders.")
+    data = payload.get("data") or {}
+    return data.get("list") or []
+
+
+def fetch_folder_medias(
+    cookie_header: str, media_id: Union[int, str], max_items: int
+) -> Tuple[dict, list[dict]]:
+    page = 1
+    page_size = min(max(max_items, 1), 20)
+    collected: list[dict] = []
+    folder_info: dict = {}
+
+    while len(collected) < max_items:
+        query = urllib.parse.urlencode(
+            {
+                "media_id": str(media_id),
+                "pn": str(page),
+                "ps": str(page_size),
+                "platform": "web",
+            }
+        )
+        payload = api_get_json(
+            f"https://api.bilibili.com/x/v3/fav/resource/list?{query}",
+            cookie_header,
+        )
+        if payload.get("code") != 0:
+            raise RuntimeError(payload.get("message") or "Failed to fetch favorite items.")
+
+        data = payload.get("data") or {}
+        folder_info = data.get("info") or folder_info
+        medias = data.get("medias") or []
+        if not medias:
+            break
+
+        collected.extend(medias)
+        if not data.get("has_more"):
+            break
+        page += 1
+
+    return folder_info, collected[:max_items]
+
+
+def normalize_live_media_items(folder_info: dict, medias: list[dict]) -> list[dict]:
+    favorite_folder = folder_info.get("title", "")
+    normalized = []
+    for media in medias:
+        bvid = media.get("bvid") or media.get("bv_id") or ""
+        if not bvid:
+            continue
+        upper = media.get("upper") or {}
+        normalized.append(
+            {
+                "bvid": bvid,
+                "title": media.get("title", ""),
+                "url": f"https://www.bilibili.com/video/{bvid}",
+                "uploader": upper.get("name", ""),
+                "uploader_uid": str(upper.get("mid", "")),
+                "favorite_folder": favorite_folder,
+                "duration": str(media.get("duration", "")),
+                "pubdate": str(media.get("pubtime", "")),
+                "desc": media.get("intro", ""),
+                "tags": [],
+            }
+        )
+    return normalized
+
+
+def write_folder_manifest(folders: list[dict], output_dir: Path) -> None:
+    payload = []
+    for folder in folders:
+        payload.append(
+            {
+                "id": str(folder.get("id", "")),
+                "title": folder.get("title", DEFAULT_FOLDER_TITLE),
+                "media_count": int(folder.get("media_count") or folder.get("count") or 0),
+            }
+        )
+    path = output_dir / "favorite_folders.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"[已写入] {path}（共 {len(payload)} 个收藏夹）")
+
+
+def project_root_from_source_dir(source_dir: Path) -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def run_browser_sync(source_dir: Path) -> tuple[list[dict], list[dict]]:
+    project_root = project_root_from_source_dir(source_dir)
+    app_root = project_root / "BiliKnowledgeApp"
+    script_path = app_root / "scripts" / "scrape_bilibili_favorites.mjs"
+    config_path = project_root / "BiliKnowledge" / "config" / "config.json"
+    node_bin = shutil.which("node")
+
+    if not node_bin:
+        raise RuntimeError("未找到 Node.js，无法执行浏览器态收藏夹同步。")
+    if not script_path.exists():
+        raise RuntimeError(f"未找到浏览器同步脚本：{script_path}")
+    if not config_path.exists():
+        raise RuntimeError(f"未找到配置文件：{config_path}")
+
+    with tempfile.NamedTemporaryFile(prefix="bk-favorites-", suffix=".json", delete=False) as handle:
+        output_path = Path(handle.name)
+
+    command = [
+        node_bin,
+        str(script_path),
+        "--config",
+        str(config_path),
+        "--output",
+        str(output_path),
+    ]
+    max_items_per_folder = str(os.environ.get("BILIKNOWLEDGE_MAX_ITEMS_PER_FOLDER", "0")).strip()
+    if max_items_per_folder.isdigit() and int(max_items_per_folder) > 0:
+        command.extend(["--max-items-per-folder", max_items_per_folder])
+
+    try:
+        subprocess.run(
+            command,
+            cwd=project_root,
+            check=True,
+            text=True,
+        )
+        payload = json.loads(output_path.read_text(encoding="utf-8"))
+        folders = payload.get("folders") or []
+        items = payload.get("items") or []
+        return folders, items
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(f"浏览器态同步失败（退出码 {exc.returncode}）。") from exc
+    finally:
+        output_path.unlink(missing_ok=True)
+
+
+def maybe_sync_live_favorites(source_dir: Path, limit: int) -> list[dict]:
+    config = load_local_config(Path("config/config.json"))
+    cookie_header = build_cookie_header(config)
+    if not cookie_header:
+        raise RuntimeError("未配置完整的 Bilibili Cookie，请先在设置中粘贴并保存整段 Cookie Header。")
+    try:
+        folders, normalized = run_browser_sync(source_dir)
+        if not folders:
+            raise RuntimeError("No favorite folders found in this account.")
+        normalized = merge_video_records(normalized)
+        source_dir.mkdir(parents=True, exist_ok=True)
+        output_path = source_dir / DEFAULT_SOURCE_FILE
+        output_path.write_text(
+            json.dumps(normalized, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        print(f"[已写入] {output_path}（共 {len(normalized)} 条收藏）")
+        return folders
+    except (RuntimeError, urllib.error.URLError, TimeoutError) as exc:
+        raise RuntimeError(f"在线同步失败：{exc}") from exc
+
+
+def scan_source_files(source_dir: str, prioritized_files: Optional[List[str]] = None) -> list[dict]:
     source = Path(source_dir)
     if not source.exists():
-        print(f"[ERROR] Source directory not found: {source_dir}")
+        print(f"[错误] 未找到来源目录：{source_dir}")
         sys.exit(1)
 
     all_videos = []
-    for f in sorted(source.glob("*.json")):
+    files = []
+    if prioritized_files:
+        for file_name in prioritized_files:
+            candidate = source / file_name
+            if candidate.exists():
+                files.append(candidate)
+    if not files:
+        files = sorted(source.glob("*.json"))
+
+    for f in files:
         try:
             with open(f, encoding="utf-8") as fh:
                 data = json.load(fh)
@@ -31,13 +269,13 @@ def scan_source_files(source_dir: str) -> list[dict]:
                 for item in data:
                     item["_source_file"] = str(f.name)
                 all_videos.extend(data)
-                print(f"[OK] {f.name}: {len(data)} records")
+                print(f"[已读取] {f.name}：{len(data)} 条记录")
             elif isinstance(data, dict):
                 data["_source_file"] = str(f.name)
                 all_videos.append(data)
-                print(f"[OK] {f.name}: 1 record")
+                print(f"[已读取] {f.name}：1 条记录")
         except json.JSONDecodeError as e:
-            print(f"[WARN] {f.name}: invalid JSON - {e}")
+            print(f"[警告] {f.name}：JSON 格式无效 - {e}")
     return all_videos
 
 
@@ -77,6 +315,7 @@ def build_manifest_entry(video: dict) -> dict:
         "title": video.get("title", ""),
         "url": video.get("url", f"https://www.bilibili.com/video/{video.get('bvid', '')}"),
         "uploader": video.get("uploader", ""),
+        "collected_at": video.get("collected_at", ""),
         "favorite_folder": video.get("favorite_folder", ""),
         "category": video.get("category", ""),
         "tags": video.get("tags", []),
@@ -93,12 +332,12 @@ def build_manifest_entry(video: dict) -> dict:
 def write_json(entries: list[dict], output_path: Path):
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(entries, f, ensure_ascii=False, indent=2)
-    print(f"[WRITE] {output_path} ({len(entries)} entries)")
+    print(f"[已写入] {output_path}（共 {len(entries)} 条）")
 
 
 def write_csv(entries: list[dict], output_path: Path):
     if not entries:
-        print("[SKIP] No entries to write CSV")
+        print("[跳过] 没有可写入 CSV 的内容")
         return
     fields = list(entries[0].keys())
     with open(output_path, "w", encoding="utf-8", newline="") as f:
@@ -108,27 +347,63 @@ def write_csv(entries: list[dict], output_path: Path):
             row = dict(entry)
             row["tags"] = "|".join(row.get("tags", []))
             writer.writerow(row)
-    print(f"[WRITE] {output_path} ({len(entries)} rows)")
+    print(f"[已写入] {output_path}（共 {len(entries)} 行）")
+
+
+def write_favorite_folders(entries: list[dict], output_path: Path) -> None:
+    counts: dict[str, int] = {}
+    for entry in entries:
+        title = entry.get("favorite_folder") or DEFAULT_FOLDER_TITLE
+        counts[title] = counts.get(title, 0) + 1
+    payload = [
+        {"id": title, "title": title, "media_count": count}
+        for title, count in sorted(counts.items(), key=lambda item: item[1], reverse=True)
+    ]
+    output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"[已写入] {output_path}（共 {len(payload)} 个收藏夹）")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Parse bilibili-favorites to manifest")
+    parser = argparse.ArgumentParser(description="导入收藏并生成本地视频清单")
     parser.add_argument("--input", default="manifest/source", help="Source data directory")
     parser.add_argument("--output", default="manifest", help="Output manifest directory")
-    parser.add_argument("--limit", type=int, default=50, help="Max videos to process")
+    parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT, help="Max videos to process")
     parser.add_argument("--dry-run", action="store_true", help="Preview only, no file write")
+    parser.add_argument(
+        "--allow-local-fallback",
+        action="store_true",
+        help="Allow using existing local source files when live sync is unavailable",
+    )
     args = parser.parse_args()
 
-    raw = scan_source_files(args.input)
+    live_folders: list[dict] = []
+    live_sync_failed: Optional[str] = None
+    try:
+        live_folders = maybe_sync_live_favorites(Path(args.input), args.limit)
+    except RuntimeError as exc:
+        live_sync_failed = str(exc)
+        if args.allow_local_fallback:
+            print(f"[警告] {live_sync_failed}")
+            print("[警告] 已启用本地回退，将改用现有来源文件。")
+        else:
+            print(f"[错误] {live_sync_failed}")
+            sys.exit(1)
+
+    prioritized_files = [DEFAULT_SOURCE_FILE]
+    raw = scan_source_files(args.input, prioritized_files=prioritized_files)
     if not raw:
-        print("[ERROR] No video data found in source directory")
+        print("[错误] 来源目录中未找到视频数据")
         sys.exit(1)
 
     merged = merge_video_records(raw)
-    print(f"\n[MERGE] {len(raw)} raw -> {len(merged)} unique (by bvid)")
+    print(f"\n[整理] 原始 {len(raw)} 条，去重后 {len(merged)} 条")
 
-    limited = merged[: args.limit]
-    print(f"[LIMIT] Processing {len(limited)} of {len(merged)} (limit={args.limit})")
+    if args.limit and args.limit > 0:
+        limited = merged[: args.limit]
+        print(f"[处理] 本次处理 {len(limited)} / {len(merged)} 条（上限 {args.limit}）")
+    else:
+        limited = merged
+        print(f"[处理] 本次处理全部 {len(limited)} 条")
 
     entries = [build_manifest_entry(v) for v in limited]
 
@@ -136,20 +411,24 @@ def main():
     for e in entries:
         p = e["priority"]
         p_counts[p] = p_counts.get(p, 0) + 1
-    print(f"[PRIORITY] {p_counts}")
+    print(f"[优先级] {p_counts}")
 
     if args.dry_run:
-        print("\n[DRY-RUN] Preview of first 3 entries:")
+        print("\n[预览] 前 3 条内容：")
         for e in entries[:3]:
             print(json.dumps(e, ensure_ascii=False, indent=2))
-        print("\n[DRY-RUN] No files written.")
+        print("\n[预览] 本次未写入文件。")
         return
 
     out = Path(args.output)
     out.mkdir(parents=True, exist_ok=True)
     write_json(entries, out / "videos.json")
     write_csv(entries, out / "videos.csv")
-    print(f"\n[DONE] Manifest generated in {out}/")
+    if live_folders:
+        write_folder_manifest(live_folders, out)
+    else:
+        write_favorite_folders(entries, out / "favorite_folders.json")
+    print(f"\n[完成] 视频清单已生成到 {out}/")
 
 
 if __name__ == "__main__":

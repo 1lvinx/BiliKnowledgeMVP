@@ -5,11 +5,15 @@ Phase 2: Tokenizer-based extraction to eliminate CLI flag false positives.
 """
 
 import argparse
+import html
 import json
 import re
 import shlex
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
+from typing import Optional, Tuple
 
 GITHUB_RE = r"https?://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
 GITHUB_NON_REPOS = frozenset({
@@ -20,6 +24,7 @@ GITHUB_NON_REPOS = frozenset({
 })
 GITLAB_RE = r"https?://gitlab\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
 HF_RE = r"https?://huggingface\.co/[A-Za-z0-9_./-]+"
+GITHUB_API_REPO = "https://api.github.com/repos/{owner}/{repo}"
 
 CLI_KEYWORDS = frozenset({
     "install", "add", "i", "run", "pull", "up", "compose",
@@ -110,6 +115,131 @@ def infer_name_from_url(url: str) -> str:
     if len(parts) >= 2:
         return f"{parts[-2]}/{parts[-1]}"
     return parts[-1]
+
+
+def parse_github_repo(url: str) -> Tuple[Optional[str], Optional[str]]:
+    parts = url.rstrip("/").split("/")
+    if len(parts) < 5 or "github.com" not in parts[2]:
+        return None, None
+    return parts[3], parts[4]
+
+
+def parse_count(raw: str) -> int:
+    text = (raw or "").strip().lower().replace(",", "")
+    if not text:
+        return 0
+    multiplier = 1
+    if text.endswith("k"):
+        multiplier = 1000
+        text = text[:-1]
+    elif text.endswith("m"):
+        multiplier = 1000000
+        text = text[:-1]
+    try:
+        return int(float(text) * multiplier)
+    except ValueError:
+        return 0
+
+
+def clean_text(raw: str) -> str:
+    text = html.unescape((raw or "").strip())
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
+def normalize_language(raw: str) -> str:
+    value = clean_text(raw).lower()
+    mapping = {
+        "javascript": "JavaScript",
+        "typescript": "TypeScript",
+        "python": "Python",
+        "go": "Go",
+        "rust": "Rust",
+        "html": "HTML",
+        "css": "CSS",
+        "c": "C",
+        "c++": "C++",
+        "c#": "C#",
+    }
+    return mapping.get(value, clean_text(raw))
+
+
+def fetch_github_repo_metadata_from_html(url: str) -> dict:
+    owner, repo = parse_github_repo(url)
+    if not owner or not repo:
+        return {}
+    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            html = response.read().decode("utf-8", errors="ignore")
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError):
+        return {}
+
+    title_match = re.search(r"<title>(.*?)</title>", html, re.I | re.S)
+    desc_match = re.search(r'<meta property="og:description" content="([^"]+)"', html, re.I)
+    stars_match = re.search(r'aria-label="([0-9.,kKmM]+) users starred this repository"', html, re.I)
+    forks_match = re.search(r'<h3 class="sr-only">Forks</h3>[\s\S]{0,500}?<strong>([0-9.,kKmM]+)</strong>', html, re.I)
+    watchers_match = re.search(r'watching</a>', html, re.I)
+    watchers_count_match = None
+    if watchers_match:
+        snippet = html[max(0, watchers_match.start() - 500):watchers_match.end()]
+        watchers_count_match = re.search(r"<strong>([0-9.,kKmM]+)</strong>", snippet, re.I)
+    language_match = re.search(r'/search\?l=([a-z0-9+_-]+)"', html, re.I)
+    updated_match = re.search(r'<relative-time datetime="([^"]+)"', html, re.I)
+
+    clean_title = ""
+    if title_match:
+        clean_title = re.sub(r"\s*· GitHub\s*$", "", clean_text(title_match.group(1)))
+
+    return {
+        "repo_full_name": f"{owner}/{repo}",
+        "description": clean_text(desc_match.group(1)) if desc_match else "",
+        "stars": parse_count(stars_match.group(1)) if stars_match else 0,
+        "forks": parse_count(forks_match.group(1)) if forks_match else 0,
+        "watchers": parse_count(watchers_count_match.group(1)) if watchers_count_match else 0,
+        "language": normalize_language(language_match.group(1)) if language_match else "",
+        "html_url": url,
+        "page_title": clean_title,
+        "pushed_at": clean_text(updated_match.group(1)) if updated_match else "",
+    }
+
+
+def fetch_github_repo_metadata(url: str) -> dict:
+    owner, repo = parse_github_repo(url)
+    if not owner or not repo:
+        return {}
+
+    api_url = GITHUB_API_REPO.format(owner=owner, repo=repo)
+    request = urllib.request.Request(
+        api_url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "BiliKnowledgeLocal/1.0",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError):
+        return fetch_github_repo_metadata_from_html(url)
+
+    return {
+        "repo_full_name": payload.get("full_name", ""),
+        "description": clean_text(payload.get("description") or ""),
+        "homepage": payload.get("homepage") or "",
+        "stars": int(payload.get("stargazers_count") or 0),
+        "forks": int(payload.get("forks_count") or 0),
+        "watchers": int(payload.get("subscribers_count") or payload.get("watchers_count") or 0),
+        "open_issues": int(payload.get("open_issues_count") or 0),
+        "language": normalize_language(payload.get("language") or ""),
+        "license": ((payload.get("license") or {}).get("spdx_id") or ""),
+        "topics": payload.get("topics") or [],
+        "archived": bool(payload.get("archived") or False),
+        "default_branch": payload.get("default_branch") or "",
+        "pushed_at": payload.get("pushed_at") or "",
+        "html_url": payload.get("html_url") or url,
+    }
 
 
 def extract_pip_packages(text: str) -> list[str]:
@@ -243,7 +373,7 @@ def extract_docker_images(text: str) -> list[str]:
 def scan_notes(notes_dir: str) -> list[tuple[Path, str]]:
     notes_path = Path(notes_dir)
     if not notes_path.exists():
-        print(f"[ERROR] Notes directory not found: {notes_dir}")
+        print(f"[错误] 未找到笔记目录：{notes_dir}")
         sys.exit(1)
     results = []
     for f in sorted(notes_path.glob("*.md")):
@@ -257,6 +387,7 @@ def extract_projects(notes: list[tuple[Path, str]]) -> dict:
     github_projects = []
     tools = []
     seen = set()
+    github_meta_cache: dict[str, dict] = {}
 
     for note_path, content in notes:
         source_note = str(note_path.name)
@@ -269,14 +400,22 @@ def extract_projects(notes: list[tuple[Path, str]]) -> dict:
             if url in seen:
                 return
             seen.add(url)
+            repo_metadata = {}
+            if ptype == "github":
+                repo_metadata = github_meta_cache.get(url)
+                if repo_metadata is None:
+                    repo_metadata = {}
+                if not repo_metadata:
+                    repo_metadata = fetch_github_repo_metadata(url)
+                    github_meta_cache[url] = repo_metadata
             github_projects.append({
-                "name": infer_name_from_url(url),
-                "url": url,
+                "name": repo_metadata.get("repo_full_name") or infer_name_from_url(url),
+                "url": repo_metadata.get("html_url") or url,
                 "source_note": source_note,
                 "source_video": source_video,
                 "type": ptype,
-                "tech_stack": [],
-                "description": "",
+                "tech_stack": repo_metadata.get("topics") or [],
+                "description": repo_metadata.get("description") or "",
                 "mentioned_context": "",
                 "reusable_value": "",
                 "commercial_value": "",
@@ -284,6 +423,16 @@ def extract_projects(notes: list[tuple[Path, str]]) -> dict:
                 "priority": "P1",
                 "status": "candidate",
                 "need_verify": True,
+                "homepage": repo_metadata.get("homepage") or "",
+                "stars": repo_metadata.get("stars") or 0,
+                "forks": repo_metadata.get("forks") or 0,
+                "watchers": repo_metadata.get("watchers") or 0,
+                "open_issues": repo_metadata.get("open_issues") or 0,
+                "language": repo_metadata.get("language") or "",
+                "license": repo_metadata.get("license") or "",
+                "archived": repo_metadata.get("archived") or False,
+                "default_branch": repo_metadata.get("default_branch") or "",
+                "pushed_at": repo_metadata.get("pushed_at") or "",
             })
 
         def _add_tool(name, url, tool_type, category):
@@ -432,7 +581,7 @@ def self_test():
     is_filtered = len(parts) >= 5 and parts[3] in GITHUB_NON_REPOS
     check("github settings filtered at project level", is_filtered)
 
-    print(f"\n[SELF-TEST] {passed} passed, {failed} failed")
+    print(f"\n[自检] 通过 {passed} 项，失败 {failed} 项")
     return failed == 0
 
 
@@ -440,17 +589,24 @@ def write_project_candidates(projects, output_dir):
     path = output_dir / "project_candidates.json"
     with open(path, "w", encoding="utf-8") as f:
         json.dump(projects, f, ensure_ascii=False, indent=2)
-    print(f"[WRITE] {path} ({len(projects)} projects)")
+    print(f"[已写入] {path}（共 {len(projects)} 个项目）")
 
 
 def write_github_projects_md(projects, output_dir):
-    lines = ["# GitHub 项目清单\n", "| # | 项目 | 链接 | 来源视频 | 用途 | 价值判断 | 状态 |", "|---|---|---|---|---|---|---|"]
+    lines = [
+        "# GitHub 项目清单\n",
+        "| # | 项目 | Star | 语言 | 链接 | 来源视频 | 状态 |",
+        "|---|---|---|---|---|---|---|",
+    ]
     for i, p in enumerate(projects, 1):
         source = p.get("source_video", p.get("source_note", ""))
-        lines.append(f"| {i} | {p['name']} | {p['url']} | {source} |  | 待分析 | candidate |")
+        lines.append(
+            f"| {i} | {p['name']} | {p.get('stars', 0)} | {p.get('language', '') or '-'} | "
+            f"{p['url']} | {source} | {p.get('status', 'candidate')} |"
+        )
     path = output_dir / "github_projects.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"[WRITE] {path}")
+    print(f"[已写入] {path}")
 
 
 def write_open_source_tools_md(tools, output_dir):
@@ -470,7 +626,7 @@ def write_open_source_tools_md(tools, output_dir):
 
     path = output_dir / "open_source_tools.md"
     path.write_text("\n".join(lines), encoding="utf-8")
-    print(f"[WRITE] {path}")
+    print(f"[已写入] {path}")
 
 
 def write_karakeep_import(projects, output_dir):
@@ -481,11 +637,11 @@ def write_karakeep_import(projects, output_dir):
         lines.append(f'{p["url"]},{p["name"]},"{tags}","{note}"')
     path = output_dir / "karakeep_import.csv"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"[WRITE] {path}")
+    print(f"[已写入] {path}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Extract projects from Markdown notes")
+    parser = argparse.ArgumentParser(description="提取项目候选")
     parser.add_argument("--notes", default="notes/raw", help="Markdown notes directory")
     parser.add_argument("--output", default="projects", help="Output directory")
     parser.add_argument("--dry-run", action="store_true", help="Preview only")
@@ -498,23 +654,23 @@ def main():
 
     notes = scan_notes(args.notes)
     if not notes:
-        print("[WARN] No notes found. Nothing to extract.")
+        print("[提示] 未找到笔记，无需提取项目。")
         sys.exit(0)
 
     result = extract_projects(notes)
     github = result["github_projects"]
     tools = result["tools"]
 
-    print(f"\n[EXTRACT] {len(github)} GitHub/GitLab projects, {len(tools)} tools/packages")
+    print(f"\n[提取] 共识别 {len(github)} 个项目、{len(tools)} 个工具/包")
 
     if args.dry_run:
-        print("\n[DRY-RUN] GitHub projects:")
+        print("\n[预览] 项目候选：")
         for p in github[:5]:
             print(f"  - {p['name']}: {p['url']}")
-        print(f"\n[DRY-RUN] Tools:")
+        print(f"\n[预览] 工具与包：")
         for t in tools[:5]:
             print(f"  - {t['name']}: {t['url']}")
-        print("\n[DRY-RUN] No files written.")
+        print("\n[预览] 本次未写入文件。")
         return
 
     out = Path(args.output)
@@ -523,7 +679,7 @@ def main():
     write_github_projects_md(github, out)
     write_open_source_tools_md(tools, out)
     write_karakeep_import(github, out)
-    print(f"\n[DONE] Projects extracted to {out}/")
+    print(f"\n[完成] 项目候选已输出到 {out}/")
 
 
 if __name__ == "__main__":

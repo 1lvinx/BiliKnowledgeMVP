@@ -2,10 +2,15 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
-use tauri::{Emitter, Runtime};
+use serde::Serialize;
+use tauri::{Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
+use which::which;
 
 const ALLOWED_SCRIPTS: &[&str] = &[
     "parse_favorites.py",
+    "generate_insights.py",
+    "fetch_subtitles.py",
+    "generate_notes.py",
     "extract_projects.py",
     "build_index.py",
     "validate_knowledge_base.py",
@@ -13,6 +18,7 @@ const ALLOWED_SCRIPTS: &[&str] = &[
 
 const DEFAULT_CONFIG: &str = r#"{
   "bilibili": {
+    "cookie": "",
     "sessdata": "",
     "bili_jct": "",
     "buvid3": "",
@@ -31,6 +37,15 @@ const DEFAULT_CONFIG: &str = r#"{
 }"#;
 
 fn knowledge_base_root() -> PathBuf {
+    if let Ok(configured) = std::env::var("BILIKNOWLEDGE_ROOT") {
+        let candidate = PathBuf::from(configured);
+        if candidate.is_dir() {
+            if let Ok(c) = candidate.canonicalize() {
+                return c;
+            }
+            return candidate;
+        }
+    }
     // 1. Try exe-relative (works for both dev and release .app)
     if let Ok(exe) = std::env::current_exe() {
         let mut dir = exe.parent().map(|p| p.to_path_buf());
@@ -63,15 +78,7 @@ fn knowledge_base_root() -> PathBuf {
                 return c;
             }
         }
-        // 3. Fallback: $HOME/Studio/.../BiliKnowledge
-        if let Ok(home) = std::env::var("HOME") {
-            let home_kb = PathBuf::from(&home)
-                .join("Studio/01_AI/BiliKnowledgeMVP/BiliKnowledge");
-            if home_kb.is_dir() {
-                return home_kb;
-            }
-        }
-        // 4. Last resort: CWD/BiliKnowledge, but never use root /
+        // 3. Last resort: CWD/BiliKnowledge, but never use root /
         let cwd_canon = cwd.canonicalize().unwrap_or_else(|_| cwd.clone());
         let candidate = cwd_canon.join("BiliKnowledge");
         // If CWD is root, use HOME instead
@@ -83,6 +90,42 @@ fn knowledge_base_root() -> PathBuf {
         return candidate;
     }
     PathBuf::from("../BiliKnowledge")
+}
+
+fn resolve_python_executable(project_root: &Path) -> Result<PathBuf, String> {
+    if let Ok(configured) = std::env::var("BILIKNOWLEDGE_PYTHON") {
+        let configured = PathBuf::from(configured);
+        if configured.exists() {
+            return Ok(configured);
+        }
+        return Err(format!(
+            "Configured Python interpreter not found: {}",
+            configured.display()
+        ));
+    }
+
+    let local_candidates = [
+        project_root.join(".venv/bin/python"),
+        project_root.join("venv/bin/python"),
+        project_root.join("external/bilibili-favorites/.venv/bin/python"),
+    ];
+
+    for candidate in local_candidates {
+        if candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    for candidate in ["python3", "python"] {
+        if let Ok(found) = which(candidate) {
+            return Ok(found);
+        }
+    }
+
+    Err(
+        "Python interpreter not found. Install python3, create .venv, or set BILIKNOWLEDGE_PYTHON."
+            .into(),
+    )
 }
 
 fn resolve_base_path(base: &Path) -> Result<PathBuf, String> {
@@ -198,6 +241,31 @@ fn knowledge_path(relative_path: &str) -> Result<PathBuf, String> {
     ensure_path_under_base(&base, &target)
 }
 
+fn is_substantive_note_content(content: &str) -> bool {
+    let normalized = content.trim();
+    if normalized.is_empty() {
+        return false;
+    }
+
+    let placeholder_signals = [
+        "> 待补充。",
+        "- 待补充",
+        "问题定义待补充",
+        "## 内容概述",
+        "## 核心观点",
+        "## 适用场景",
+        "## 解决的问题",
+        "## 关键名词",
+    ];
+
+    let hits = placeholder_signals
+        .iter()
+        .filter(|signal| normalized.contains(**signal))
+        .count();
+
+    hits < 4
+}
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -210,7 +278,140 @@ fn get_videos() -> Result<String, String> {
     if !path.exists() {
         return Err(format!("Manifest not found at {:?}", path));
     }
+    let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let mut videos: serde_json::Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+
+    if let Some(items) = videos.as_array_mut() {
+        for video in items.iter_mut() {
+            let note_path = video
+                .get("note_path")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+
+            let note_ready = if note_path.is_empty() {
+                false
+            } else {
+                let note_full_path = knowledge_path(&format!("notes/raw/{note_path}"))?;
+                if !note_full_path.exists() {
+                    false
+                } else {
+                    let note_content = fs::read_to_string(note_full_path).unwrap_or_default();
+                    is_substantive_note_content(&note_content)
+                }
+            };
+
+            video["note_ready"] = serde_json::Value::Bool(note_ready);
+        }
+    }
+
+    serde_json::to_string(&videos).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_favorite_folders() -> Result<String, String> {
+    let path = knowledge_path("manifest/favorite_folders.json")?;
+    if !path.exists() {
+        return Ok("[]".into());
+    }
     fs::read_to_string(path).map_err(|e| e.to_string())
+}
+
+#[derive(Serialize)]
+struct BilibiliCookieValidation {
+    valid: bool,
+    message: String,
+    mid: Option<u64>,
+    uname: Option<String>,
+}
+
+#[tauri::command]
+async fn validate_bilibili_cookie() -> Result<String, String> {
+    let config_path = knowledge_path("config/config.json")?;
+    let config_text = fs::read_to_string(&config_path).unwrap_or_else(|_| DEFAULT_CONFIG.to_string());
+    let config_json: serde_json::Value =
+        serde_json::from_str(&config_text).map_err(|e| format!("配置文件格式无效：{e}"))?;
+
+    let raw_cookie = config_json["bilibili"]["cookie"]
+        .as_str()
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let sessdata = config_json["bilibili"]["sessdata"]
+        .as_str()
+        .unwrap_or("")
+        .trim()
+        .to_string();
+
+    let cookie_header = if !raw_cookie.is_empty() {
+        raw_cookie
+    } else if !sessdata.is_empty() {
+        format!("SESSDATA={sessdata}")
+    } else {
+        String::new()
+    };
+
+    if cookie_header.is_empty() {
+        let payload = BilibiliCookieValidation {
+            valid: false,
+            message: "未配置 SESSDATA，请先保存 Bilibili Cookie。".into(),
+            mid: None,
+            uname: None,
+        };
+        return serde_json::to_string(&payload).map_err(|e| e.to_string());
+    }
+
+    let client = reqwest::Client::builder()
+        .user_agent(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 \
+             (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+        )
+        .build()
+        .map_err(|e| format!("创建网络客户端失败：{e}"))?;
+
+    let response = client
+        .get("https://api.bilibili.com/x/web-interface/nav")
+        .header("Cookie", cookie_header)
+        .header("Referer", "https://www.bilibili.com/")
+        .header("Accept", "application/json, text/plain, */*")
+        .send()
+        .await
+        .map_err(|e| format!("请求 Bilibili 登录状态失败：{e}"))?;
+
+    let payload: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("解析 Bilibili 返回失败：{e}"))?;
+
+    let data = payload.get("data").cloned().unwrap_or(serde_json::Value::Null);
+    let is_login = data.get("isLogin").and_then(|v| v.as_bool()).unwrap_or(false);
+
+    let result = if is_login {
+        BilibiliCookieValidation {
+            valid: true,
+            message: format!(
+                "Cookie 校验通过，当前账号：{}",
+                data.get("uname").and_then(|v| v.as_str()).unwrap_or("未知账号")
+            ),
+            mid: data.get("mid").and_then(|v| v.as_u64()),
+            uname: data.get("uname").and_then(|v| v.as_str()).map(|v| v.to_string()),
+        }
+    } else {
+        BilibiliCookieValidation {
+            valid: false,
+            message: payload
+                .get("message")
+                .and_then(|v| v.as_str())
+                .filter(|v| !v.is_empty())
+                .unwrap_or("SESSDATA 无效或已过期，请重新登录并更新 Cookie。")
+                .to_string(),
+            mid: None,
+            uname: None,
+        }
+    };
+
+    serde_json::to_string(&result).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -236,20 +437,14 @@ async fn run_script<R: Runtime>(
     let scripts_root = ensure_path_under_base(&knowledge_root, &knowledge_root.join("scripts"))?;
     // Resolve python relative to project root (knowledge base's parent)
     let project_root = base.parent().unwrap_or(&base);
-    let python_path = project_root.join("external/bilibili-favorites/.venv/bin/python");
+    let python_path = resolve_python_executable(project_root)?;
     let script_path = ensure_path_under_base(&scripts_root, &scripts_root.join(script_name))?;
 
-    if !python_path.exists() {
-        return Err(format!(
-            "Python 虚拟环境未找到：{}\n请确认已安装依赖。",
-            python_path.display()
-        ));
-    }
     if !script_path.exists() {
         return Err(format!("脚本未找到: {}", script_name));
     }
 
-    let mut command = Command::new(python_path);
+    let mut command = Command::new(&python_path);
     command.arg(script_path);
     for arg in args {
         command.arg(arg);
@@ -349,6 +544,24 @@ fn get_projects() -> Result<String, String> {
 }
 
 #[tauri::command]
+fn get_insights() -> Result<String, String> {
+    let path = knowledge_path("manifest/insights.json")?;
+    if !path.exists() {
+        return Ok("[]".into());
+    }
+    fs::read_to_string(path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_subtitles() -> Result<String, String> {
+    let path = knowledge_path("manifest/subtitles.json")?;
+    if !path.exists() {
+        return Ok("[]".into());
+    }
+    fs::read_to_string(path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn get_config() -> Result<String, String> {
     let path = knowledge_path("config/config.json")?;
     if !path.exists() {
@@ -415,6 +628,10 @@ fn ensure_workspace() -> Result<String, String> {
     if !manifest_path.exists() {
         fs::write(&manifest_path, "[]").map_err(|e| format!("Failed to init manifest: {e}"))?;
     }
+    let folders_path = root.join("manifest/favorite_folders.json");
+    if !folders_path.exists() {
+        fs::write(&folders_path, "[]").map_err(|e| format!("Failed to init folders: {e}"))?;
+    }
     let projects_path = root.join("projects/project_candidates.json");
     if !projects_path.exists() {
         fs::write(&projects_path, "[]").map_err(|e| format!("Failed to init projects: {e}"))?;
@@ -436,6 +653,129 @@ fn get_processing_status() -> Result<String, String> {
     Ok(content)
 }
 
+#[tauri::command]
+fn open_bilibili_login_window<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
+    const LABEL: &str = "bilibili-login";
+    const LOGIN_URL: &str = "https://passport.bilibili.com/login";
+    const MODERN_CHROME_UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
+
+    if let Some(window) = app.get_webview_window(LABEL) {
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        return Ok(());
+    }
+
+    let url = LOGIN_URL
+        .parse()
+        .map_err(|e| format!("Invalid login URL: {e}"))?;
+
+    WebviewWindowBuilder::new(&app, LABEL, WebviewUrl::External(url))
+        .title("Bilibili Official Login")
+        .user_agent(MODERN_CHROME_UA)
+        .inner_size(1180.0, 820.0)
+        .min_inner_size(960.0, 700.0)
+        .resizable(true)
+        .center()
+        .build()
+        .map_err(|e| format!("Failed to open login window: {e}"))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn generate_bilibili_qr() -> Result<String, String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
+
+    let resp = client
+        .get("https://passport.bilibili.com/x/passport-login/web/qrcode/generate")
+        .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36")
+        .send()
+        .map_err(|e| format!("Failed to request QR code: {e}"))?;
+
+    let body: serde_json::Value = resp.json().map_err(|e| format!("Failed to parse response: {e}"))?;
+
+    if body["code"] != 0 {
+        return Err(format!("API error: {}", body["message"]));
+    }
+
+    let data = &body["data"];
+    let result = serde_json::json!({
+        "url": data["url"].as_str().unwrap_or(""),
+        "qrcode_key": data["qrcode_key"].as_str().unwrap_or(""),
+    });
+
+    Ok(result.to_string())
+}
+
+#[tauri::command]
+fn poll_bilibili_qr(qrcode_key: String) -> Result<String, String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
+
+    let url = format!(
+        "https://passport.bilibili.com/x/passport-login/web/qrcode/poll?qrcode_key={}",
+        qrcode_key
+    );
+
+    let resp = client
+        .get(&url)
+        .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36")
+        .send()
+        .map_err(|e| format!("Failed to poll QR status: {e}"))?;
+
+    let body: serde_json::Value = resp.json().map_err(|e| format!("Failed to parse response: {e}"))?;
+
+    let code = body["data"]["code"].as_i64().unwrap_or(-1);
+
+    if code == 0 {
+        // Login success - extract cookies from URL
+        let goto_url = body["data"]["url"].as_str().unwrap_or("");
+
+        // Parse URL query parameters to get cookies
+        let mut sessdata = String::new();
+        let mut bili_jct = String::new();
+        let mut dedeuserid = String::new();
+        let mut buvid3 = String::new();
+
+        if let Some(query_start) = goto_url.find('?') {
+            let query = &goto_url[query_start + 1..];
+            for param in query.split('&') {
+                if let Some((key, value)) = param.split_once('=') {
+                    match key {
+                        "SESSDATA" => sessdata = value.to_string(),
+                        "bili_jct" => bili_jct = value.to_string(),
+                        "DedeUserID" => dedeuserid = value.to_string(),
+                        "buvid3" => buvid3 = value.to_string(),
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        let result = serde_json::json!({
+            "code": 0,
+            "segdata": sessdata,
+            "bili_jct": bili_jct,
+            "dedeuserid": dedeuserid,
+            "buvid3": buvid3,
+        });
+
+        Ok(result.to_string())
+    } else {
+        // Return the status code for polling
+        let result = serde_json::json!({
+            "code": code,
+            "message": body["data"]["message"].as_str().unwrap_or(""),
+        });
+        Ok(result.to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -443,15 +783,22 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             get_videos,
+            get_favorite_folders,
+            validate_bilibili_cookie,
             get_note,
             get_projects,
+            get_insights,
+            get_subtitles,
             get_config,
             save_config,
             run_script,
             update_video_status,
             check_workspace,
             ensure_workspace,
-            get_processing_status
+            get_processing_status,
+            open_bilibili_login_window,
+            generate_bilibili_qr,
+            poll_bilibili_qr
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

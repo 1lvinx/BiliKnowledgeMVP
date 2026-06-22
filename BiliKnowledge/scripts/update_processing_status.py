@@ -66,7 +66,7 @@ def write_status(root: Path, status: dict):
     path = root / "manifest" / "processing_status.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(status, ensure_ascii=False, indent=4) + "\n", encoding="utf-8")
-    print(f"[WRITE] {path}")
+    print(f"[已写入] {path}")
 
 
 def update_processing_status(root: Path, validated: bool = False):
@@ -76,7 +76,7 @@ def update_processing_status(root: Path, validated: bool = False):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Update processing_status.json")
+    parser = argparse.ArgumentParser(description="更新处理状态")
     parser.add_argument("--root", default=".", help="Knowledge base root directory")
     parser.add_argument("--validated", action="store_true", help="Mark validation as passed")
     args = parser.parse_args()
@@ -84,9 +84,11 @@ def main():
     root = Path(args.root).resolve()
     status = update_processing_status(root, validated=args.validated)
 
-    print(f"[STATUS] videos={status['total_videos']}, pending={status['pending']}, "
-          f"notes={status['note_created']}, projects={status['projects_extracted']}")
-    print(f"[PIPELINE] {json.dumps(status['pipeline'])}")
+    print(
+        f"[状态] 视频={status['total_videos']}，待处理={status['pending']}，"
+        f"笔记={status['note_created']}，项目={status['projects_extracted']}"
+    )
+    print(f"[流程] {json.dumps(status['pipeline'], ensure_ascii=False)}")
 
 
 if __name__ == "__main__":
