@@ -87,3 +87,38 @@ python3 -m compileall -q BiliKnowledge/scripts
 Status: **Beta RC accepted locally**
 
 This commit is suitable as the local Beta Candidate baseline. Remote push, release publishing, notarized packaging, and wider device/manual QA remain separate follow-up steps.
+
+## Local package artifact proof
+
+Generated on: 2026-06-24  
+Command:
+
+```bash
+cd BiliKnowledgeApp
+npm run tauri build
+```
+
+Generated artifacts:
+
+```text
+BiliKnowledgeApp/src-tauri/target/release/bundle/macos/biliknowledgeapp.app
+BiliKnowledgeApp/src-tauri/target/release/bundle/dmg/biliknowledgeapp_0.1.0_x64.dmg
+```
+
+DMG checksum:
+
+```text
+f04fd7713598a419c2108fd05fc3d75b087b004cdc8610e1ab9bcddfff4ef592  BiliKnowledgeApp/src-tauri/target/release/bundle/dmg/biliknowledgeapp_0.1.0_x64.dmg
+```
+
+Package notes:
+
+- Tauri release build: PASS
+- macOS `.app` bundle generation: PASS
+- macOS `.dmg` bundle generation: PASS
+- Code signing: NOT SIGNED in this local build
+- Gatekeeper assessment: local machine reports accepted because security assessment is disabled / no usable signature
+
+Release gate:
+
+This local RC artifact is suitable for internal smoke validation. Public distribution still requires Developer ID signing, notarization, and stapling in a release environment with Apple credentials.
