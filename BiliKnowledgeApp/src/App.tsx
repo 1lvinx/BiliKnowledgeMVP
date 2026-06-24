@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import ReactMarkdown from "react-markdown";
 import {
   Activity,
   BookOpen,
@@ -16,13 +15,16 @@ import {
   HardDrive,
   Heart,
   LayoutDashboard,
+  Library,
+  Moon,
   PlaySquare,
+  RefreshCw,
   Search,
   Settings as SettingsIcon,
   ShieldCheck,
   Sparkles,
   Star,
-  Subtitles,
+  Sun,
   Tag,
   Terminal,
 } from "lucide-react";
@@ -42,197 +44,155 @@ import {
   MacToolbar,
   MacToolbarButton,
 } from "./components/MacUI";
-import { LogViewer } from "./components/LogViewer";
-import { SettingsView } from "./components/SettingsView";
 import { ActionCenter } from "./components/ActionCenter";
 import { previewVideos, previewProjects } from "./data/demo";
 import { previewInsights } from "./data/demo-insights";
 import { previewSubtitles } from "./data/demo-subtitles";
 import { runtimeEvidenceStatus } from "./data/runtimeEvidenceStatus";
-import { compareVideosByRecency, formatVideoTime, localizeLabel, priorityTone, statusLabel, statusTone } from "./lib/video-utils";
+import { compareVideosByRecency, formatVideoTime, localizeLabel, priorityTone, setDisplayTimezone, statusLabel, statusTone } from "./lib/video-utils";
 import { cn } from "./lib/utils";
-import { Videos } from "./pages/Videos";
-import { Notes } from "./pages/Notes";
-import { Candidates } from "./pages/Candidates";
 import { getSavedLanguage, saveLanguage, setLanguage as setI18nLanguage, t } from "./i18n";
+import {
+  PREVIEW_CONFIG_STORAGE_KEY,
+  RUNTIME_EVIDENCE_CAPTURE_GUIDE,
+  buildPreviewPipelineStatus,
+  buildScriptCatalog,
+  buildTaskDisplay,
+  buildViewMeta,
+  getScriptDisplayName,
+  getScriptScopeLabel,
+  getScriptStateLabel,
+  getScriptStateTone,
+  previewNote,
+  type AppearancePreference,
+  type BilibiliCookieValidationResult,
+  type DensityPreference,
+  type FontPreference,
+  type ScriptItem,
+  type ScriptRunState,
+  type TaskDisplay,
+  type TaskLightState,
+  type ToastMessage,
+  type VideoTaskStage,
+  type VideoTaskState,
+  type VideoTaskSnapshot,
+  type View,
+  type ViewMode,
+} from "./app/app-model";
 import "./App.css";
 
-type View =
-  | "dashboard"
-  | "favorites"
-  | "videos"
-  | "notes"
-  | "projects"
-  | "knowledge"
-  | "scripts"
-  | "settings"
-  | "tags";
-
-type ViewMode = "list" | "detail";
-
-interface ScriptItem {
-  name: string;
-  title: string;
-  detail: string;
-  status: "Idle" | "Running" | "Success" | "Failed";
-}
-
-const RUNTIME_EVIDENCE_CAPTURE_GUIDE = [
-  {
-    label: "Route URL",
-    value: "http://localhost:1420",
-  },
-  {
-    label: "Screenshot path",
-    value: "/private/tmp/bili-pipeline-status-playwright.png",
-  },
-  {
-    label: "Runtime evidence path",
-    value: "agent-room/runtime/evidence/20260523-003116-biliknowledgemvp-runtime-verification-hard-gate-second-controlled-trial.md",
-  },
-  {
-    label: "Report linkage",
-    value: "reports/pipeline-status-ui-integration-acceptance-summary-2026-05-23.md",
-  },
-  {
-    label: "Capture rule",
-    value: "PASS requires runtime evidence + visible result; build/test PASS alone is not enough.",
-  },
-] as const;
-
-function buildPreviewPipelineStatus(): ProcessingStatus {
-  return {
-    last_updated: "preview mode",
-    total_videos: previewVideos.length,
-    pending: previewVideos.filter((video) => video.status === "pending").length,
-    note_created: previewVideos.length,
-    projects_extracted: previewProjects.length,
-    reviewed: previewVideos.filter((video) => video.status === "reviewed").length,
-    pipeline: {
-      manifest_generated: true,
-      notes_generated: true,
-      projects_extracted: true,
-      index_built: true,
-      validated: false,
-    },
-  };
-}
-
-function buildViewMeta(t: (key: string, p?: Record<string, string | number>) => string): Record<View, { title: string; subtitle: string }> {
-  return {
-    dashboard: { title: t("view.overview"), subtitle: t("view.overviewSubtitle") },
-    favorites: { title: t("view.favorites"), subtitle: t("view.favoritesSubtitle") },
-    videos: { title: t("view.videos"), subtitle: t("view.videosSubtitle") },
-    notes: { title: t("view.notes"), subtitle: t("view.notesSubtitle") },
-    projects: { title: t("view.projects"), subtitle: t("view.projectsSubtitle") },
-    knowledge: { title: t("view.knowledge"), subtitle: t("view.knowledgeSubtitle") },
-    scripts: { title: t("sidebar.healthCheck"), subtitle: t("view.scriptsSubtitle") },
-    settings: { title: t("view.settings"), subtitle: t("view.settingsSubtitle") },
-    tags: { title: t("sidebar.tags"), subtitle: t("view.tagsSubtitle") },
-  };
-}
-
-function buildScriptCatalog(t: (key: string, p?: Record<string, string | number>) => string): ScriptItem[] {
-  return [
-    {
-      name: "parse_favorites.py",
-      title: t("scripts.parseFavorites"),
-      detail: t("scripts.parseFavoritesDesc"),
-      status: "Idle" as const,
-    },
-    {
-      name: "generate_insights.py",
-      title: t("scripts.generateInsights"),
-      detail: t("scripts.generateInsightsDesc"),
-      status: "Idle" as const,
-    },
-    {
-      name: "fetch_subtitles.py",
-      title: t("scripts.fetchSubtitles"),
-      detail: t("scripts.fetchSubtitlesDesc"),
-      status: "Idle" as const,
-    },
-    {
-      name: "generate_notes.py",
-      title: t("scripts.generateNotes"),
-      detail: t("scripts.generateNotesDesc"),
-      status: "Idle" as const,
-    },
-    {
-      name: "extract_projects.py",
-      title: t("scripts.extractProjects"),
-      detail: t("scripts.extractProjectsDesc"),
-      status: "Idle" as const,
-    },
-    {
-      name: "build_index.py",
-      title: t("scripts.buildIndex"),
-      detail: t("scripts.buildIndexDesc"),
-      status: "Idle" as const,
-    },
-    {
-      name: "validate_knowledge_base.py",
-      title: t("scripts.healthCheck"),
-      detail: t("scripts.healthCheckDesc"),
-      status: "Idle" as const,
-    },
-  ];
-}
-
-function getScriptDisplayName(
-  scriptName: string,
-  t: (key: string, p?: Record<string, string | number>) => string,
-) {
-  const labels: Record<string, string> = {
-    "parse_favorites.py": t("scripts.parseFavorites"),
-    "generate_insights.py": t("scripts.generateInsights"),
-    "fetch_subtitles.py": t("scripts.fetchSubtitles"),
-    "generate_notes.py": t("scripts.generateNotes"),
-    "extract_projects.py": t("scripts.extractProjects"),
-    "build_index.py": t("scripts.buildIndex"),
-    "validate_knowledge_base.py": t("scripts.healthCheck"),
-  };
-  return labels[scriptName] ?? t("toolbar.runSelected");
-}
+const LazyLogViewer = lazy(() => import("./components/LogViewer").then((module) => ({ default: module.LogViewer })));
+const LazySettingsView = lazy(() => import("./components/SettingsView").then((module) => ({ default: module.SettingsView })));
+const LazyVideos = lazy(() => import("./pages/Videos").then((module) => ({ default: module.Videos })));
+const LazyNotes = lazy(() => import("./pages/Notes").then((module) => ({ default: module.Notes })));
+const LazyCandidates = lazy(() => import("./pages/Candidates").then((module) => ({ default: module.Candidates })));
+const LazyReactMarkdown = lazy(() => import("react-markdown"));
 
 function isTauriRuntime() {
   return isTauri() || (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);
 }
 
-function previewNote(video: Video) {
-  return `# ${video.title}
-
-## Summary
-
-This browser preview uses local sample data because Tauri backend commands are only available inside the desktop runtime.
-
-## Review Points
-
-- Priority: ${video.priority}
-- Status: ${statusLabel(video.status)}
-- Folder: ${video.favorite_folder}
-
-## Next Action
-
-Open the native app build to read real files, run local flows, and update review status.`;
+function GlobalTaskStatusCard({ task }: { task: TaskDisplay }) {
+  return (
+    <article className={`global-task-card tone-${task.light}`}>
+      <div className="global-task-card-head">
+        <span className={`global-task-light is-${task.light}`} />
+        <strong>{task.label}</strong>
+      </div>
+      <div className="global-task-card-state">{task.statusText}</div>
+    </article>
+  );
 }
 
-interface BilibiliCookieValidationResult {
-  valid: boolean;
-  message: string;
-  mid?: number | null;
-  uname?: string | null;
-}
+function GlobalTaskStatusPanel({
+  video,
+  subtitle,
+  insight,
+  noteContent,
+  taskState,
+}: {
+  video: Video | null;
+  subtitle: VideoSubtitle | null;
+  insight: VideoInsight | null;
+  noteContent: string | null;
+  taskState: VideoTaskState | null;
+}) {
+  const hasStructuredNote = Boolean(video?.note_ready || (noteContent && noteContent.trim().length > 0));
+  const subtitleTask = buildTaskDisplay("字幕", "subtitle", taskState?.subtitle, Boolean(subtitle), subtitle, insight);
+  const insightTask = buildTaskDisplay("洞察", "insight", taskState?.insight, Boolean(insight), subtitle, insight);
+  const noteTask = buildTaskDisplay("笔记", "note", taskState?.note, hasStructuredNote, subtitle, insight);
+  const tasks = [subtitleTask, insightTask, noteTask];
+  const runningTask = tasks.find((task) => task.statusText === "进行中");
+  const blockedTask = tasks.find((task) => task.statusText === "阻塞");
+  const failedTask = tasks.find((task) => task.statusText === "失败");
+  const allDone = tasks.every((task) => task.statusText === "完成");
+  const currentPhase = runningTask?.label ?? blockedTask?.label ?? failedTask?.label ?? (allDone ? "全部阶段" : "待开始");
+  const overallState = runningTask
+    ? "进行中"
+    : failedTask
+      ? "失败"
+      : blockedTask
+        ? "阻塞"
+        : allDone
+          ? "完成"
+          : "待开始";
+  const overallLight: TaskLightState = runningTask || blockedTask
+    ? "yellow"
+    : failedTask
+      ? "red"
+      : allDone
+        ? "green"
+        : "red";
+  const latestTimestamp = [subtitleTask.endedAt, insightTask.endedAt, noteTask.endedAt, subtitleTask.startedAt, insightTask.startedAt, noteTask.startedAt]
+    .filter(Boolean)[0];
 
-interface ToastMessage {
-  id: number;
-  tone: "neutral" | "success" | "error";
-  text: string;
+  return (
+    <section className="mac-toolbar-status">
+      <div className="mac-toolbar-status-trigger">
+        <div className="mac-sidebar-status-pill">
+          <span className={`global-task-light is-${overallLight}`} />
+          <strong>{overallState}</strong>
+        </div>
+      </div>
+      <div className="mac-toolbar-status-popover">
+        <div className="mac-sidebar-status-header">
+          <div>
+            <strong>{video?.title || "当前未选中视频"}</strong>
+            <span>{video ? `${video.id} · ${video.uploader || "-"} · ${video.favorite_folder || "全部收藏夹"}` : "切换任意视频后同步显示处理进度"}</span>
+          </div>
+        </div>
+        <div className="mac-sidebar-status-summary">
+          <div className="mac-sidebar-status-pill">
+            <span className={`global-task-light is-${overallLight}`} />
+            <strong>{overallState}</strong>
+          </div>
+          <div className="mac-sidebar-status-summary-meta">
+            <div className="mac-sidebar-status-phase">
+              <span>阶段</span>
+              <strong>{currentPhase}</strong>
+            </div>
+            <div className="mac-sidebar-status-phase is-time">
+              <span>时间</span>
+              <strong>{latestTimestamp || "-"}</strong>
+            </div>
+          </div>
+        </div>
+        <div className="mac-sidebar-status-grid">
+          <GlobalTaskStatusCard task={subtitleTask} />
+          <GlobalTaskStatusCard task={insightTask} />
+          <GlobalTaskStatusCard task={noteTask} />
+        </div>
+      </div>
+    </section>
+  );
 }
-
 function App() {
   const [currentView, setCurrentView] = useState<View>("dashboard");
   const viewMode: ViewMode = "list";
+  const [appearance, setAppearance] = useState<AppearancePreference>("system");
+  const [fontPreference, setFontPreference] = useState<FontPreference>("system");
+  const [densityPreference, setDensityPreference] = useState<DensityPreference>("comfortable");
+  const [timezonePreference, setTimezonePreference] = useState("Asia/Singapore");
   const [videos, setVideos] = useState<Video[]>([]);
   const [favoriteFolders, setFavoriteFolders] = useState<FavoriteFolder[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -274,13 +234,69 @@ function App() {
       setLanguage(lang);
       setI18nLanguage(lang);
       saveLanguage(lang);
+      void persistPreferencePatch({ language: lang }).catch((err) => appendLog(`语言偏好保存失败：${String(err)}`));
+    }
+  }
+
+  function handleAppearanceChange(nextAppearance: AppearancePreference) {
+    setAppearance(nextAppearance);
+    void persistPreferencePatch({ appearance: nextAppearance }).catch((err) => appendLog(`外观偏好保存失败：${String(err)}`));
+  }
+
+  function handleFontChange(nextFont: FontPreference) {
+    setFontPreference(nextFont);
+    void persistPreferencePatch({ fontFamily: nextFont }).catch((err) => appendLog(`字体偏好保存失败：${String(err)}`));
+  }
+
+  function handleDensityChange(nextDensity: DensityPreference) {
+    setDensityPreference(nextDensity);
+    void persistPreferencePatch({ density: nextDensity }).catch((err) => appendLog(`密度偏好保存失败：${String(err)}`));
+  }
+
+  function handleTimezoneChange(nextTimezone: string) {
+    setTimezonePreference(nextTimezone);
+    setDisplayTimezone(nextTimezone);
+    void persistPreferencePatch({ timezone: nextTimezone }).catch((err) => appendLog(`时区偏好保存失败：${String(err)}`));
+  }
+
+  async function persistPreferencePatch(
+    patch: Partial<{
+      appearance: AppearancePreference;
+      fontFamily: FontPreference;
+      density: DensityPreference;
+      timezone: string;
+      language: string;
+    }>,
+  ) {
+    if (!tauriAvailable) {
+      const cached = window.localStorage.getItem(PREVIEW_CONFIG_STORAGE_KEY);
+      const parsed = cached ? JSON.parse(cached) : {};
+      const preferences = { ...(parsed.preferences ?? {}), ...patch };
+      window.localStorage.setItem(PREVIEW_CONFIG_STORAGE_KEY, JSON.stringify({ ...parsed, preferences }));
+      return;
+    }
+
+    const raw: string = await invoke("get_config");
+    const parsed = JSON.parse(raw);
+    const preferences = { ...(parsed.preferences ?? {}), ...patch };
+    await invoke("save_config", { config: JSON.stringify({ ...parsed, preferences }) });
+  }
+
+  async function setAppearanceAndPersist(nextAppearance: AppearancePreference) {
+    setAppearance(nextAppearance);
+    try {
+      await persistPreferencePatch({ appearance: nextAppearance });
+    } catch (err) {
+      appendLog(`外观偏好保存失败：${String(err)}`);
     }
   }
 
   const viewMeta = useMemo(() => buildViewMeta(t), [language]);
   const scriptCatalog = useMemo(() => buildScriptCatalog(t), [language]);
   const [selectedScript, setSelectedScript] = useState("validate_knowledge_base.py");
+  const [scriptStates, setScriptStates] = useState<Record<string, ScriptRunState>>({});
   const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [videoTaskStates, setVideoTaskStates] = useState<Record<string, VideoTaskState>>({});
   const toastTimerRef = useRef<number | null>(null);
 
   const onScrollToConsole = () => {
@@ -300,6 +316,45 @@ function App() {
       setToast(null);
       toastTimerRef.current = null;
     }, 2600);
+  }
+
+  function nowStamp() {
+    return new Date().toLocaleString(undefined, {
+      timeZone: timezonePreference,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
+
+  function updateScriptState(scriptName: string, patch: Partial<ScriptRunState>) {
+    setScriptStates((prev) => ({
+      ...prev,
+      [scriptName]: {
+        ...(prev[scriptName] || {}),
+        state: prev[scriptName]?.state ?? "idle",
+        ...patch,
+      },
+    }));
+  }
+
+  function updateVideoTaskState(videoId: string, stage: VideoTaskStage, patch: Partial<VideoTaskSnapshot>) {
+    setVideoTaskStates((prev) => ({
+      ...prev,
+      [videoId]: {
+        subtitle: prev[videoId]?.subtitle,
+        insight: prev[videoId]?.insight,
+        note: prev[videoId]?.note,
+        [stage]: {
+          state: "idle",
+          ...(prev[videoId]?.[stage] || {}),
+          ...patch,
+        },
+      },
+    }));
   }
 
   async function fetchVideos() {
@@ -325,13 +380,16 @@ function App() {
         return acc;
       }, {});
       setFavoriteFolders(
-        Object.entries(counts).map(([title, media_count]) => ({ id: title, title, media_count })),
+        Object.entries(counts)
+          .map(([title, media_count]) => ({ id: title, title, media_count, latest_ts: 0, latest_collected_at: "" }))
+          .sort((a, b) => a.title.localeCompare(b.title, "zh-CN")),
       );
       return;
     }
     try {
       const data: string = await invoke("get_favorite_folders");
-      setFavoriteFolders(JSON.parse(data));
+      const parsed = JSON.parse(data);
+      setFavoriteFolders(Array.isArray(parsed) ? parsed : []);
     } catch {
       setFavoriteFolders([]);
     }
@@ -404,6 +462,7 @@ function App() {
   async function runFullPipeline() {
     if (pipelineRunning || isRunning) return;
     if (!tauriAvailable) return;
+    let currentPipelineStep: (typeof PIPELINE_STEPS)[number] | null = null;
     setPipelineRunning(true);
     setPipelineError(null);
     appendLog("流程执行：开始完整处理");
@@ -416,10 +475,23 @@ function App() {
         throw new Error(cookieCheck.message);
       }
       for (const script of PIPELINE_STEPS) {
+        currentPipelineStep = script;
         setPipelineStep(script);
+        updateScriptState(script, {
+          state: "running",
+          startedAt: nowStamp(),
+          endedAt: undefined,
+          lastMessage: `正在执行 ${getScriptDisplayName(script, t)}`,
+        });
         appendLog(`流程执行：正在处理 ${getScriptDisplayName(script, t)}`);
         await invoke("run_script", { scriptName: script, args: [] });
         appendLog(`流程执行：${getScriptDisplayName(script, t)} 已完成`);
+        updateScriptState(script, {
+          state: "success",
+          endedAt: nowStamp(),
+          lastMessage: `${getScriptDisplayName(script, t)} 已完成`,
+          lastOutput: `流程执行：${getScriptDisplayName(script, t)} 已完成`,
+        });
       }
       appendLog("流程执行：全部步骤已完成");
       await fetchVideos();
@@ -431,6 +503,14 @@ function App() {
     } catch (err) {
       setPipelineError(String(err));
       appendLog(`流程执行失败：${String(err)}`);
+      if (currentPipelineStep) {
+        updateScriptState(currentPipelineStep, {
+          state: "error",
+          endedAt: nowStamp(),
+          lastMessage: String(err),
+          lastOutput: `流程执行失败：${String(err)}`,
+        });
+      }
     } finally {
       setPipelineStep(null);
       setPipelineRunning(false);
@@ -513,6 +593,12 @@ function App() {
       setIsRunning(true);
       setSelectedScript(name);
       setError(null);
+      updateScriptState(name, {
+        state: "running",
+        startedAt: nowStamp(),
+        endedAt: undefined,
+        lastMessage: `正在执行 ${displayName}`,
+      });
       if (name === "parse_favorites.py" || name === "fetch_subtitles.py") {
         const cookieCheck = await validateBilibiliCookie({
           requiredFor: name === "parse_favorites.py" ? "导入收藏夹" : "抓取字幕",
@@ -520,12 +606,24 @@ function App() {
         if (!cookieCheck.valid) {
           appendLog(cookieCheck.message);
           setError(cookieCheck.message);
+          updateScriptState(name, {
+            state: "blocked",
+            endedAt: nowStamp(),
+            lastMessage: cookieCheck.message,
+            lastOutput: cookieCheck.message,
+          });
           return;
         }
       }
       appendLog(t("error.scriptStart", { name: displayName }));
       await invoke("run_script", { scriptName: name, args });
       appendLog(t("error.scriptSuccess", { name: displayName }));
+      updateScriptState(name, {
+        state: "success",
+        endedAt: nowStamp(),
+        lastMessage: `${displayName} 执行完成`,
+        lastOutput: t("error.scriptSuccess", { name: displayName }),
+      });
       await fetchVideos();
       await fetchFavoriteFolders();
       await fetchProjects();
@@ -536,6 +634,12 @@ function App() {
     } catch (err) {
       const errMsg = String(err);
       appendLog(t("error.scriptError", { name: displayName, error: errMsg }));
+      updateScriptState(name, {
+        state: "error",
+        endedAt: nowStamp(),
+        lastMessage: errMsg,
+        lastOutput: t("error.scriptError", { name: displayName, error: errMsg }),
+      });
       if (!errMsg.includes("exit code") && !errMsg.includes("issues")) {
         setError(t("error.scriptFailed"));
       }
@@ -548,6 +652,18 @@ function App() {
     if (!tauriAvailable || subtitleExtracting) return;
     try {
       setSubtitleExtracting(true);
+      updateScriptState("fetch_subtitles.py", {
+        state: "running",
+        startedAt: nowStamp(),
+        endedAt: undefined,
+        lastMessage: `正在抓取字幕：${videoId}`,
+      });
+      updateVideoTaskState(videoId, "subtitle", {
+        state: "running",
+        startedAt: nowStamp(),
+        endedAt: undefined,
+        message: "正在抓取字幕",
+      });
       appendLog(`字幕提取：正在处理 ${videoId}`);
       showToast(`开始抓取字幕：${videoId}`, "neutral");
       await invoke("run_script", {
@@ -556,10 +672,32 @@ function App() {
       });
       await fetchSubtitles();
       appendLog(`字幕提取：已完成 ${videoId}`);
+      updateScriptState("fetch_subtitles.py", {
+        state: "success",
+        endedAt: nowStamp(),
+        lastMessage: `字幕抓取完成：${videoId}`,
+        lastOutput: `字幕提取：已完成 ${videoId}`,
+      });
+      updateVideoTaskState(videoId, "subtitle", {
+        state: "success",
+        endedAt: nowStamp(),
+        message: "字幕抓取完成",
+      });
       showToast(`字幕抓取完成：${videoId}`, "success");
     } catch (err) {
       appendLog(`字幕提取失败：${String(err)}`);
       setError(String(err));
+      updateScriptState("fetch_subtitles.py", {
+        state: "error",
+        endedAt: nowStamp(),
+        lastMessage: String(err),
+        lastOutput: `字幕提取失败：${String(err)}`,
+      });
+      updateVideoTaskState(videoId, "subtitle", {
+        state: "error",
+        endedAt: nowStamp(),
+        message: String(err),
+      });
       showToast(`字幕抓取失败：${videoId}`, "error");
     } finally {
       setSubtitleExtracting(false);
@@ -570,6 +708,18 @@ function App() {
     if (!tauriAvailable || isRunning) return;
     try {
       setIsRunning(true);
+      updateScriptState("generate_insights.py", {
+        state: "running",
+        startedAt: nowStamp(),
+        endedAt: undefined,
+        lastMessage: `正在生成洞察：${videoId}`,
+      });
+      updateVideoTaskState(videoId, "insight", {
+        state: "running",
+        startedAt: nowStamp(),
+        endedAt: undefined,
+        message: "正在生成洞察",
+      });
       appendLog(`视频洞察：正在生成 ${videoId}`);
       showToast(`开始分析笔记：${videoId}`, "neutral");
       await invoke("run_script", {
@@ -578,10 +728,32 @@ function App() {
       });
       await fetchInsights();
       appendLog(`视频洞察：已生成 ${videoId}`);
+      updateScriptState("generate_insights.py", {
+        state: "success",
+        endedAt: nowStamp(),
+        lastMessage: `洞察生成完成：${videoId}`,
+        lastOutput: `视频洞察：已生成 ${videoId}`,
+      });
+      updateVideoTaskState(videoId, "insight", {
+        state: "success",
+        endedAt: nowStamp(),
+        message: "洞察生成完成",
+      });
       showToast(`笔记分析完成：${videoId}`, "success");
     } catch (err) {
       appendLog(`视频洞察失败：${String(err)}`);
       setError(String(err));
+      updateScriptState("generate_insights.py", {
+        state: "error",
+        endedAt: nowStamp(),
+        lastMessage: String(err),
+        lastOutput: `视频洞察失败：${String(err)}`,
+      });
+      updateVideoTaskState(videoId, "insight", {
+        state: "error",
+        endedAt: nowStamp(),
+        message: String(err),
+      });
       showToast(`笔记分析失败：${videoId}`, "error");
     } finally {
       setIsRunning(false);
@@ -590,8 +762,43 @@ function App() {
 
   async function generateNoteForVideo(videoId: string) {
     if (!tauriAvailable || isRunning) return;
+    const hasSubtitle = subtitles.some((subtitle) => subtitle.video_id === videoId);
+    const hasInsight = insights.some((insight) => insight.video_id === videoId);
+    if (!hasSubtitle || !hasInsight) {
+      const missing = [
+        !hasSubtitle ? "字幕" : null,
+        !hasInsight ? "洞察" : null,
+      ].filter(Boolean).join("、");
+      updateVideoTaskState(videoId, "note", {
+        state: "blocked",
+        startedAt: nowStamp(),
+        endedAt: nowStamp(),
+        message: `缺少${missing}，无法生成有效笔记`,
+      });
+      updateScriptState("generate_notes.py", {
+        state: "blocked",
+        startedAt: nowStamp(),
+        endedAt: nowStamp(),
+        lastMessage: `缺少${missing}，无法生成笔记`,
+        lastOutput: `笔记生成受阻：缺少${missing}`,
+      });
+      showToast(`笔记生成受阻：缺少${missing}`, "error");
+      return;
+    }
     try {
       setIsRunning(true);
+      updateScriptState("generate_notes.py", {
+        state: "running",
+        startedAt: nowStamp(),
+        endedAt: undefined,
+        lastMessage: `正在生成基础笔记：${videoId}`,
+      });
+      updateVideoTaskState(videoId, "note", {
+        state: "running",
+        startedAt: nowStamp(),
+        endedAt: undefined,
+        message: "正在生成基础笔记",
+      });
       appendLog(`笔记生成：正在处理 ${videoId}`);
       showToast(`开始生成基础笔记：${videoId}`, "neutral");
       await invoke("run_script", {
@@ -600,10 +807,32 @@ function App() {
       });
       await fetchVideos();
       appendLog(`笔记生成：已完成 ${videoId}`);
+      updateScriptState("generate_notes.py", {
+        state: "success",
+        endedAt: nowStamp(),
+        lastMessage: `基础笔记生成完成：${videoId}`,
+        lastOutput: `笔记生成：已完成 ${videoId}`,
+      });
+      updateVideoTaskState(videoId, "note", {
+        state: "success",
+        endedAt: nowStamp(),
+        message: "基础笔记生成完成",
+      });
       showToast(`基础笔记生成完成：${videoId}`, "success");
     } catch (err) {
       appendLog(`笔记生成失败：${String(err)}`);
       setError(String(err));
+      updateScriptState("generate_notes.py", {
+        state: "error",
+        endedAt: nowStamp(),
+        lastMessage: String(err),
+        lastOutput: `笔记生成失败：${String(err)}`,
+      });
+      updateVideoTaskState(videoId, "note", {
+        state: "error",
+        endedAt: nowStamp(),
+        message: String(err),
+      });
       showToast(`基础笔记生成失败：${videoId}`, "error");
     } finally {
       setIsRunning(false);
@@ -656,6 +885,92 @@ function App() {
       unlisten.then((remove) => remove());
     };
   }, []);
+
+  useEffect(() => {
+    async function loadVisualPreferences() {
+      try {
+        if (!tauriAvailable) {
+          const cached = window.localStorage.getItem(PREVIEW_CONFIG_STORAGE_KEY);
+          if (!cached) return;
+          const parsed = JSON.parse(cached) as {
+            preferences?: {
+              appearance?: AppearancePreference;
+              fontFamily?: FontPreference;
+              density?: DensityPreference;
+              timezone?: string;
+            };
+          };
+          const nextAppearance = parsed.preferences?.appearance;
+          if (nextAppearance === "system" || nextAppearance === "light" || nextAppearance === "dark") {
+            setAppearance(nextAppearance);
+          }
+          const nextFont = parsed.preferences?.fontFamily;
+          if (nextFont === "system" || nextFont === "rounded" || nextFont === "serif" || nextFont === "mono") {
+            setFontPreference(nextFont);
+          }
+          const nextDensity = parsed.preferences?.density;
+          if (nextDensity === "comfortable" || nextDensity === "compact") {
+            setDensityPreference(nextDensity);
+          }
+          if (parsed.preferences?.timezone) {
+            setTimezonePreference(parsed.preferences.timezone);
+            setDisplayTimezone(parsed.preferences.timezone);
+          }
+          return;
+        }
+
+        const raw: string = await invoke("get_config");
+        const parsed = JSON.parse(raw) as {
+          preferences?: {
+            appearance?: AppearancePreference;
+            fontFamily?: FontPreference;
+            density?: DensityPreference;
+            timezone?: string;
+          };
+        };
+        const nextAppearance = parsed.preferences?.appearance;
+        if (nextAppearance === "system" || nextAppearance === "light" || nextAppearance === "dark") {
+          setAppearance(nextAppearance);
+        }
+        const nextFont = parsed.preferences?.fontFamily;
+        if (nextFont === "system" || nextFont === "rounded" || nextFont === "serif" || nextFont === "mono") {
+          setFontPreference(nextFont);
+        }
+        const nextDensity = parsed.preferences?.density;
+        if (nextDensity === "comfortable" || nextDensity === "compact") {
+          setDensityPreference(nextDensity);
+        }
+        if (parsed.preferences?.timezone) {
+          setTimezonePreference(parsed.preferences.timezone);
+          setDisplayTimezone(parsed.preferences.timezone);
+        }
+      } catch {
+        // Keep default visual preferences as fallback.
+      }
+    }
+
+    void loadVisualPreferences();
+  }, [tauriAvailable]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const applyAppearance = () => {
+      const resolved = appearance === "system" ? (media.matches ? "dark" : "light") : appearance;
+      root.dataset.theme = resolved;
+    };
+
+    applyAppearance();
+    media.addEventListener?.("change", applyAppearance);
+    return () => media.removeEventListener?.("change", applyAppearance);
+  }, [appearance]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.font = fontPreference;
+    root.dataset.density = densityPreference;
+    root.dataset.timezone = timezonePreference;
+  }, [fontPreference, densityPreference, timezonePreference]);
 
   useEffect(() => {
     if (!tauriAvailable) return;
@@ -723,6 +1038,12 @@ function App() {
     videos[0] ||
     null;
   const activeProject = selectedProject ?? filteredProjects[0] ?? projects[0] ?? null;
+  const activeInsight = activeVideo
+    ? insights.find((item) => item.video_id === activeVideo.id) ?? null
+    : null;
+  const activeSubtitle = activeVideo
+    ? subtitles.find((item) => item.video_id === activeVideo.id) ?? null
+    : null;
   const reviewedCount = videos.filter((video) => video.status === "reviewed").length;
   const pendingCount = videos.filter((video) => video.status === "pending").length;
   const p0Count = videos.filter((video) => video.priority === "P0").length;
@@ -730,18 +1051,19 @@ function App() {
 
   const toolbarAction = getToolbarAction({
     currentView,
-    activeVideo,
     isRunning,
     selectedScript,
-    fetchNote,
     runPythonScript,
   });
-  const toolbarControls = getToolbarControls({
-    currentView,
-    isRunning,
-    subtitleExtracting,
-    runPythonScript,
-  });
+  const toolbarControls = getToolbarControls();
+  const resolvedAppearance: Exclude<AppearancePreference, "system"> =
+    appearance === "system"
+      ? (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+      : appearance;
+  const showToolbarSearch =
+    currentView === "knowledge" ||
+    currentView === "scripts" ||
+    currentView === "tags";
 
   return (
     <MacAppShell
@@ -818,6 +1140,26 @@ function App() {
               <span>{t("kb.p0Items")}</span>
               <strong>{p0Count}</strong>
             </div>
+            <div className="mac-sidebar-theme-toggle" aria-label={t("settings.theme")}>
+              <button
+                aria-pressed={resolvedAppearance === "light"}
+                className={cn(resolvedAppearance === "light" && "is-active")}
+                onClick={() => void setAppearanceAndPersist("light")}
+                type="button"
+              >
+                <Sun size={15} />
+                <span>{t("settings.light")}</span>
+              </button>
+              <button
+                aria-pressed={resolvedAppearance === "dark"}
+                className={cn(resolvedAppearance === "dark" && "is-active")}
+                onClick={() => void setAppearanceAndPersist("dark")}
+                type="button"
+              >
+                <Moon size={15} />
+                <span>{t("settings.dark")}</span>
+              </button>
+            </div>
           </div>
         </MacSidebar>
       }
@@ -825,8 +1167,17 @@ function App() {
         <MacToolbar
           controls={toolbarControls}
           action={toolbarAction}
+          status={
+            <GlobalTaskStatusPanel
+              insight={activeInsight}
+              noteContent={noteContent}
+              subtitle={activeSubtitle}
+              taskState={activeVideo ? (videoTaskStates[activeVideo.id] ?? null) : null}
+              video={activeVideo}
+            />
+          }
           search={
-            currentView !== "settings" ? (
+            showToolbarSearch ? (
               <MacSearchField
                 onChange={setSearchTerm}
                 placeholder={t("toolbar.search")}
@@ -852,153 +1203,171 @@ function App() {
             <Circle size={10} fill="currentColor" /> {error}
           </MacInlineNotice>
         )}
-        {currentView === "dashboard" && (
-          <div className="mac-page-scroll custom-scrollbar">
-            {isTauriRuntime() ? (
-              <ActionCenter
-                videos={videos}
-                projects={projects}
-                onOpenNote={openVideoInNotes}
-                onStartLearning={(video) => {
-                  if (video.note_path) {
-                    openVideoInNotes(video);
-                  } else {
-                    openVideoInFavorites(video);
-                  }
-                }}
+        <Suspense
+          fallback={
+            <div className="mac-page-scroll custom-scrollbar">
+              <MacEmptyState detail={t("status.processing")} title={t("status.processing")} />
+            </div>
+          }
+        >
+          {currentView === "dashboard" && (
+            <div className="mac-page-scroll custom-scrollbar">
+              {isTauriRuntime() ? (
+                <ActionCenter
+                  videos={videos}
+                  projects={projects}
+                  onOpenNote={openVideoInNotes}
+                  onStartLearning={(video) => {
+                    if (video.note_path) {
+                      openVideoInNotes(video);
+                    } else {
+                      openVideoInFavorites(video);
+                    }
+                  }}
+                />
+              ) : (
+                renderDashboard({
+                  activeVideo,
+                  isPreview: !tauriAvailable,
+                  isRunning,
+                  logs,
+                  openVideoInNotes,
+                  p0Count,
+                  pendingCount,
+                  projects,
+                  reviewedCount,
+                  runPythonScript,
+                  videos,
+                  fetchNote,
+                  filterPriority,
+                  setFilterPriority,
+                  filterStatus,
+                  setFilterStatus,
+                  filteredVideos,
+                  updateStatus,
+                  noteContent,
+                  onScrollToConsole,
+                  pipelineStatus,
+                  pipelineLoading,
+                  pipelineError,
+                  fetchProcessingStatus,
+                  pipelineRunning,
+                  pipelineStep,
+                  runFullPipeline,
+                })
+              )}
+            </div>
+          )}
+          {currentView === "favorites" && (
+            <LazyVideos
+              activeVideo={activeVideo}
+              fetchNote={fetchNote}
+              favoriteFolders={favoriteFolders}
+              filterPriority={filterPriority}
+              filterStatus={filterStatus}
+              groupByFolder
+              onExtractSubtitle={extractSubtitle}
+              onGenerateInsight={generateInsightForVideo}
+              onGenerateNote={generateNoteForVideo}
+              onRunBatchSubtitle={() => runPythonScript("fetch_subtitles.py", ["--root", ".", "--limit", "30"])}
+              onRunBatchInsight={() => runPythonScript("generate_insights.py", ["--root", ".", "--limit", "30"])}
+              onRunBatchNote={() => runPythonScript("generate_notes.py", ["--root", ".", "--limit", "30"])}
+              setFilterPriority={setFilterPriority}
+              setFilterStatus={setFilterStatus}
+              title={t("view.favorites")}
+              updateStatus={updateStatus}
+              videoTaskStates={videoTaskStates}
+              videos={favoriteVideos}
+            />
+          )}
+          {currentView === "videos" && (
+            <LazyVideos
+              activeVideo={activeVideo}
+              fetchNote={fetchNote}
+              favoriteFolders={favoriteFolders}
+              filterPriority={filterPriority}
+              filterStatus={filterStatus}
+              onExtractSubtitle={extractSubtitle}
+              onGenerateInsight={generateInsightForVideo}
+              onGenerateNote={generateNoteForVideo}
+              onRunBatchSubtitle={() => runPythonScript("fetch_subtitles.py", ["--root", ".", "--limit", "30"])}
+              onRunBatchInsight={() => runPythonScript("generate_insights.py", ["--root", ".", "--limit", "30"])}
+              onRunBatchNote={() => runPythonScript("generate_notes.py", ["--root", ".", "--limit", "30"])}
+              setFilterPriority={setFilterPriority}
+              setFilterStatus={setFilterStatus}
+              title={t("view.videos")}
+              updateStatus={updateStatus}
+              videoTaskStates={videoTaskStates}
+              videos={filteredVideos}
+            />
+          )}
+          {currentView === "notes" && (
+            <LazyNotes
+              activeVideo={activeVideo}
+              fetchNote={fetchNote}
+              noteContent={noteContent}
+              onExtractSubtitle={extractSubtitle}
+              subtitleExtracting={subtitleExtracting}
+              videos={filteredVideos}
+              insights={insights}
+              subtitles={subtitles}
+              videoTaskStates={videoTaskStates}
+            />
+          )}
+          {currentView === "projects" && (
+            <LazyCandidates
+              activeProject={activeProject}
+              projects={filteredProjects}
+              setSelectedProject={setSelectedProject}
+              viewMode={viewMode}
+            />
+          )}
+          {currentView === "knowledge" &&
+            renderKnowledge({
+              openVideoInNotes,
+              openVideoInFavorites,
+              noteCount,
+              onOpenCandidates: () => setCurrentView("projects"),
+              onRefreshKnowledge: () => void runHiddenKnowledgeRefresh(),
+              onOpenScripts: () => setCurrentView("scripts"),
+              onOpenTags: () => setCurrentView("tags"),
+              pendingCount,
+              projects,
+              reviewedCount,
+              videos,
+            })}
+          {currentView === "scripts" &&
+            renderScripts({
+              isRunning,
+              logs,
+              onViewOutput: () => outputAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+              outputAnchorRef,
+              runPythonScript,
+              selectedScript,
+              scriptStates,
+              setLogs,
+              setSelectedScript,
+              scriptCatalog,
+            })}
+          {currentView === "tags" && (
+            renderThoughts({
+              insights,
+              openVideoInNotes,
+              videos,
+            })
+          )}
+          {currentView === "settings" && (
+            <div className="mac-page-scroll custom-scrollbar">
+              <LazySettingsView
+                onAppearanceChange={handleAppearanceChange}
+                onDensityChange={handleDensityChange}
+                onFontChange={handleFontChange}
+                onLanguageChange={handleLanguageChange}
+                onTimezoneChange={handleTimezoneChange}
               />
-            ) : (
-              renderDashboard({
-                activeVideo,
-                isPreview: !tauriAvailable,
-                isRunning,
-                logs,
-                openVideoInNotes,
-                p0Count,
-                pendingCount,
-                projects,
-                reviewedCount,
-                runPythonScript,
-                videos,
-                fetchNote,
-                filterPriority,
-                setFilterPriority,
-                filterStatus,
-                setFilterStatus,
-                filteredVideos,
-                updateStatus,
-                noteContent,
-                onScrollToConsole,
-                pipelineStatus,
-                pipelineLoading,
-                pipelineError,
-                fetchProcessingStatus,
-                pipelineRunning,
-                pipelineStep,
-                runFullPipeline,
-              })
-            )}
-          </div>
-        )}
-        {currentView === "favorites" && (
-          <Videos
-            activeVideo={activeVideo}
-            fetchNote={fetchNote}
-            favoriteFolders={favoriteFolders}
-            filterPriority={filterPriority}
-            filterStatus={filterStatus}
-            groupByFolder
-            onExtractSubtitle={extractSubtitle}
-            onGenerateInsight={generateInsightForVideo}
-            onGenerateNote={generateNoteForVideo}
-            onRunBatchSubtitle={() => runPythonScript("fetch_subtitles.py", ["--root", ".", "--limit", "30"])}
-            onRunBatchInsight={() => runPythonScript("generate_insights.py", ["--root", ".", "--limit", "30"])}
-            onRunBatchNote={() => runPythonScript("generate_notes.py", ["--root", ".", "--limit", "30"])}
-            setFilterPriority={setFilterPriority}
-            setFilterStatus={setFilterStatus}
-            title={t("view.favorites")}
-            updateStatus={updateStatus}
-            videos={favoriteVideos}
-          />
-        )}
-        {currentView === "videos" && (
-          <Videos
-            activeVideo={activeVideo}
-            fetchNote={fetchNote}
-            favoriteFolders={favoriteFolders}
-            filterPriority={filterPriority}
-            filterStatus={filterStatus}
-            onExtractSubtitle={extractSubtitle}
-            onGenerateInsight={generateInsightForVideo}
-            onGenerateNote={generateNoteForVideo}
-            onRunBatchSubtitle={() => runPythonScript("fetch_subtitles.py", ["--root", ".", "--limit", "30"])}
-            onRunBatchInsight={() => runPythonScript("generate_insights.py", ["--root", ".", "--limit", "30"])}
-            onRunBatchNote={() => runPythonScript("generate_notes.py", ["--root", ".", "--limit", "30"])}
-            setFilterPriority={setFilterPriority}
-            setFilterStatus={setFilterStatus}
-            title={t("view.videos")}
-            updateStatus={updateStatus}
-            videos={filteredVideos}
-          />
-        )}
-        {currentView === "notes" && (
-          <Notes
-            activeVideo={activeVideo}
-            fetchNote={fetchNote}
-            noteContent={noteContent}
-            onExtractSubtitle={extractSubtitle}
-            subtitleExtracting={subtitleExtracting}
-            videos={filteredVideos}
-            insights={insights}
-            subtitles={subtitles}
-          />
-        )}
-        {currentView === "projects" && (
-          <Candidates
-            activeProject={activeProject}
-            projects={filteredProjects}
-            setSelectedProject={setSelectedProject}
-            viewMode={viewMode}
-          />
-        )}
-        {currentView === "knowledge" &&
-          renderKnowledge({
-            openVideoInNotes,
-            openVideoInFavorites,
-            noteCount,
-            onOpenCandidates: () => setCurrentView("projects"),
-            onRefreshKnowledge: () => void runHiddenKnowledgeRefresh(),
-            onOpenScripts: () => setCurrentView("scripts"),
-            onOpenTags: () => setCurrentView("tags"),
-            pendingCount,
-            projects,
-            reviewedCount,
-            videos,
-          })}
-        {currentView === "scripts" &&
-          renderScripts({
-            isRunning,
-            logs,
-            onViewOutput: () => outputAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-            outputAnchorRef,
-            runPythonScript,
-            selectedScript,
-            setLogs,
-            setSelectedScript,
-            scriptCatalog,
-          })}
-        {currentView === "tags" && (
-          renderThoughts({
-            insights,
-            openVideoInNotes,
-            videos,
-          })
-        )}
-        {currentView === "settings" && (
-          <div className="mac-page-scroll custom-scrollbar">
-            <SettingsView onLanguageChange={handleLanguageChange} />
-          </div>
-        )}
+            </div>
+          )}
+        </Suspense>
       </div>
     </MacAppShell>
   );
@@ -1006,32 +1375,16 @@ function App() {
 
 function getToolbarAction({
   currentView,
-  activeVideo,
   isRunning,
   selectedScript,
-  fetchNote,
   runPythonScript,
 }: {
   currentView: View;
-  activeVideo: Video | null;
   isRunning: boolean;
   selectedScript: string;
-  fetchNote: (video: Video) => void;
   runPythonScript: (name: string, args?: string[]) => void;
 }) {
   if (currentView === "settings") return undefined;
-
-  if (currentView === "notes") {
-    return (
-      <MacToolbarButton
-        disabled={!activeVideo}
-        icon={<BookOpen size={14} />}
-        label={t("toolbar.openNote")}
-        onClick={() => activeVideo && fetchNote(activeVideo)}
-        primary
-      />
-    );
-  }
 
   if (currentView === "scripts") {
     return (
@@ -1045,12 +1398,16 @@ function getToolbarAction({
     );
   }
 
-  if (currentView === "favorites" || currentView === "videos") {
+  if (
+    currentView === "favorites" ||
+    currentView === "videos" ||
+    currentView === "notes" ||
+    currentView === "projects"
+  ) {
     return undefined;
   }
 
   const actionByView: Partial<Record<View, { label: string; script: string; icon: ReactNode }>> = {
-    dashboard: { label: t("action.import"), script: "parse_favorites.py", icon: <CloudDownload size={14} /> },
     favorites: {
       label: t("action.importFromBilibili"),
       script: "parse_favorites.py",
@@ -1078,50 +1435,8 @@ function getToolbarAction({
   );
 }
 
-function getToolbarControls({
-  currentView,
-  isRunning,
-  subtitleExtracting,
-  runPythonScript,
-}: {
-  currentView: View;
-  isRunning: boolean;
-  subtitleExtracting: boolean;
-  runPythonScript: (name: string, args?: string[]) => void;
-}) {
-  if (currentView !== "favorites" && currentView !== "videos") {
-    return undefined;
-  }
-
-  return (
-    <div className="flex gap-2 flex-wrap justify-center">
-      <MacToolbarButton
-        disabled={isRunning}
-        icon={<CloudDownload size={14} />}
-        label={t("action.importFromBilibili")}
-        onClick={() => runPythonScript("parse_favorites.py")}
-        primary={currentView === "favorites"}
-      />
-      <MacToolbarButton
-        disabled={isRunning || subtitleExtracting}
-        icon={<Subtitles size={14} />}
-        label={t("scripts.fetchSubtitles")}
-        onClick={() => runPythonScript("fetch_subtitles.py")}
-      />
-      <MacToolbarButton
-        disabled={isRunning}
-        icon={<Sparkles size={14} />}
-        label={t("scripts.generateInsights")}
-        onClick={() => runPythonScript("generate_insights.py")}
-      />
-      <MacToolbarButton
-        disabled={isRunning}
-        icon={<FileText size={14} />}
-        label={t("scripts.generateNotes")}
-        onClick={() => runPythonScript("generate_notes.py")}
-      />
-    </div>
-  );
+function getToolbarControls() {
+  return undefined;
 }
 
 function getStaleness(lastUpdated: string | undefined): { stale: boolean; hours: number } {
@@ -1797,7 +2112,7 @@ function renderDashboard({
             <div className="dashboard-note-body">
               {noteContent ? (
                 <div className="dashboard-markdown">
-                  <ReactMarkdown>{noteContent}</ReactMarkdown>
+                  <LazyReactMarkdown>{noteContent}</LazyReactMarkdown>
                 </div>
               ) : (
                 <p>{t("dashboard.selectVideoHint")}</p>
@@ -1821,7 +2136,7 @@ function renderDashboard({
                 onClick={onScrollToConsole}
               />
             </header>
-            <LogViewer logs={logs.slice(-10)} />
+            <LazyLogViewer logs={logs.slice(-10)} />
           </div>
         </aside>
       </section>
@@ -1910,13 +2225,16 @@ function renderKnowledge({
                 <h2>{t("kb.knowledgeBasePath")}</h2>
                 <span>../BiliKnowledge</span>
               </header>
-              <div className="mb-4 flex flex-wrap gap-2">
-                <MacToolbarButton label={t("kb.openCandidates")} onClick={onOpenCandidates} primary />
-                <MacToolbarButton
-                  label={t("kb.openTopRepo")}
-                  onClick={() => topProjects[0] && openUrl(topProjects[0].url)}
-                />
-                <MacToolbarButton label={t("kb.refreshKnowledge")} onClick={onRefreshKnowledge} />
+              <div className="kb-path-actions">
+                <MacToolbarButton icon={<Library size={14} />} label={t("kb.openCandidates")} onClick={onOpenCandidates} />
+                {topProjects[0] ? (
+                  <MacToolbarButton
+                    icon={<ExternalLink size={14} />}
+                    label={t("kb.openTopRepo")}
+                    onClick={() => openUrl(topProjects[0].url)}
+                  />
+                ) : null}
+                <MacToolbarButton icon={<RefreshCw size={14} />} label={t("kb.refreshKnowledge")} onClick={onRefreshKnowledge} />
               </div>
               <div className="kb-meta-list">
                 <div className="kb-meta-row">
@@ -2157,6 +2475,7 @@ function renderScripts({
   outputAnchorRef,
   runPythonScript,
   selectedScript,
+  scriptStates,
   setLogs,
   setSelectedScript,
   scriptCatalog,
@@ -2167,12 +2486,14 @@ function renderScripts({
   outputAnchorRef: RefObject<HTMLDivElement | null>;
   runPythonScript: (name: string, args?: string[]) => void;
   selectedScript: string;
+  scriptStates: Record<string, ScriptRunState>;
   setLogs: (logs: string[]) => void;
   setSelectedScript: (name: string) => void;
   scriptCatalog: ScriptItem[];
 }) {
   const activeScript = scriptCatalog.find((script) => script.name === selectedScript) ?? scriptCatalog[0];
-  const lastOutput = logs.length > 0 ? logs[logs.length - 1] : null;
+  const activeScriptState = scriptStates[activeScript.name];
+  const lastOutput = activeScriptState?.lastOutput || (logs.length > 0 ? logs[logs.length - 1] : null);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -2183,7 +2504,9 @@ function renderScripts({
             <ShieldCheck size={15} />
           </div>
           <div className="script-list">
-            {scriptCatalog.map((script) => (
+            {scriptCatalog.map((script) => {
+              const state = scriptStates[script.name]?.state ?? "idle";
+              return (
               <button
                 className={cn("script-row", selectedScript === script.name && "is-selected")}
                 key={script.name}
@@ -2194,11 +2517,12 @@ function renderScripts({
                   <div className="script-row-title">{script.title}</div>
                   <div className="script-row-subtitle">{script.detail}</div>
                 </div>
-                <MacStatusPill tone={isRunning && selectedScript === script.name ? "orange" : "neutral"}>
-                  {isRunning && selectedScript === script.name ? t("scripts.running") : script.status}
+                <MacStatusPill tone={getScriptStateTone(state)}>
+                  {getScriptStateLabel(state, t)}
                 </MacStatusPill>
               </button>
-            ))}
+              );
+            })}
           </div>
         </section>
         <section className="script-detail-wrap custom-scrollbar">
@@ -2213,7 +2537,7 @@ function renderScripts({
             <div className="script-meta-grid">
               <div className="script-meta-row">
                 <span>{t("scripts.scriptDetail.status")}</span>
-                <strong>{isRunning && selectedScript === activeScript.name ? t("scripts.running") : activeScript.status}</strong>
+                <strong>{getScriptStateLabel(activeScriptState?.state ?? "idle", t)}</strong>
               </div>
               <div className="script-meta-row">
                 <span>{t("scripts.scriptDetail.permission")}</span>
@@ -2221,11 +2545,26 @@ function renderScripts({
               </div>
               <div className="script-meta-row">
                 <span>{t("scripts.scriptDetail.lastRun")}</span>
-                <strong>{logs.length > 0 ? t("scripts.scriptDetail.recentOutput") : t("scripts.scriptDetail.never")}</strong>
+                <strong>{activeScriptState?.endedAt || activeScriptState?.startedAt || t("scripts.scriptDetail.never")}</strong>
               </div>
               <div className="script-meta-row">
                 <span>{t("scripts.scriptDetail.scope")}</span>
-                <strong>{t("scripts.scriptDetail.knowledgeValidation")}</strong>
+                <strong>{getScriptScopeLabel(activeScript.name, t)}</strong>
+              </div>
+            </div>
+
+            <div className="script-meta-grid">
+              <div className="script-meta-row">
+                <span>开始时间</span>
+                <strong>{activeScriptState?.startedAt || "-"}</strong>
+              </div>
+              <div className="script-meta-row">
+                <span>结束时间</span>
+                <strong>{activeScriptState?.endedAt || "-"}</strong>
+              </div>
+              <div className="script-meta-row">
+                <span>最近结果</span>
+                <strong>{activeScriptState?.lastMessage || "尚未执行"}</strong>
               </div>
             </div>
 
