@@ -11,6 +11,7 @@ const ALLOWED_SCRIPTS: &[&str] = &[
     "generate_insights.py",
     "fetch_subtitles.py",
     "generate_notes.py",
+    "reconcile_notes.py",
     "extract_projects.py",
     "build_index.py",
     "validate_knowledge_base.py",
@@ -245,31 +246,6 @@ fn knowledge_path(relative_path: &str) -> Result<PathBuf, String> {
     ensure_path_under_base(&base, &target)
 }
 
-fn is_substantive_note_content(content: &str) -> bool {
-    let normalized = content.trim();
-    if normalized.is_empty() {
-        return false;
-    }
-
-    let placeholder_signals = [
-        "> 待补充。",
-        "- 待补充",
-        "问题定义待补充",
-        "## 内容概述",
-        "## 核心观点",
-        "## 适用场景",
-        "## 解决的问题",
-        "## 关键名词",
-    ];
-
-    let hits = placeholder_signals
-        .iter()
-        .filter(|signal| normalized.contains(**signal))
-        .count();
-
-    hits < 4
-}
-
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -287,6 +263,12 @@ fn get_videos() -> Result<String, String> {
 
     if let Some(items) = videos.as_array_mut() {
         for video in items.iter_mut() {
+            let video_id = video
+                .get("id")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string();
             let note_path = video
                 .get("note_path")
                 .and_then(|value| value.as_str())
@@ -294,18 +276,23 @@ fn get_videos() -> Result<String, String> {
                 .trim()
                 .to_string();
 
-            let note_ready = if note_path.is_empty() {
-                false
-            } else {
+            let mut resolved_note_path = String::new();
+            if !note_path.is_empty() {
                 let note_full_path = knowledge_path(&format!("notes/raw/{note_path}"))?;
-                if !note_full_path.exists() {
-                    false
-                } else {
-                    let note_content = fs::read_to_string(note_full_path).unwrap_or_default();
-                    is_substantive_note_content(&note_content)
+                if note_full_path.is_file() {
+                    resolved_note_path = note_path;
                 }
-            };
+            }
+            if resolved_note_path.is_empty() && !video_id.is_empty() {
+                let fallback_name = format!("{video_id}.md");
+                let fallback_path = knowledge_path(&format!("notes/raw/{fallback_name}"))?;
+                if fallback_path.is_file() {
+                    resolved_note_path = fallback_name;
+                }
+            }
 
+            let note_ready = !resolved_note_path.is_empty();
+            video["note_path"] = serde_json::Value::String(resolved_note_path);
             video["note_ready"] = serde_json::Value::Bool(note_ready);
         }
     }

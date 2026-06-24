@@ -47,6 +47,8 @@ def resolve_note_path(root: Path, video: dict[str, Any]) -> Path:
             return candidate
         if candidate.parts and candidate.parts[0] == root.name:
             return Path(*candidate.parts)
+        if len(candidate.parts) == 1:
+            return root / "notes" / "raw" / candidate.name
         return root / candidate
     video_id = str(video.get("id") or "").strip()
     return root / "notes" / "raw" / f"{video_id}.md"
@@ -103,11 +105,24 @@ def check_note_path(root: Path, sample_size: int, seed: int, note_scope: str) ->
     sample = rng.sample(videos, min(sample_size, len(videos))) if videos else []
     issues: list[str] = []
     opened = 0
+    pending = 0
     bytes_read = 0
     timings: list[float] = []
     missing_examples: list[str] = []
     for video in sample:
         started = time.perf_counter()
+        raw_note_path = str(video.get("note_path") or "").strip()
+        video_id = str(video.get("id") or "").strip()
+        fallback_path = root / "notes" / "raw" / f"{video_id}.md" if video_id else None
+
+        if note_scope == "all" and not raw_note_path:
+            if fallback_path and fallback_path.exists():
+                issues.append(f"materialized note missing note_path: {video_id} -> {fallback_path}")
+            else:
+                pending += 1
+            timings.append((time.perf_counter() - started) * 1000)
+            continue
+
         note_path = resolve_note_path(root, video)
         try:
             text = note_path.read_text(encoding="utf-8")
@@ -121,16 +136,22 @@ def check_note_path(root: Path, sample_size: int, seed: int, note_scope: str) ->
         timings.append((time.perf_counter() - started) * 1000)
     if missing_examples:
         issues.extend(missing_examples[:10])
-    success_rate = (opened / len(sample) * 100) if sample else 0.0
-    status = "PASS" if sample and opened == len(sample) else "FAIL"
+    checked = opened if note_scope == "materialized" else opened + pending
+    success_rate = (checked / len(sample) * 100) if sample else 0.0
+    status = "PASS" if sample and checked == len(sample) and not issues else "FAIL"
+    if note_scope == "all":
+        summary = f"抽样 {len(sample)} 条，已物化并打开 {opened} 条，待生成 {pending} 条，状态正确率 {success_rate:.1f}%。"
+    else:
+        summary = f"抽样 {len(sample)} 条，成功打开 {opened}/{len(sample)}，成功率 {success_rate:.1f}%。"
     return CheckResult(
         name="笔记链路 note_path 打开",
         status=status,
-        summary=f"抽样 {len(sample)} 条，成功打开 {opened}/{len(sample)}，成功率 {success_rate:.1f}%。",
+        summary=summary,
         metrics={
             "note_scope": note_scope,
             "sample_size": len(sample),
             "opened": opened,
+            "pending_without_note": pending,
             "success_rate_percent": round(success_rate, 2),
             "bytes_read": bytes_read,
             "avg_open_ms": round(statistics.mean(timings), 2) if timings else 0,

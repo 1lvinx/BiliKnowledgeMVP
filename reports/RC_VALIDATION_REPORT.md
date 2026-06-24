@@ -311,3 +311,47 @@ All-video random note chain: FAIL by product/data semantics
 Legacy preference migration code: FIXED, pending real app persistence smoke
 RC2: HOLD until real app manual smoke confirms persistence and note-state UX
 ```
+
+---
+
+## Fix Update — reconcile note materialization state
+
+Commit scope: `fix: reconcile note materialization state`
+
+What changed:
+
+- Added `BiliKnowledge/scripts/reconcile_notes.py`.
+- Reconciled `manifest/videos.json` and `manifest/videos.csv` against `notes/raw/*.md`.
+- `note_path` now means a real Markdown file exists and can be opened.
+- `note_ready` is aligned with materialized note availability for app routing/status.
+- `parse_favorites.py` now preserves/rebuilds note materialization state after imports.
+- `generate_notes.py` marks newly generated notes as `note_ready=true`.
+- Tauri `get_videos` now backfills `note_path` from `notes/raw/{video_id}.md` when the manifest field is missing.
+- The app no longer falls back to `{video_id}.md` when `note_path` is absent; it shows a clear "note not generated" state instead.
+- Notes page now lists videos with a real `note_path`, not only legacy `note_ready` values.
+- RC probe now distinguishes:
+  - all-video sample: validates materialized vs pending state correctness
+  - materialized-note sample: validates 50/50 open success
+
+Updated evidence:
+
+```text
+All-video random 50:
+PASS — 10 materialized notes opened, 40 pending notes correctly marked, state correctness 100.0%
+
+Materialized-note random 50:
+PASS — 50/50 opened, success rate 100.0%
+```
+
+Manifest reconciliation result:
+
+```text
+total videos: 6736
+materialized notes: 1444
+note_path added: 1414
+note_ready changed: 1444
+```
+
+Remaining unrelated RC gate:
+
+- Local real `BiliKnowledge/config/config.json` still needs one real app settings save to persist migrated preference defaults. The file contains local secrets and is intentionally not committed.

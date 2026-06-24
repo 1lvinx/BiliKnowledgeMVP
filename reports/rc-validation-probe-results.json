@@ -2,7 +2,7 @@
   "probe": "Phase RC-Validation-1",
   "root": "/Users/elvinx/DevCompany/products/bili-knowledge-mvp/BiliKnowledge",
   "external_knowledge": "/Users/elvinx/Knowledge",
-  "elapsed_ms": 587.34,
+  "elapsed_ms": 564.19,
   "checks": [
     {
       "name": "收藏夹导入清单",
@@ -16,51 +16,41 @@
         "duplicate_count": 0,
         "failed_folder_count": 0,
         "partial_folder_count": 10,
-        "probe_ms": 144.23
+        "probe_ms": 134.55
       },
       "issues": []
     },
     {
       "name": "笔记链路 note_path 打开",
-      "status": "FAIL",
-      "summary": "抽样 50 条，成功打开 10/50，成功率 20.0%。",
+      "status": "PASS",
+      "summary": "抽样 50 条，已物化并打开 10 条，待生成 40 条，状态正确率 100.0%。",
       "metrics": {
         "note_scope": "all",
         "sample_size": 50,
         "opened": 10,
-        "success_rate_percent": 20.0,
+        "pending_without_note": 40,
+        "success_rate_percent": 100.0,
         "bytes_read": 4146,
-        "avg_open_ms": 0.06,
-        "p95_open_ms": 0.12,
+        "avg_open_ms": 0.05,
+        "p95_open_ms": 0.14,
         "seed": 20260624
       },
-      "issues": [
-        "BV1jR2LB9EcC -> BiliKnowledge/notes/raw/BV1jR2LB9EcC.md: [Errno 2] No such file or directory: 'BiliKnowledge/notes/raw/BV1jR2LB9EcC.md'",
-        "BV16gDkBVEGp -> BiliKnowledge/notes/raw/BV16gDkBVEGp.md: [Errno 2] No such file or directory: 'BiliKnowledge/notes/raw/BV16gDkBVEGp.md'",
-        "BV1UBtWeGE7R -> BiliKnowledge/notes/raw/BV1UBtWeGE7R.md: [Errno 2] No such file or directory: 'BiliKnowledge/notes/raw/BV1UBtWeGE7R.md'",
-        "BV13z421z791 -> BiliKnowledge/notes/raw/BV13z421z791.md: [Errno 2] No such file or directory: 'BiliKnowledge/notes/raw/BV13z421z791.md'",
-        "BV1CM4y1x7xa -> BiliKnowledge/notes/raw/BV1CM4y1x7xa.md: [Errno 2] No such file or directory: 'BiliKnowledge/notes/raw/BV1CM4y1x7xa.md'",
-        "BV1RS421A7xi -> BiliKnowledge/notes/raw/BV1RS421A7xi.md: [Errno 2] No such file or directory: 'BiliKnowledge/notes/raw/BV1RS421A7xi.md'",
-        "BV19J411N7RA -> BiliKnowledge/notes/raw/BV19J411N7RA.md: [Errno 2] No such file or directory: 'BiliKnowledge/notes/raw/BV19J411N7RA.md'",
-        "BV193aDzfE4e -> BiliKnowledge/notes/raw/BV193aDzfE4e.md: [Errno 2] No such file or directory: 'BiliKnowledge/notes/raw/BV193aDzfE4e.md'",
-        "BV1vcqzYKEAS -> BiliKnowledge/notes/raw/BV1vcqzYKEAS.md: [Errno 2] No such file or directory: 'BiliKnowledge/notes/raw/BV1vcqzYKEAS.md'",
-        "BV1QcvhBdEEv -> BiliKnowledge/notes/raw/BV1QcvhBdEEv.md: [Errno 2] No such file or directory: 'BiliKnowledge/notes/raw/BV1QcvhBdEEv.md'"
-      ]
+      "issues": []
     },
     {
       "name": "关键词搜索探测",
       "status": "PASS",
-      "summary": "搜索 5 个关键词，语料 8280 篇，平均 16.38 ms。",
+      "summary": "搜索 5 个关键词，语料 8280 篇，平均 13.44 ms。",
       "metrics": {
         "keyword_count": 5,
         "document_count": 8280,
-        "collect_ms": 256.81,
-        "avg_search_ms": 16.38,
-        "max_search_ms": 18.33,
+        "collect_ms": 258.14,
+        "avg_search_ms": 13.44,
+        "max_search_ms": 19.9,
         "results": {
           "ComfyUI": {
             "hit_count": 22,
-            "elapsed_ms": 15.77,
+            "elapsed_ms": 19.9,
             "top_hits": [
               {
                 "doc": "video:BV1L9kFBvEhe",
@@ -86,7 +76,7 @@
           },
           "Claude": {
             "hit_count": 274,
-            "elapsed_ms": 13.41,
+            "elapsed_ms": 13.02,
             "top_hits": [
               {
                 "doc": "insight:BV1xK4y1E7pR",
@@ -112,7 +102,7 @@
           },
           "Agent": {
             "hit_count": 228,
-            "elapsed_ms": 16.55,
+            "elapsed_ms": 11.98,
             "top_hits": [
               {
                 "doc": "/Users/elvinx/Knowledge/AI/learning/Elvinx-AI-Workshop-L15/00_course/Topx_15天AI工程学习路径_逸峰AI工作坊.md",
@@ -138,7 +128,7 @@
           },
           "OpenWrt": {
             "hit_count": 19,
-            "elapsed_ms": 17.86,
+            "elapsed_ms": 10.9,
             "top_hits": [
               {
                 "doc": "BiliKnowledge/notes/raw/BV1mt4115718.md",
@@ -164,7 +154,7 @@
           },
           "MCP": {
             "hit_count": 34,
-            "elapsed_ms": 18.33,
+            "elapsed_ms": 11.42,
             "top_hits": [
               {
                 "doc": "insight:BV1oP6c5I1xY",
@@ -221,7 +211,7 @@
         "external_markdown_count": 28,
         "total_markdown_count": 1483,
         "total_bytes": 747148,
-        "probe_ms": 30.56
+        "probe_ms": 32.29
       },
       "issues": []
     }

@@ -541,8 +541,13 @@ function App() {
     }
     try {
       setSelectedVideo(video);
+      if (!video.note_path) {
+        setNoteContent(t("inspector.noteMissing"));
+        showToast(`笔记未生成：${video.id}`, "error");
+        return;
+      }
       setNoteContent(t("error.loadingNote"));
-      const content: string = await invoke("get_note", { notePath: video.note_path || `${video.id}.md` });
+      const content: string = await invoke("get_note", { notePath: video.note_path });
       setNoteContent(content);
     } catch {
       setSelectedVideo(video);

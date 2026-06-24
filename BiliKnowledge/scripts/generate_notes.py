@@ -313,6 +313,7 @@ def main():
         note_path.write_text(note_text, encoding="utf-8")
         next_video = dict(video)
         next_video["note_path"] = note_path.name
+        next_video["note_ready"] = True
         updated_videos.append(next_video)
         generated += 1
         print(f"[笔记] 已生成 {note_path.name}")

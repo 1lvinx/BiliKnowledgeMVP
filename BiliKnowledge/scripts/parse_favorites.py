@@ -396,6 +396,36 @@ def build_manifest_entry(video: dict) -> dict:
     }
 
 
+
+def reconcile_note_materialization(entries: list[dict], notes_dir: Path) -> dict[str, int]:
+    metrics = {
+        "materialized": 0,
+        "note_path_added": 0,
+        "note_path_cleared": 0,
+    }
+    for entry in entries:
+        video_id = str(entry.get("id") or "").strip()
+        current_note_path = str(entry.get("note_path") or "").strip()
+        candidates: list[Path] = []
+        if current_note_path:
+            candidates.append(notes_dir / Path(current_note_path).name)
+        if video_id:
+            candidates.append(notes_dir / f"{video_id}.md")
+
+        note_path = next((candidate for candidate in candidates if candidate.is_file()), None)
+        if note_path:
+            if not current_note_path:
+                metrics["note_path_added"] += 1
+            entry["note_path"] = note_path.name
+            entry["note_ready"] = True
+            metrics["materialized"] += 1
+        else:
+            if current_note_path:
+                metrics["note_path_cleared"] += 1
+            entry["note_path"] = ""
+            entry["note_ready"] = False
+    return metrics
+
 def write_json(entries: list[dict], output_path: Path):
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(entries, f, ensure_ascii=False, indent=2)
@@ -499,6 +529,9 @@ def main():
         print(f"[处理] 本次处理全部 {len(limited)} 条")
 
     entries = [build_manifest_entry(v) for v in limited]
+    out = Path(args.output)
+    note_metrics = reconcile_note_materialization(entries, out.parent / "notes" / "raw")
+    print(f"[笔记状态] {note_metrics}")
 
     p_counts = {}
     for e in entries:
@@ -513,7 +546,6 @@ def main():
         print("\n[预览] 本次未写入文件。")
         return
 
-    out = Path(args.output)
     out.mkdir(parents=True, exist_ok=True)
     write_json(entries, out / "videos.json")
     write_csv(entries, out / "videos.csv")
