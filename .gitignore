@@ -53,3 +53,6 @@ BiliKnowledge/projects/*.bak_*
 BiliKnowledge/projects/github_projects.md
 BiliKnowledge/projects/open_source_tools.md
 BiliKnowledge/projects/project_candidates.json
+
+# local backup files
+*.bak_*
