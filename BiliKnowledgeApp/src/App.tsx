@@ -462,7 +462,7 @@ function App() {
     try {
       setSelectedVideo(video);
       setNoteContent(t("error.loadingNote"));
-      const content: string = await invoke("get_note", { notePath: `${video.id}.md` });
+      const content: string = await invoke("get_note", { notePath: video.note_path || `${video.id}.md` });
       setNoteContent(content);
     } catch {
       setSelectedVideo(video);

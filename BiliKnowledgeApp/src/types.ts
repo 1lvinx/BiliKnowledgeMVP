@@ -21,6 +21,8 @@ export interface FavoriteFolder {
   id: string;
   title: string;
   media_count: number;
+  latest_ts?: number;
+  latest_collected_at?: string;
   sync_status?: "complete" | "partial" | "failed";
   synced_count?: number;
   error?: string;

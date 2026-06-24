@@ -10,6 +10,7 @@ import {
 import { cn } from "../lib/utils";
 import { t } from "../i18n";
 import { BilibiliLogin } from "./BilibiliLogin";
+import type { AppearancePreference, DensityPreference, FontPreference } from "../app/app-model";
 
 interface Config {
   bilibili: {
@@ -27,6 +28,10 @@ interface Config {
   };
   preferences: {
     language: string;
+    appearance: AppearancePreference;
+    timezone: string;
+    fontFamily: FontPreference;
+    density: DensityPreference;
   };
 }
 
@@ -40,12 +45,33 @@ const defaultConfig: Config = {
   },
   preferences: {
     language: "zh-CN",
+    appearance: "system",
+    timezone: "Asia/Singapore",
+    fontFamily: "system",
+    density: "comfortable",
   },
 };
 
 const languageOptions = [
   { value: "zh-CN", label: "中文（简体）", detail: "Chinese Simplified" },
   { value: "en-US", label: "English", detail: "English" },
+];
+
+const timezoneOptions = [
+  { value: "Asia/Singapore", label: "Singapore (UTC+08:00)" },
+  { value: "Asia/Shanghai", label: "Beijing / Shanghai (UTC+08:00)" },
+  { value: "Asia/Tokyo", label: "Tokyo (UTC+09:00)" },
+  { value: "America/Los_Angeles", label: "Los Angeles (UTC-08:00/UTC-07:00)" },
+  { value: "America/New_York", label: "New York (UTC-05:00/UTC-04:00)" },
+  { value: "Europe/London", label: "London (UTC+00:00/UTC+01:00)" },
+  { value: "UTC", label: "UTC" },
+];
+
+const fontOptions: Array<{ value: FontPreference; label: string; detail: string }> = [
+  { value: "system", label: "System UI", detail: "SF Pro / Inter / PingFang SC" },
+  { value: "rounded", label: "Rounded", detail: "SF Pro Rounded / Nunito / PingFang SC" },
+  { value: "serif", label: "Serif", detail: "New York / Noto Serif SC" },
+  { value: "mono", label: "Mono", detail: "SF Mono / JetBrains Mono / Menlo" },
 ];
 
 const settingsSectionKeys = [
@@ -86,7 +112,19 @@ function normalizeConfig(value: unknown): Config {
   };
 }
 
-export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: string) => void }) {
+export function SettingsView({
+  onLanguageChange,
+  onAppearanceChange,
+  onFontChange,
+  onDensityChange,
+  onTimezoneChange,
+}: {
+  onLanguageChange?: (lang: string) => void;
+  onAppearanceChange?: (appearance: AppearancePreference) => void;
+  onFontChange?: (fontFamily: FontPreference) => void;
+  onDensityChange?: (density: DensityPreference) => void;
+  onTimezoneChange?: (timezone: string) => void;
+}) {
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -132,6 +170,14 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
     } finally {
       setSaving(false);
     }
+  }
+
+  function updatePreferences(nextPreferences: Partial<Config["preferences"]>) {
+    if (!config) return;
+    setConfig({
+      ...config,
+      preferences: { ...config.preferences, ...nextPreferences },
+    });
   }
 
   useEffect(() => {
@@ -180,26 +226,50 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
               <span className="mac-inspector-meta">../BiliKnowledge</span>
             </MacSettingsRow>
             <MacSettingsRow detail={t("settings.appearanceDesc")} label={t("settings.appearanceLabel")}>
-              <select className="mac-select" defaultValue="system">
+              <select
+                className="mac-select"
+                onChange={(event) => {
+                  const appearance = event.target.value as AppearancePreference;
+                  updatePreferences({ appearance });
+                  onAppearanceChange?.(appearance);
+                }}
+                value={config.preferences.appearance}
+              >
                 <option value="system">{t("settings.system")}</option>
                 <option value="light">{t("settings.light")}</option>
+                <option value="dark">{t("settings.dark")}</option>
               </select>
             </MacSettingsRow>
             <MacSettingsRow detail={t("settings.languageDesc")} label={t("settings.language")}>
               <select
                 className="mac-select"
                 onChange={(event) => {
-                  setConfig({
-                    ...config,
-                    preferences: { ...config.preferences, language: event.target.value },
-                  });
-                  onLanguageChange?.(event.target.value);
+                  const language = event.target.value;
+                  updatePreferences({ language });
+                  onLanguageChange?.(language);
                 }}
                 value={config.preferences.language}
               >
                 {languageOptions.map((language) => (
                   <option key={language.value} value={language.value}>
                     {language.label}
+                  </option>
+                ))}
+              </select>
+            </MacSettingsRow>
+            <MacSettingsRow detail={t("settings.timezoneDesc")} label={t("settings.timezone")}>
+              <select
+                className="mac-select"
+                onChange={(event) => {
+                  const timezone = event.target.value;
+                  updatePreferences({ timezone });
+                  onTimezoneChange?.(timezone);
+                }}
+                value={config.preferences.timezone}
+              >
+                {timezoneOptions.map((timezone) => (
+                  <option key={timezone.value} value={timezone.value}>
+                    {timezone.label}
                   </option>
                 ))}
               </select>
@@ -396,11 +466,9 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
               <select
                 className="mac-select"
                 onChange={(event) => {
-                  setConfig({
-                    ...config,
-                    preferences: { ...config.preferences, language: event.target.value },
-                  });
-                  onLanguageChange?.(event.target.value);
+                  const language = event.target.value;
+                  updatePreferences({ language });
+                  onLanguageChange?.(language);
                 }}
                 value={config.preferences.language}
               >
@@ -418,17 +486,65 @@ export function SettingsView({ onLanguageChange }: { onLanguageChange?: (lang: s
                 {config.preferences.language}
               </span>
             </MacSettingsRow>
+            <MacSettingsRow detail={t("settings.timezoneDesc")} label={t("settings.timezone")}>
+              <select
+                className="mac-select"
+                onChange={(event) => {
+                  const timezone = event.target.value;
+                  updatePreferences({ timezone });
+                  onTimezoneChange?.(timezone);
+                }}
+                value={config.preferences.timezone}
+              >
+                {timezoneOptions.map((timezone) => (
+                  <option key={timezone.value} value={timezone.value}>
+                    {timezone.label}
+                  </option>
+                ))}
+              </select>
+            </MacSettingsRow>
             <MacSettingsRow detail={t("settings.themeDesc")} label={t("settings.theme")}>
-              <select className="mac-select" defaultValue="modern-light">
-                <option value="modern-light">{t("settings.modernLight")}</option>
+              <select
+                className="mac-select"
+                onChange={(event) => {
+                  const appearance = event.target.value as AppearancePreference;
+                  updatePreferences({ appearance });
+                  onAppearanceChange?.(appearance);
+                }}
+                value={config.preferences.appearance}
+              >
+                <option value="light">{t("settings.modernLight")}</option>
+                <option value="dark">{t("settings.dark")}</option>
                 <option value="system">{t("settings.system")}</option>
               </select>
             </MacSettingsRow>
             <MacSettingsRow detail={t("settings.fontDesc")} label={t("settings.font")}>
-              <span className="mac-inspector-meta">Inter / PingFang SC / Noto Sans SC</span>
+              <select
+                className="mac-select"
+                onChange={(event) => {
+                  const fontFamily = event.target.value as FontPreference;
+                  updatePreferences({ fontFamily });
+                  onFontChange?.(fontFamily);
+                }}
+                value={config.preferences.fontFamily}
+              >
+                {fontOptions.map((font) => (
+                  <option key={font.value} value={font.value}>
+                    {font.label} · {font.detail}
+                  </option>
+                ))}
+              </select>
             </MacSettingsRow>
             <MacSettingsRow detail={t("settings.densityDesc")} label={t("settings.density")}>
-              <select className="mac-select" defaultValue="comfortable">
+              <select
+                className="mac-select"
+                onChange={(event) => {
+                  const density = event.target.value as DensityPreference;
+                  updatePreferences({ density });
+                  onDensityChange?.(density);
+                }}
+                value={config.preferences.density}
+              >
                 <option value="comfortable">{t("settings.comfortable")}</option>
                 <option value="compact">{t("settings.compact")}</option>
               </select>

@@ -2,7 +2,7 @@ import { Boxes, ExternalLink, GitFork, Globe, Star } from "lucide-react";
 import type { Project } from "../types";
 import { t } from "../i18n";
 import { cn } from "../lib/utils";
-import { localizeLabel } from "../lib/video-utils";
+import { getDisplayTimezone, localizeLabel } from "../lib/video-utils";
 import { MacEmptyState, MacPanel, MacSplitView, MacStatusPill, MacTagPill } from "../components/MacUI";
 
 type ViewMode = "list" | "detail";
@@ -31,25 +31,33 @@ export function Candidates({
             <span>{projects.length}</span>
           </div>
           <div className="mac-native-list">
-            {sortedProjects.map((project) => (
-              <button
-                className={cn("mac-native-row", activeProject?.url === project.url && "is-selected")}
-                key={project.url}
-                onClick={() => setSelectedProject(project)}
-                type="button"
-              >
-                <div>
-                  <div className="mac-row-title">{project.name}</div>
-                  <div className="mac-row-meta">
-                    <span>{localizeLabel(project.type)}</span>
-                    {typeof project.stars === "number" && project.stars > 0 ? <span>Star {project.stars}</span> : null}
-                    {project.language ? <span>{project.language}</span> : null}
-                    <span>{project.source_note}</span>
+            {sortedProjects.length === 0 ? (
+              <MacEmptyState
+                detail="运行项目提取后，这里会显示从笔记中识别出的开源仓库与工具候选。"
+                icon={<Boxes size={24} />}
+                title="暂无开源候选"
+              />
+            ) : (
+              sortedProjects.map((project) => (
+                <button
+                  className={cn("mac-native-row", activeProject?.url === project.url && "is-selected")}
+                  key={project.url}
+                  onClick={() => setSelectedProject(project)}
+                  type="button"
+                >
+                  <div>
+                    <div className="mac-row-title">{project.name}</div>
+                    <div className="mac-row-meta">
+                      <span>{localizeLabel(project.type)}</span>
+                      {typeof project.stars === "number" && project.stars > 0 ? <span>Star {project.stars}</span> : null}
+                      {project.language ? <span>{project.language}</span> : null}
+                      <span>{project.source_note}</span>
+                    </div>
                   </div>
-                </div>
-                <MacStatusPill tone="blue">{localizeLabel(project.status || "candidate")}</MacStatusPill>
-              </button>
-            ))}
+                  <MacStatusPill tone="blue">{localizeLabel(project.status || "candidate")}</MacStatusPill>
+                </button>
+              ))
+            )}
           </div>
         </section>
       )}
@@ -60,15 +68,15 @@ export function Candidates({
               <MacPanel title={activeProject.name} meta={localizeLabel(activeProject.type)}>
                 <div className="mac-inspector-content">
                   <p>{activeProject.description || "从视频笔记中提取出来的开源项目候选。"}</p>
-                  <div className="flex flex-wrap gap-3 text-sm text-slate-400">
+                  <div className="mac-project-metrics">
                     {typeof activeProject.stars === "number" ? (
-                      <span className="inline-flex items-center gap-1">
+                      <span className="mac-project-metric">
                         <Star size={14} />
                         {activeProject.stars}
                       </span>
                     ) : null}
                     {typeof activeProject.forks === "number" ? (
-                      <span className="inline-flex items-center gap-1">
+                      <span className="mac-project-metric">
                         <GitFork size={14} />
                         {activeProject.forks}
                       </span>
@@ -151,5 +159,10 @@ function formatProjectDate(raw?: string) {
   if (Number.isNaN(date.getTime())) {
     return raw;
   }
-  return date.toLocaleDateString();
+  return date.toLocaleDateString(undefined, {
+    timeZone: getDisplayTimezone(),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
 }

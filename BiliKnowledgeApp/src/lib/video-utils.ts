@@ -1,5 +1,15 @@
 import { t } from "../i18n";
 
+let displayTimezone = "Asia/Singapore";
+
+export function setDisplayTimezone(timezone: string) {
+  displayTimezone = timezone || "Asia/Singapore";
+}
+
+export function getDisplayTimezone() {
+  return displayTimezone;
+}
+
 export function statusTone(status: string): "blue" | "green" | "orange" | "red" | "neutral" {
   if (status === "pending") return "orange";
   if (status === "reviewed") return "green";
@@ -66,7 +76,31 @@ export function formatVideoDuration(raw: string): string {
 }
 
 export function formatVideoTime(raw?: string): string {
-  return raw || "-";
+  if (!raw) return "-";
+  const value = Number(raw);
+  if (Number.isFinite(value) && value > 0) {
+    const normalized = value > 10_000_000_000 ? value : value * 1000;
+    return new Date(normalized).toLocaleString(undefined, {
+      timeZone: displayTimezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  const parsed = Date.parse(raw);
+  if (Number.isFinite(parsed)) {
+    return new Date(parsed).toLocaleString(undefined, {
+      timeZone: displayTimezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  return raw;
 }
 
 export function formatPubdate(raw: string): string {
@@ -75,7 +109,12 @@ export function formatPubdate(raw: string): string {
     return raw || "-";
   }
   const normalized = value > 10_000_000_000 ? value : value * 1000;
-  return new Date(normalized).toLocaleDateString();
+  return new Date(normalized).toLocaleDateString(undefined, {
+    timeZone: displayTimezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
 }
 
 export function getVideoTimestamp(video: { pubdate?: string; collected_at?: string }): number {
