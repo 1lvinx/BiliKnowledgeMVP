@@ -242,3 +242,72 @@ Suggested commit order:
 3. fix: validate notes only against materialized note set
 4. docs: update rc validation report
 ```
+
+---
+
+## Follow-up Update — 2026-06-24
+
+After the initial ACTION REQUIRED result, two follow-up actions were completed.
+
+### Fix applied: legacy preference migration
+
+Commit:
+
+```text
+6ea4b06 fix: migrate legacy preference config defaults
+```
+
+What changed:
+
+- Tauri `get_config` now returns normalized preferences with missing defaults filled.
+- Tauri `save_config` writes normalized preferences.
+- Added Rust coverage for legacy preferences migration.
+
+Validation:
+
+```text
+cargo test: PASS, 21 tests passed
+```
+
+Remaining manual gate:
+
+- Launch real app once and save settings to persist normalized defaults into the local real config file.
+- Do not commit the real config file because it contains local credentials/secrets.
+
+### Additional probe: materialized notes scope
+
+Command:
+
+```bash
+python3 tools/rc_validation_probe.py \
+  --root BiliKnowledge \
+  --note-scope materialized \
+  --output reports/rc-validation-probe-materialized-notes-results.json
+```
+
+Result:
+
+| Metric | Value |
+| --- | ---: |
+| note scope | materialized |
+| sampled notes | 50 |
+| opened notes | 50 |
+| success rate | 100.0% |
+| average open time | 0.30 ms |
+| p95 open time | 0.37 ms |
+
+Interpretation:
+
+- Existing generated Markdown notes open correctly.
+- The original `10/50` failure is caused by sampling from all imported videos, many of which do not yet have generated notes.
+- Product logic should keep this distinction visible: `imported video` is not the same as `materialized note`.
+
+Updated RC-Validation-1 status:
+
+```text
+Build/test layer: PASS
+Materialized note open chain: PASS
+All-video random note chain: FAIL by product/data semantics
+Legacy preference migration code: FIXED, pending real app persistence smoke
+RC2: HOLD until real app manual smoke confirms persistence and note-state UX
+```

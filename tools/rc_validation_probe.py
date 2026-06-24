@@ -95,8 +95,10 @@ def check_import_manifest(root: Path) -> CheckResult:
     )
 
 
-def check_note_path(root: Path, sample_size: int, seed: int) -> CheckResult:
+def check_note_path(root: Path, sample_size: int, seed: int, note_scope: str) -> CheckResult:
     videos = [v for v in load_json(root / "manifest" / "videos.json", []) if isinstance(v, dict)]
+    if note_scope == "materialized":
+        videos = [video for video in videos if resolve_note_path(root, video).exists()]
     rng = random.Random(seed)
     sample = rng.sample(videos, min(sample_size, len(videos))) if videos else []
     issues: list[str] = []
@@ -126,6 +128,7 @@ def check_note_path(root: Path, sample_size: int, seed: int) -> CheckResult:
         status=status,
         summary=f"抽样 {len(sample)} 条，成功打开 {opened}/{len(sample)}，成功率 {success_rate:.1f}%。",
         metrics={
+            "note_scope": note_scope,
             "sample_size": len(sample),
             "opened": opened,
             "success_rate_percent": round(success_rate, 2),
@@ -284,6 +287,7 @@ def main() -> int:
     parser.add_argument("--root", default="BiliKnowledge", help="BiliKnowledge root directory")
     parser.add_argument("--external-knowledge", default=str(Path.home() / "Knowledge"), help="Optional external Markdown knowledge root")
     parser.add_argument("--sample-size", type=int, default=50)
+    parser.add_argument("--note-scope", choices=["all", "materialized"], default="all", help="Sample all videos or only videos with an existing note file")
     parser.add_argument("--seed", type=int, default=20260624)
     parser.add_argument("--cycles", type=int, default=20)
     parser.add_argument("--keywords", nargs="*", default=DEFAULT_KEYWORDS)
@@ -295,7 +299,7 @@ def main() -> int:
     started = time.perf_counter()
     checks = [
         check_import_manifest(root),
-        check_note_path(root, args.sample_size, args.seed),
+        check_note_path(root, args.sample_size, args.seed, args.note_scope),
         check_search(root, args.keywords, external),
         check_persistence(root, args.cycles),
         check_large_knowledge(root, external),

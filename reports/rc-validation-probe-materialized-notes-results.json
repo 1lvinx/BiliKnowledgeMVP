@@ -1,0 +1,219 @@
+{
+  "probe": "Phase RC-Validation-1",
+  "root": "/Users/elvinx/DevCompany/products/bili-knowledge-mvp/BiliKnowledge",
+  "external_knowledge": "/Users/elvinx/Knowledge",
+  "elapsed_ms": 1025.36,
+  "checks": [
+    {
+      "name": "收藏夹导入清单",
+      "status": "PASS",
+      "summary": "检测到 6736 条视频、21 个收藏夹、重复 0 条。",
+      "metrics": {
+        "videos_json_count": 6736,
+        "videos_csv_rows": 6736,
+        "favorite_folder_count": 21,
+        "unique_video_ids": 6736,
+        "duplicate_count": 0,
+        "failed_folder_count": 0,
+        "partial_folder_count": 10,
+        "probe_ms": 158.39
+      },
+      "issues": []
+    },
+    {
+      "name": "笔记链路 note_path 打开",
+      "status": "PASS",
+      "summary": "抽样 50 条，成功打开 50/50，成功率 100.0%。",
+      "metrics": {
+        "note_scope": "materialized",
+        "sample_size": 50,
+        "opened": 50,
+        "success_rate_percent": 100.0,
+        "bytes_read": 21612,
+        "avg_open_ms": 0.3,
+        "p95_open_ms": 0.37,
+        "seed": 20260624
+      },
+      "issues": []
+    },
+    {
+      "name": "关键词搜索探测",
+      "status": "PASS",
+      "summary": "搜索 5 个关键词，语料 8280 篇，平均 13.19 ms。",
+      "metrics": {
+        "keyword_count": 5,
+        "document_count": 8280,
+        "collect_ms": 447.1,
+        "avg_search_ms": 13.19,
+        "max_search_ms": 15.98,
+        "results": {
+          "ComfyUI": {
+            "hit_count": 22,
+            "elapsed_ms": 10.52,
+            "top_hits": [
+              {
+                "doc": "video:BV1L9kFBvEhe",
+                "count": 3
+              },
+              {
+                "doc": "video:BV1tAAPzmEgc",
+                "count": 2
+              },
+              {
+                "doc": "video:BV1D8P4zHE1s",
+                "count": 2
+              },
+              {
+                "doc": "video:BV1Bnn3zcEbS",
+                "count": 2
+              },
+              {
+                "doc": "video:BV1uCbseQE13",
+                "count": 2
+              }
+            ]
+          },
+          "Claude": {
+            "hit_count": 274,
+            "elapsed_ms": 12.41,
+            "top_hits": [
+              {
+                "doc": "insight:BV1xK4y1E7pR",
+                "count": 14
+              },
+              {
+                "doc": "insight:BV1oP6c5I1xY",
+                "count": 11
+              },
+              {
+                "doc": "insight:BV1qR8e7K3aB",
+                "count": 9
+              },
+              {
+                "doc": "insight:BV1Pc7X6NEMX",
+                "count": 7
+              },
+              {
+                "doc": "BiliKnowledge/notes/raw/BV1Pc7X6NEMX.md",
+                "count": 5
+              }
+            ]
+          },
+          "Agent": {
+            "hit_count": 228,
+            "elapsed_ms": 11.35,
+            "top_hits": [
+              {
+                "doc": "/Users/elvinx/Knowledge/AI/learning/Elvinx-AI-Workshop-L15/00_course/Topx_15天AI工程学习路径_逸峰AI工作坊.md",
+                "count": 74
+              },
+              {
+                "doc": "/Users/elvinx/Knowledge/AI/learning/Elvinx-AI-Workshop-L15/00_course/day01/Day01_课本_项目总览与学习启动.md",
+                "count": 19
+              },
+              {
+                "doc": "insight:BV1H7V16vEvu",
+                "count": 11
+              },
+              {
+                "doc": "insight:BV1zM4a3G9uV",
+                "count": 8
+              },
+              {
+                "doc": "BiliKnowledge/notes/raw/BV1H7V16vEvu.md",
+                "count": 8
+              }
+            ]
+          },
+          "OpenWrt": {
+            "hit_count": 19,
+            "elapsed_ms": 15.7,
+            "top_hits": [
+              {
+                "doc": "BiliKnowledge/notes/raw/BV1mt4115718.md",
+                "count": 8
+              },
+              {
+                "doc": "insight:BV1mt4115718",
+                "count": 7
+              },
+              {
+                "doc": "/Users/elvinx/Knowledge/AI/learning/Elvinx-AI-Workshop-L15/00_course/Topx_15天AI工程学习路径_逸峰AI工作坊.md",
+                "count": 3
+              },
+              {
+                "doc": "video:BV1mt4115718",
+                "count": 1
+              },
+              {
+                "doc": "video:BV1EJ411c7VC",
+                "count": 1
+              }
+            ]
+          },
+          "MCP": {
+            "hit_count": 34,
+            "elapsed_ms": 15.98,
+            "top_hits": [
+              {
+                "doc": "insight:BV1oP6c5I1xY",
+                "count": 22
+              },
+              {
+                "doc": "video:BV1c8NFzhEMi",
+                "count": 2
+              },
+              {
+                "doc": "video:BV1ZwdWBeE4V",
+                "count": 2
+              },
+              {
+                "doc": "video:BV17kzaBHEoU",
+                "count": 2
+              },
+              {
+                "doc": "video:BV1ZJsBznEt3",
+                "count": 2
+              }
+            ]
+          }
+        }
+      },
+      "issues": []
+    },
+    {
+      "name": "重启持久化配置探测",
+      "status": "FAIL",
+      "summary": "模拟配置读写校验 20 次，文件哈希保持一致。",
+      "metrics": {
+        "cycles": 20,
+        "config_path": "BiliKnowledge/config/config.json",
+        "before_sha256": "44bd88d9769437ce57145b7a29fbc670ce5709a9eb1b2fd519a5b3c0f2831d5c",
+        "after_sha256": "44bd88d9769437ce57145b7a29fbc670ce5709a9eb1b2fd519a5b3c0f2831d5c",
+        "avg_cycle_ms": 0.12,
+        "preferences": {
+          "language": "zh-CN",
+          "appearance": "light"
+        }
+      },
+      "issues": [
+        "missing preference keys: timezone, fontFamily, density"
+      ]
+    },
+    {
+      "name": "大知识库规模探测",
+      "status": "PASS",
+      "summary": "检测到 Markdown 1483 个，约 0.71 MiB。",
+      "metrics": {
+        "internal_markdown_count": 1455,
+        "external_knowledge_path": "/Users/elvinx/Knowledge",
+        "external_markdown_count": 28,
+        "total_markdown_count": 1483,
+        "total_bytes": 747148,
+        "probe_ms": 24.61
+      },
+      "issues": []
+    }
+  ],
+  "overall_status": "ACTION_REQUIRED"
+}
