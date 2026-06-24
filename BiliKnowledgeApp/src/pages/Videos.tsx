@@ -3,12 +3,22 @@ import { ChevronRight, FileText, Search, Sparkles, Subtitles } from "lucide-reac
 import type { FavoriteFolder, Video } from "../types";
 import { t } from "../i18n";
 import { cn } from "../lib/utils";
-import { formatVideoDuration, formatVideoTime, statusLabel, statusTone } from "../lib/video-utils";
+import { compareVideosByRecency, formatVideoDuration, formatVideoTime, statusLabel, statusTone } from "../lib/video-utils";
 import { VideoInspector } from "../components/VideoInspector";
 import { MacEmptyState, MacSplitView, MacStatusPill, MacToolbarButton } from "../components/MacUI";
 
 const PAGE_SIZE = 200;
 const UNASSIGNED_FOLDER = "未归属";
+
+interface VideoTaskSnapshot {
+  state: "idle" | "running" | "blocked" | "success" | "error";
+}
+
+interface VideoTaskState {
+  subtitle?: VideoTaskSnapshot;
+  insight?: VideoTaskSnapshot;
+  note?: VideoTaskSnapshot;
+}
 
 interface VideosProps {
   activeVideo: Video | null;
@@ -27,6 +37,7 @@ interface VideosProps {
   setFilterStatus: (value: string) => void;
   title: string;
   updateStatus: (id: string, status: string) => void;
+  videoTaskStates?: Record<string, VideoTaskState>;
   videos: Video[];
 }
 
@@ -45,8 +56,8 @@ export function Videos({
   onRunBatchNote,
   setFilterPriority,
   setFilterStatus,
-  title,
   updateStatus,
+  videoTaskStates = {},
   videos,
 }: VideosProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -91,15 +102,16 @@ export function Videos({
       .sort((a, b) => {
         if (a === UNASSIGNED_FOLDER) return 1;
         if (b === UNASSIGNED_FOLDER) return -1;
-        const aIndex = favoriteFolders.findIndex((folder) => folder.title === a);
-        const bIndex = favoriteFolders.findIndex((folder) => folder.title === b);
-        if (aIndex === -1 && bIndex === -1) return a.localeCompare(b, "zh-CN");
-        if (aIndex === -1) return 1;
-        if (bIndex === -1) return -1;
-        return aIndex - bIndex;
+        const aItems = [...(groupsFromVideos[a] ?? [])].sort(compareVideosByRecency);
+        const bItems = [...(groupsFromVideos[b] ?? [])].sort(compareVideosByRecency);
+        const aTop = aItems[0];
+        const bTop = bItems[0];
+        const diff = aTop && bTop ? compareVideosByRecency(aTop, bTop) : 0;
+        if (diff !== 0) return diff;
+        return a.localeCompare(b, "zh-CN");
       })
       .map((title) => {
-        const items = groupsFromVideos[title] ?? [];
+        const items = [...(groupsFromVideos[title] ?? [])].sort(compareVideosByRecency);
         const visibleLimit = folderVisibleCounts[title] ?? PAGE_SIZE;
         return {
           title,
@@ -128,12 +140,53 @@ export function Videos({
     }
   }
 
+  function getStageTone(state?: VideoTaskSnapshot["state"]) {
+    if (state === "success") return "green";
+    if (state === "running" || state === "blocked") return "yellow";
+    if (state === "error") return "red";
+    return "neutral";
+  }
+
+  function getStageLabel(state?: VideoTaskSnapshot["state"]) {
+    if (state === "success") return "完成";
+    if (state === "running") return "进行中";
+    if (state === "blocked") return "阻塞";
+    if (state === "error") return "失败";
+    return "未开始";
+  }
+
+  function renderTaskStrip(videoId: string) {
+    const taskState = videoTaskStates[videoId];
+    const stages = [
+      { label: "字幕", state: taskState?.subtitle?.state },
+      { label: "洞察", state: taskState?.insight?.state },
+      { label: "笔记", state: taskState?.note?.state },
+    ].filter((item) => item.state && item.state !== "idle");
+
+    if (!stages.length) {
+      return (
+        <div className="mac-row-taskstrip">
+          <span className="mac-row-taskchip tone-neutral">流程 待开始</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mac-row-taskstrip">
+        {stages.map((stage) => (
+          <span className={`mac-row-taskchip tone-${getStageTone(stage.state as VideoTaskSnapshot["state"])}`} key={`${videoId}-${stage.label}`}>
+            {stage.label} {getStageLabel(stage.state as VideoTaskSnapshot["state"])}
+          </span>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <MacSplitView columns="minmax(430px, 1fr) 320px">
       <section className="mac-list-pane custom-scrollbar">
-        <div className="mac-panel-header">
-          <h2>{title}</h2>
-          <div className="flex gap-2 flex-wrap justify-end">
+        <div className="mac-list-controls">
+          <div className="mac-list-controls-row">
             <MacToolbarButton
               icon={<Subtitles size={14} />}
               label={t("scripts.fetchSubtitles")}
@@ -149,6 +202,8 @@ export function Videos({
               label={t("scripts.generateNotes")}
               onClick={onRunBatchNote}
             />
+          </div>
+          <div className="mac-list-controls-row mac-list-controls-row--filters">
             <select
               className="mac-select"
               onChange={(event) => setFilterPriority(event.target.value)}
@@ -170,6 +225,11 @@ export function Videos({
               <option value="archived">{t("video.archived")}</option>
             </select>
           </div>
+          {!groupByFolder ? (
+            <div className="mac-list-context-note">
+              当前为全部收藏夹合并视图，不对应单一收藏夹；列表按最近收藏/发布时间排序。
+            </div>
+          ) : null}
         </div>
         <div className="mac-native-list" onScroll={handleFlatListScroll}>
           {videos.length === 0 ? (
@@ -210,8 +270,8 @@ export function Videos({
                         className={cn(
                           "rounded-2xl border px-3 py-2 text-xs",
                           isFailed
-                            ? "border-rose-500/30 bg-rose-500/10 text-rose-200"
-                            : "border-amber-500/30 bg-amber-500/10 text-amber-100",
+                            ? "mac-sync-notice is-error"
+                            : "mac-sync-notice is-warning",
                         )}
                       >
                         {isFailed
@@ -236,6 +296,7 @@ export function Videos({
                         <span>{formatVideoTime(video.collected_at || video.pubdate)}</span>
                         <span>{video.id}</span>
                       </div>
+                      {renderTaskStrip(video.id)}
                     </div>
                     <MacStatusPill tone={statusTone(video.status)}>{statusLabel(video.status)}</MacStatusPill>
                   </button>
@@ -277,6 +338,7 @@ export function Videos({
                     <span>{formatVideoTime(video.collected_at || video.pubdate)}</span>
                     <span>{video.id}</span>
                   </div>
+                  {renderTaskStrip(video.id)}
                 </div>
                 <MacStatusPill tone={statusTone(video.status)}>{statusLabel(video.status)}</MacStatusPill>
               </button>

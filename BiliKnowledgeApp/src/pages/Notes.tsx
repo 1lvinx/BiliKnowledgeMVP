@@ -11,6 +11,16 @@ import { SubtitlePanel } from "../components/SubtitlePanel";
 
 type InspectorTab = "insight" | "subtitle";
 
+interface VideoTaskSnapshot {
+  state: "idle" | "running" | "blocked" | "success" | "error";
+}
+
+interface VideoTaskState {
+  subtitle?: VideoTaskSnapshot;
+  insight?: VideoTaskSnapshot;
+  note?: VideoTaskSnapshot;
+}
+
 function isPlaceholderNoteContent(content: string | null): boolean {
   if (!content) return true;
   const normalized = content.trim();
@@ -40,6 +50,7 @@ interface NotesProps {
   videos: Video[];
   insights?: VideoInsight[];
   subtitles?: VideoSubtitle[];
+  videoTaskStates?: Record<string, VideoTaskState>;
 }
 
 export function Notes({
@@ -51,6 +62,7 @@ export function Notes({
   videos,
   insights = [],
   subtitles = [],
+  videoTaskStates = {},
 }: NotesProps) {
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("insight");
 
@@ -69,6 +81,32 @@ export function Notes({
   const noteVideos = videos.filter((video) => video.note_ready);
 
   const hasSubstantiveNote = !isPlaceholderNoteContent(noteContent);
+
+  function getStageTone(state?: VideoTaskSnapshot["state"]) {
+    if (state === "success") return "green";
+    if (state === "running" || state === "blocked") return "yellow";
+    if (state === "error") return "red";
+    return "neutral";
+  }
+
+  function getStageLabel(state?: VideoTaskSnapshot["state"]) {
+    if (state === "success") return "完成";
+    if (state === "running") return "进行中";
+    if (state === "blocked") return "阻塞";
+    if (state === "error") return "失败";
+    return "未开始";
+  }
+
+  function renderTaskStrip(videoId: string) {
+    const taskState = videoTaskStates[videoId];
+    return (
+      <div className="mac-row-taskstrip">
+        <span className={`mac-row-taskchip tone-${getStageTone(taskState?.subtitle?.state)}`}>字幕 {getStageLabel(taskState?.subtitle?.state)}</span>
+        <span className={`mac-row-taskchip tone-${getStageTone(taskState?.insight?.state)}`}>洞察 {getStageLabel(taskState?.insight?.state)}</span>
+        <span className={`mac-row-taskchip tone-${getStageTone(taskState?.note?.state)}`}>笔记 {getStageLabel(taskState?.note?.state)}</span>
+      </div>
+    );
+  }
 
   return (
     <MacSplitView columns="280px minmax(0, 1fr) 340px">
@@ -97,6 +135,7 @@ export function Notes({
                   <span>{localizeLabel(video.category)}</span>
                   <span>{formatVideoTime(video.collected_at || video.pubdate)}</span>
                 </div>
+                {renderTaskStrip(video.id)}
               </div>
             </button>
           ))}

@@ -36,10 +36,6 @@ export function MacSidebar({ children }: { children: ReactNode }) {
           <span>{t("sidebar.localIntelligenceStudio")}</span>
         </div>
       </div>
-      <div className="mac-sidebar-vault">
-        <span className="mac-sidebar-vault-label">Workspace</span>
-        <strong>Personal Vault</strong>
-      </div>
       {children}
     </aside>
   );
@@ -92,6 +88,7 @@ export function MacToolbar({
   subtitle,
   leading,
   controls,
+  status,
   search,
   action,
 }: {
@@ -99,6 +96,7 @@ export function MacToolbar({
   subtitle?: string;
   leading?: ReactNode;
   controls?: ReactNode;
+  status?: ReactNode;
   search?: ReactNode;
   action?: ReactNode;
 }) {
@@ -113,6 +111,7 @@ export function MacToolbar({
       </div>
       <div className="mac-toolbar-center">{controls}</div>
       <div className="mac-toolbar-trailing">
+        {status}
         {search}
         {action}
       </div>

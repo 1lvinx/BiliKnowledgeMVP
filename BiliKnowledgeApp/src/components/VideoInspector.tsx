@@ -81,6 +81,9 @@ export function VideoInspector({
             <p className="mac-inspector-meta">
               {t("inspector.importedDataHint")}
             </p>
+            <p className="mac-inspector-meta">
+              当前条目归属：{activeVideo.favorite_folder || "全部收藏夹聚合视图"}
+            </p>
             <div className="mac-native-list">
               <div className="mac-native-row">
                 <span className="mac-row-title">{t("inspector.bvid")}</span>
