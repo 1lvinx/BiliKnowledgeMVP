@@ -253,6 +253,7 @@ function App() {
   const [filterStatus, setFilterStatus] = useState("all");
   const outputAnchorRef = useRef<HTMLDivElement>(null);
   const hiddenRefreshRef = useRef(false);
+  const knowledgeRefreshNoticeRef = useRef(false);
   const tauriAvailable = isTauriRuntime();
 
   const [pipelineStatus, setPipelineStatus] = useState<ProcessingStatus | null>(null);
@@ -666,8 +667,11 @@ function App() {
       !pipelineStatus?.pipeline.index_built ||
       !pipelineStatus?.pipeline.validated;
 
-    if (needsRefresh) {
-      void runHiddenKnowledgeRefresh();
+    if (needsRefresh && !knowledgeRefreshNoticeRef.current) {
+      knowledgeRefreshNoticeRef.current = true;
+      appendLog("知识库索引可能需要刷新：请在知识库页点击刷新，或在处理流程中手动运行项目提取/索引构建。");
+    } else if (!needsRefresh) {
+      knowledgeRefreshNoticeRef.current = false;
     }
   }, [
     currentView,

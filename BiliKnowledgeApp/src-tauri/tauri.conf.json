@@ -25,7 +25,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost data:; connect-src 'self' http://127.0.0.1:* tauri: ipc:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost data: https://api.qrserver.com; connect-src 'self' http://127.0.0.1:* tauri: ipc: https://passport.bilibili.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';"
     }
   },
   "bundle": {

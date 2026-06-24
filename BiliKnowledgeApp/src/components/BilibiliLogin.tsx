@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { QrCode, RefreshCw, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { t } from "../i18n";
@@ -23,7 +23,26 @@ function BilibiliLogin({ onLoginSuccess }: BilibiliLoginProps) {
   const [status, setStatus] = useState<LoginStatus>("idle");
   const [qrUrl, setQrUrl] = useState("");
   const [statusText, setStatusText] = useState("");
-  const [polling, setPolling] = useState(false);
+  const pollingRef = useRef(false);
+  const pollTimerRef = useRef<number | null>(null);
+
+  function clearPollTimer() {
+    if (pollTimerRef.current) {
+      window.clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }
+
+  function stopPolling() {
+    pollingRef.current = false;
+    clearPollTimer();
+  }
+
+  useEffect(() => {
+    return () => {
+      stopPolling();
+    };
+  }, []);
 
   async function generateQrCode() {
     if (!isTauriRuntime()) {
@@ -49,15 +68,16 @@ function BilibiliLogin({ onLoginSuccess }: BilibiliLoginProps) {
   }
 
   async function startPolling(qrcodeKey: string) {
-    if (polling) return;
-    setPolling(true);
-
+    if (pollingRef.current) return;
+    pollingRef.current = true;
     const maxAttempts = 60; // 3 minutes (3s interval)
     let attempts = 0;
 
     const poll = async () => {
+      if (!pollingRef.current) return;
+
       if (attempts >= maxAttempts) {
-        setPolling(false);
+        stopPolling();
         setStatus("error");
         setStatusText(t("bilibili.qrExpired"));
         return;
@@ -69,11 +89,11 @@ function BilibiliLogin({ onLoginSuccess }: BilibiliLoginProps) {
 
         if (data.code === 0) {
           // Success
-          setPolling(false);
+          stopPolling();
           setStatus("success");
           setStatusText(t("bilibili.loginSuccess"));
           onLoginSuccess?.({
-            sessdata: data.segdata || "",
+            sessdata: data.sessdata || data.segdata || "",
             bili_jct: data.bili_jct || "",
             dedeuserid: data.dedeuserid || "",
             buvid3: data.buvid3 || "",
@@ -89,16 +109,18 @@ function BilibiliLogin({ onLoginSuccess }: BilibiliLoginProps) {
           setStatusText(t("bilibili.waitingConfirm"));
         } else if (data.code === 86038) {
           // QR code expired
-          setPolling(false);
+          stopPolling();
           setStatus("error");
           setStatusText(t("bilibili.qrExpired"));
           return;
         }
 
         attempts++;
-        setTimeout(poll, 3000);
+        if (pollingRef.current) {
+          pollTimerRef.current = window.setTimeout(poll, 3000);
+        }
       } catch (err) {
-        setPolling(false);
+        stopPolling();
         setStatus("error");
         setStatusText(`${t("bilibili.pollFailed")}: ${String(err)}`);
       }
@@ -108,10 +130,18 @@ function BilibiliLogin({ onLoginSuccess }: BilibiliLoginProps) {
   }
 
   function reset() {
-    setPolling(false);
+    stopPolling();
     setQrUrl("");
     setStatus("idle");
     setStatusText("");
+  }
+
+  // Generate QR code SVG from URL
+  function generateQrSvg(url: string): string {
+    // Use a simple QR code generation approach via API
+    // We'll use the goqr.me API for simplicity
+    const encodedUrl = encodeURIComponent(url);
+    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodedUrl}`;
   }
 
   return (
@@ -140,32 +170,16 @@ function BilibiliLogin({ onLoginSuccess }: BilibiliLoginProps) {
       )}
 
       {/* QR Code Ready */}
-      {status === "qr-ready" && qrUrl && (
+      {(status === "qr-ready" || status === "waiting-scan") && qrUrl && (
         <div className="bilibili-login-qr">
           <div className="bilibili-qr-container">
-            {/* Generate QR code as SVG using a simple QR code library or display URL */}
-            <div className="bilibili-qr-placeholder">
-              <QrCode size={120} />
-              <span className="bilibili-qr-hint">{t("bilibili.scanHint")}</span>
-            </div>
-          </div>
-          <p className="bilibili-status-text">{statusText}</p>
-          <MacToolbarButton
-            icon={<RefreshCw size={14} />}
-            label={t("bilibili.refreshQr")}
-            onClick={reset}
-          />
-        </div>
-      )}
-
-      {/* Waiting for Scan */}
-      {status === "waiting-scan" && (
-        <div className="bilibili-login-qr">
-          <div className="bilibili-qr-container">
-            <div className="bilibili-qr-placeholder">
-              <QrCode size={120} />
-              <span className="bilibili-qr-hint">{t("bilibili.scanHint")}</span>
-            </div>
+            <img
+              src={generateQrSvg(qrUrl)}
+              alt="Bilibili QR Code"
+              className="bilibili-qr-image"
+              width={200}
+              height={200}
+            />
           </div>
           <p className="bilibili-status-text">{statusText}</p>
           <MacToolbarButton
@@ -180,9 +194,7 @@ function BilibiliLogin({ onLoginSuccess }: BilibiliLoginProps) {
       {status === "waiting-confirm" && (
         <div className="bilibili-login-qr">
           <div className="bilibili-qr-container">
-            <div className="bilibili-qr-placeholder">
-              <CheckCircle2 size={120} className="text-green" />
-            </div>
+            <CheckCircle2 size={120} className="text-green" />
           </div>
           <p className="bilibili-status-text">{statusText}</p>
         </div>

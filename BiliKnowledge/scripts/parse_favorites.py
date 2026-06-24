@@ -162,6 +162,7 @@ def write_folder_manifest(
     folders: list[dict],
     output_dir: Path,
     *,
+    entries: Optional[list[dict]] = None,
     failed_folders: Optional[list[dict]] = None,
     partial_folders: Optional[list[dict]] = None,
 ) -> None:
@@ -173,22 +174,47 @@ def write_folder_manifest(
         str(folder.get("id", "")): folder
         for folder in (partial_folders or [])
     }
+    latest_map: dict[str, tuple[int, str]] = {}
+    for entry in (entries or []):
+        folder_title = str(entry.get("favorite_folder") or DEFAULT_FOLDER_TITLE)
+        raw_latest = str(entry.get("collected_at") or entry.get("pubdate") or "").strip()
+        latest_ts = 0
+        pubdate = str(entry.get("pubdate") or "").strip()
+        if pubdate.isdigit():
+            latest_ts = int(pubdate)
+        latest_title, latest_raw = latest_map.get(folder_title, (0, ""))
+        if latest_ts >= latest_title:
+            latest_map[folder_title] = (latest_ts, raw_latest or latest_raw)
     payload = []
     for folder in folders:
         folder_id = str(folder.get("id", ""))
         partial = partial_map.get(folder_id) or {}
         failed = failed_map.get(folder_id) or {}
         sync_status = "failed" if failed else "partial" if partial else "complete"
+        latest_ts, latest_collected_at = latest_map.get(
+            folder.get("title", DEFAULT_FOLDER_TITLE),
+            (0, ""),
+        )
         payload.append(
             {
                 "id": folder_id,
                 "title": folder.get("title", DEFAULT_FOLDER_TITLE),
                 "media_count": int(folder.get("media_count") or folder.get("count") or 0),
+                "latest_ts": latest_ts,
+                "latest_collected_at": latest_collected_at,
                 "sync_status": sync_status,
                 "synced_count": int(partial.get("actual_count") or folder.get("media_count") or folder.get("count") or 0),
                 "error": failed.get("error", ""),
             }
         )
+    payload.sort(
+        key=lambda item: (
+            int(item.get("latest_ts") or 0),
+            int(item.get("media_count") or 0),
+            item.get("title", ""),
+        ),
+        reverse=True,
+    )
     path = output_dir / "favorite_folders.json"
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[已写入] {path}（共 {len(payload)} 个收藏夹）")
@@ -277,6 +303,7 @@ def maybe_sync_live_favorites(source_dir: Path, limit: int) -> list[dict]:
         write_folder_manifest(
             folders,
             source_dir.parent,
+            entries=normalized,
             failed_folders=failed_folders,
             partial_folders=partial_folders,
         )
@@ -391,14 +418,40 @@ def write_csv(entries: list[dict], output_path: Path):
 
 
 def write_favorite_folders(entries: list[dict], output_path: Path) -> None:
-    counts: dict[str, int] = {}
+    folder_meta: dict[str, dict] = {}
     for entry in entries:
         title = entry.get("favorite_folder") or DEFAULT_FOLDER_TITLE
-        counts[title] = counts.get(title, 0) + 1
+        latest_ts = 0
+        pubdate = str(entry.get("pubdate") or "").strip()
+        if pubdate.isdigit():
+            latest_ts = int(pubdate)
+        latest_collected_at = str(entry.get("collected_at") or entry.get("pubdate") or "").strip()
+        current = folder_meta.setdefault(
+            title,
+            {
+                "id": title,
+                "title": title,
+                "media_count": 0,
+                "latest_ts": 0,
+                "latest_collected_at": "",
+            },
+        )
+        current["media_count"] += 1
+        if latest_ts >= int(current.get("latest_ts") or 0):
+            current["latest_ts"] = latest_ts
+            current["latest_collected_at"] = latest_collected_at
     payload = [
-        {"id": title, "title": title, "media_count": count}
-        for title, count in sorted(counts.items(), key=lambda item: item[1], reverse=True)
+        value
+        for value in folder_meta.values()
     ]
+    payload.sort(
+        key=lambda item: (
+            int(item.get("latest_ts") or 0),
+            int(item.get("media_count") or 0),
+            item.get("title", ""),
+        ),
+        reverse=True,
+    )
     output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"[已写入] {output_path}（共 {len(payload)} 个收藏夹）")
 

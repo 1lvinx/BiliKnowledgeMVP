@@ -151,6 +151,10 @@ function httpGetJson(url, cookieHeader) {
   });
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchLoginProfile(cookieHeader) {
   const payload = await httpGetJson("https://api.bilibili.com/x/web-interface/nav", cookieHeader);
   const data = payload.data || {};
@@ -162,14 +166,23 @@ async function fetchLoginProfile(cookieHeader) {
 
 async function fetchFavoriteFolders(cookieHeader, mid) {
   const query = new URLSearchParams({ up_mid: String(mid) }).toString();
-  const payload = await httpGetJson(
-    `https://api.bilibili.com/x/v3/fav/folder/created/list-all?${query}`,
-    cookieHeader,
-  );
-  if (payload.code !== 0) {
-    throw new Error(payload.message || "Failed to fetch favorite folders");
+  let lastMessage = "Failed to fetch favorite folders";
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    const payload = await httpGetJson(
+      `https://api.bilibili.com/x/v3/fav/folder/created/list-all?${query}`,
+      cookieHeader,
+    );
+    if (payload.code === 0) {
+      return (payload.data && payload.data.list) || [];
+    }
+    lastMessage = payload.message || lastMessage;
+    const retryable = /banned|频繁|稍后|限制/i.test(lastMessage);
+    if (!retryable || attempt === 4) {
+      break;
+    }
+    await sleep(1200 * attempt);
   }
-  return (payload.data && payload.data.list) || [];
+  throw new Error(lastMessage);
 }
 
 async function fetchFolderResourcesWithCookie(cookieHeader, folder, options) {
@@ -185,12 +198,25 @@ async function fetchFolderResourcesWithCookie(cookieHeader, folder, options) {
       ps: "20",
       platform: "web",
     }).toString();
-    const payload = await httpGetJson(
-      `https://api.bilibili.com/x/v3/fav/resource/list?${query}`,
-      cookieHeader,
-    );
+    let payload = null;
+    let payloadMessage = "";
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      payload = await httpGetJson(
+        `https://api.bilibili.com/x/v3/fav/resource/list?${query}`,
+        cookieHeader,
+      );
+      if (payload && payload.code === 0) {
+        break;
+      }
+      payloadMessage = payload?.message || "";
+      const retryable = /banned|频繁|稍后|限制/i.test(payloadMessage);
+      if (!retryable || attempt === 4) {
+        break;
+      }
+      await sleep(1200 * attempt);
+    }
     if (!payload || payload.code !== 0) {
-      throw new Error(payload?.message || `收藏夹接口返回异常（${folder.title || "默认收藏夹"}）`);
+      throw new Error(payloadMessage || `收藏夹接口返回异常（${folder.title || "默认收藏夹"}）`);
     }
     const medias = payload.data?.medias || [];
     for (const media of medias) {
@@ -225,6 +251,7 @@ async function fetchFolderResourcesWithCookie(cookieHeader, folder, options) {
     if (!payload.data?.has_more) {
       break;
     }
+    await sleep(220);
   }
 
   return items;
@@ -322,6 +349,25 @@ async function currentFirstBvid(page) {
   return items[0] ? items[0].bvid : "";
 }
 
+async function currentPagerState(page) {
+  return await page.evaluate(() => {
+    const active = document.querySelector(".vui_pagenation .vui_pagenation--btn-num.vui_button--active");
+    const next = Array.from(document.querySelectorAll(".vui_pagenation .vui_pagenation--btn-side")).find((element) =>
+      (element.textContent || "").replace(/\s+/g, " ").trim() === "下一页",
+    );
+
+    const activePage = Number((active?.textContent || "").trim()) || 0;
+    const nextDisabled = !next
+      || next.hasAttribute("disabled")
+      || next.className.includes("vui_button--disabled");
+
+    return {
+      activePage,
+      nextDisabled,
+    };
+  });
+}
+
 async function waitForFolderCards(page, folderTitle, options = {}) {
   const attempts = Number(options.attempts || 8);
   const delayMs = Number(options.delayMs || 800);
@@ -354,22 +400,55 @@ async function waitForFolderCards(page, folderTitle, options = {}) {
   return [];
 }
 
-async function clickNextPage(page, previousFirstBvid) {
-  const next = page.getByText("下一页", { exact: true }).first();
-  if ((await next.count()) === 0) {
+async function clickNextPage(page, previousFirstBvid, previousPageNumber) {
+  const pagerState = await currentPagerState(page);
+  if (pagerState.nextDisabled) {
     return false;
   }
 
   try {
-    await next.click({ timeout: 5000 });
+    const textButton = page.getByText("下一页", { exact: true }).first();
+    if ((await textButton.count()) > 0) {
+      await textButton.scrollIntoViewIfNeeded();
+      await textButton.click({ timeout: 5000 });
+    } else {
+      throw new Error("text next button not found");
+    }
   } catch {
-    return false;
+    try {
+      const nextButton = page
+        .locator(".vui_pagenation .vui_pagenation--btn-side", { hasText: "下一页" })
+        .first();
+      if ((await nextButton.count()) > 0) {
+        await nextButton.scrollIntoViewIfNeeded();
+        await nextButton.click({ timeout: 5000, force: true });
+      } else {
+        const nextPageNumber = previousPageNumber > 0 ? String(previousPageNumber + 1) : "";
+        if (!nextPageNumber) {
+          return false;
+        }
+        const nextPageButton = page
+          .locator(".vui_pagenation .vui_pagenation--btn-num", { hasText: nextPageNumber })
+          .first();
+        if ((await nextPageButton.count()) === 0) {
+          return false;
+        }
+        await nextPageButton.scrollIntoViewIfNeeded();
+        await nextPageButton.click({ timeout: 5000, force: true });
+      }
+    } catch {
+      return false;
+    }
   }
 
   for (let attempt = 0; attempt < 20; attempt += 1) {
     await page.waitForTimeout(400);
     const nextFirstBvid = await currentFirstBvid(page);
-    if (nextFirstBvid && nextFirstBvid !== previousFirstBvid) {
+    const nextPagerState = await currentPagerState(page);
+    if (
+      (nextFirstBvid && nextFirstBvid !== previousFirstBvid)
+      || (nextPagerState.activePage > previousPageNumber && nextPagerState.activePage > 0)
+    ) {
       return true;
     }
   }
@@ -464,9 +543,12 @@ async function scrapeFolderOnce(context, folder, options, cookieHeader) {
           console.warn(`[浏览器同步] ${folderTitle} 第 ${pageNumber} 页未解析到视频卡片，停止翻页`);
           break;
         }
-        const moved = await clickNextPage(page, firstBvid);
+        const pagerState = await currentPagerState(page);
+        const moved = await clickNextPage(page, firstBvid, pagerState.activePage);
         if (!moved) {
-          console.warn(`[浏览器同步] ${folderTitle} 第 ${pageNumber} 页后无法继续翻页，停止抓取`);
+          console.warn(
+            `[浏览器同步] ${folderTitle} 第 ${pageNumber} 页后无法继续翻页（当前分页 ${pagerState.activePage}），停止抓取`,
+          );
           break;
         }
         if (targetCount > 1000 && pageNumber % 25 === 0) {
@@ -516,6 +598,7 @@ async function scrapeFolder(context, folder, options, cookieHeader) {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
+      const beforeCount = mergedItems.length;
       const passItems = await scrapeFolderOnce(context, folder, options, cookieHeader);
       mergedItems = dedupeFolderItems([...mergedItems, ...passItems]);
       if (!shouldRetryLargeFolder) {
@@ -524,7 +607,7 @@ async function scrapeFolder(context, folder, options, cookieHeader) {
       if (targetCount > 0 && mergedItems.length >= targetCount) {
         break;
       }
-      if (mergedItems.length > 0) {
+      if (mergedItems.length === beforeCount) {
         break;
       }
       if (attempt < maxAttempts) {
@@ -554,14 +637,7 @@ function normalizeFolders(folders, mid) {
       media_count: Number(folder.media_count || folder.count || 0),
       mid: String(mid),
     }))
-    .sort((a, b) => {
-      const aDefault = a.title === "默认收藏夹";
-      const bDefault = b.title === "默认收藏夹";
-      if (aDefault !== bDefault) {
-        return aDefault ? 1 : -1;
-      }
-      return a.media_count - b.media_count;
-    });
+    .filter((folder) => folder.id);
 }
 
 async function main() {
@@ -604,11 +680,21 @@ async function main() {
     const items = [];
     const failedFolders = [];
     const partialFolders = [];
+    const folderLatestMap = new Map();
     for (const folder of folders) {
       try {
         const folderItems = await scrapeFolder(context, folder, {
           maxItemsPerFolder: args.maxItemsPerFolder,
         }, cookieHeader);
+        const latestItem = [...folderItems].sort((a, b) => {
+          const aTs = Number.parseInt(String(a.pubdate || "0"), 10) || 0;
+          const bTs = Number.parseInt(String(b.pubdate || "0"), 10) || 0;
+          return bTs - aTs;
+        })[0];
+        folderLatestMap.set(folder.id, {
+          latest_ts: Number.parseInt(String(latestItem?.pubdate || "0"), 10) || 0,
+          latest_collected_at: String(latestItem?.collected_at || latestItem?.pubdate || ""),
+        });
         const expectedCount = Number(folder.media_count || 0);
         if (expectedCount > 0 && folderItems.length < expectedCount && args.maxItemsPerFolder <= 0) {
           partialFolders.push({
@@ -633,6 +719,7 @@ async function main() {
         });
         console.warn(`[浏览器同步] ${folder.title} 同步失败：${error.message || error}`);
       }
+      await sleep(500);
     }
 
     const expectedVisibleItems = folders.reduce((sum, folder) => {
@@ -657,7 +744,22 @@ async function main() {
         mid: profile.mid,
         uname: profile.uname,
       },
-      folders: folders.map(({ id, title, media_count }) => ({ id, title, media_count })),
+      folders: folders
+        .map(({ id, title, media_count }) => ({
+          id,
+          title,
+          media_count,
+          ...(folderLatestMap.get(id) || { latest_ts: 0, latest_collected_at: "" }),
+        }))
+        .sort((a, b) => {
+          if ((b.latest_ts || 0) !== (a.latest_ts || 0)) {
+            return (b.latest_ts || 0) - (a.latest_ts || 0);
+          }
+          if ((b.media_count || 0) !== (a.media_count || 0)) {
+            return (b.media_count || 0) - (a.media_count || 0);
+          }
+          return String(a.title || "").localeCompare(String(b.title || ""), "zh-CN");
+        }),
       items,
       failed_folders: failedFolders,
       partial_folders: partialFolders,

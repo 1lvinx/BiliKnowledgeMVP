@@ -32,7 +32,11 @@ const DEFAULT_CONFIG: &str = r#"{
     "model": "deepseek-v4-flash"
   },
   "preferences": {
-    "language": "zh-CN"
+    "language": "zh-CN",
+    "appearance": "system",
+    "timezone": "Asia/Singapore",
+    "fontFamily": "system",
+    "density": "comfortable"
   }
 }"#;
 
@@ -315,7 +319,10 @@ fn get_favorite_folders() -> Result<String, String> {
     if !path.exists() {
         return Ok("[]".into());
     }
-    fs::read_to_string(path).map_err(|e| e.to_string())
+    let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let folders: Vec<serde_json::Value> =
+        serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    serde_json::to_string(&folders).map_err(|e| e.to_string())
 }
 
 #[derive(Serialize)]
@@ -570,10 +577,58 @@ fn get_config() -> Result<String, String> {
     fs::read_to_string(path).map_err(|e| e.to_string())
 }
 
+fn validate_preference_choice(
+    preferences: &serde_json::Value,
+    key: &str,
+    allowed: &[&str],
+) -> Result<(), String> {
+    let Some(value) = preferences.get(key) else {
+        return Ok(());
+    };
+    let Some(value) = value.as_str() else {
+        return Err(format!("Invalid config: preferences.{key} must be a string"));
+    };
+    if allowed.contains(&value) {
+        Ok(())
+    } else {
+        Err(format!("Invalid config: unsupported preferences.{key}: {value}"))
+    }
+}
+
+fn validate_config_value(config: &serde_json::Value) -> Result<(), String> {
+    let Some(preferences) = config.get("preferences") else {
+        return Ok(());
+    };
+    if !preferences.is_object() {
+        return Err("Invalid config: preferences must be an object".into());
+    }
+
+    validate_preference_choice(preferences, "language", &["zh-CN", "en-US"])?;
+    validate_preference_choice(preferences, "appearance", &["system", "light", "dark"])?;
+    validate_preference_choice(preferences, "fontFamily", &["system", "rounded", "serif", "mono"])?;
+    validate_preference_choice(preferences, "density", &["comfortable", "compact"])?;
+    validate_preference_choice(
+        preferences,
+        "timezone",
+        &[
+            "Asia/Singapore",
+            "Asia/Shanghai",
+            "Asia/Tokyo",
+            "America/Los_Angeles",
+            "America/New_York",
+            "Europe/London",
+            "UTC",
+        ],
+    )?;
+
+    Ok(())
+}
+
 #[tauri::command]
 fn save_config(config: String) -> Result<(), String> {
-    serde_json::from_str::<serde_json::Value>(&config)
+    let parsed = serde_json::from_str::<serde_json::Value>(&config)
         .map_err(|e| format!("Invalid config JSON: {e}"))?;
+    validate_config_value(&parsed)?;
     let path = knowledge_path("config/config.json")?;
     let parent = path
         .parent()
@@ -759,7 +814,7 @@ fn poll_bilibili_qr(qrcode_key: String) -> Result<String, String> {
 
         let result = serde_json::json!({
             "code": 0,
-            "segdata": sessdata,
+            "sessdata": sessdata,
             "bili_jct": bili_jct,
             "dedeuserid": dedeuserid,
             "buvid3": buvid3,
@@ -1035,5 +1090,34 @@ mod tests {
         assert_eq!(final_videos.as_array().unwrap()[1]["status"], "reviewed");
 
         fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn accepts_valid_visual_preferences() {
+        let config = serde_json::json!({
+            "preferences": {
+                "language": "zh-CN",
+                "appearance": "dark",
+                "timezone": "Asia/Singapore",
+                "fontFamily": "mono",
+                "density": "compact"
+            }
+        });
+
+        assert!(validate_config_value(&config).is_ok());
+    }
+
+    #[test]
+    fn rejects_invalid_visual_preferences() {
+        let config = serde_json::json!({
+            "preferences": {
+                "appearance": "neon",
+                "timezone": "Mars/Olympus",
+                "fontFamily": "comic",
+                "density": "tiny"
+            }
+        });
+
+        assert!(validate_config_value(&config).is_err());
     }
 }
