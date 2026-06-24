@@ -568,13 +568,49 @@ fn get_subtitles() -> Result<String, String> {
     fs::read_to_string(path).map_err(|e| e.to_string())
 }
 
+fn default_config_value() -> Result<serde_json::Value, String> {
+    serde_json::from_str(DEFAULT_CONFIG)
+        .map_err(|e| format!("Invalid embedded default config JSON: {e}"))
+}
+
+fn normalize_config_value(mut config: serde_json::Value) -> Result<serde_json::Value, String> {
+    let default_config = default_config_value()?;
+    let default_preferences = default_config
+        .get("preferences")
+        .and_then(|value| value.as_object())
+        .ok_or_else(|| "Invalid embedded default config: preferences missing".to_string())?;
+
+    if !config.is_object() {
+        return Err("Invalid config: root must be an object".into());
+    }
+
+    if config.get("preferences").is_none() {
+        config["preferences"] = serde_json::Value::Object(serde_json::Map::new());
+    }
+
+    let Some(preferences) = config.get_mut("preferences").and_then(|value| value.as_object_mut()) else {
+        return Err("Invalid config: preferences must be an object".into());
+    };
+
+    for (key, value) in default_preferences {
+        preferences.entry(key.clone()).or_insert_with(|| value.clone());
+    }
+
+    validate_config_value(&config)?;
+    Ok(config)
+}
+
 #[tauri::command]
 fn get_config() -> Result<String, String> {
     let path = knowledge_path("config/config.json")?;
     if !path.exists() {
         return Ok(DEFAULT_CONFIG.into());
     }
-    fs::read_to_string(path).map_err(|e| e.to_string())
+    let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let parsed = serde_json::from_str::<serde_json::Value>(&content)
+        .map_err(|e| format!("Invalid config JSON: {e}"))?;
+    let normalized = normalize_config_value(parsed)?;
+    serde_json::to_string_pretty(&normalized).map_err(|e| e.to_string())
 }
 
 fn validate_preference_choice(
@@ -628,7 +664,7 @@ fn validate_config_value(config: &serde_json::Value) -> Result<(), String> {
 fn save_config(config: String) -> Result<(), String> {
     let parsed = serde_json::from_str::<serde_json::Value>(&config)
         .map_err(|e| format!("Invalid config JSON: {e}"))?;
-    validate_config_value(&parsed)?;
+    let normalized = normalize_config_value(parsed)?;
     let path = knowledge_path("config/config.json")?;
     let parent = path
         .parent()
@@ -636,7 +672,8 @@ fn save_config(config: String) -> Result<(), String> {
     if !parent.exists() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    fs::write(path, config).map_err(|e| e.to_string())
+    let content = serde_json::to_string_pretty(&normalized).map_err(|e| e.to_string())?;
+    fs::write(path, content).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1105,6 +1142,27 @@ mod tests {
         });
 
         assert!(validate_config_value(&config).is_ok());
+    }
+
+    #[test]
+    fn migrates_missing_visual_preferences() {
+        let config = serde_json::json!({
+            "bilibili": {
+                "status": "not_configured"
+            },
+            "preferences": {
+                "language": "zh-CN",
+                "appearance": "light"
+            }
+        });
+
+        let normalized = normalize_config_value(config).expect("legacy config should migrate");
+        let preferences = normalized.get("preferences").unwrap();
+        assert_eq!(preferences.get("language").unwrap(), "zh-CN");
+        assert_eq!(preferences.get("appearance").unwrap(), "light");
+        assert_eq!(preferences.get("timezone").unwrap(), "Asia/Singapore");
+        assert_eq!(preferences.get("fontFamily").unwrap(), "system");
+        assert_eq!(preferences.get("density").unwrap(), "comfortable");
     }
 
     #[test]
