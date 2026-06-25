@@ -110,41 +110,57 @@ function GlobalTaskStatusPanel({
   insight,
   noteContent,
   taskState,
+  scriptStates,
 }: {
   video: Video | null;
   subtitle: VideoSubtitle | null;
   insight: VideoInsight | null;
   noteContent: string | null;
   taskState: VideoTaskState | null;
+  scriptStates: Record<string, ScriptRunState>;
 }) {
   const hasStructuredNote = Boolean(video?.note_ready || (noteContent && noteContent.trim().length > 0));
   const subtitleTask = buildTaskDisplay("字幕", "subtitle", taskState?.subtitle, Boolean(subtitle), subtitle, insight);
   const insightTask = buildTaskDisplay("洞察", "insight", taskState?.insight, Boolean(insight), subtitle, insight);
   const noteTask = buildTaskDisplay("笔记", "note", taskState?.note, hasStructuredNote, subtitle, insight);
   const tasks = [subtitleTask, insightTask, noteTask];
+  const runningScript = Object.entries(scriptStates).find(([, state]) => state.state === "running");
+  const failedScript = Object.entries(scriptStates).find(([, state]) => state.state === "error");
+  const blockedScript = Object.entries(scriptStates).find(([, state]) => state.state === "blocked");
   const runningTask = tasks.find((task) => task.statusText === "进行中");
   const blockedTask = tasks.find((task) => task.statusText === "阻塞");
   const failedTask = tasks.find((task) => task.statusText === "失败");
   const allDone = tasks.every((task) => task.statusText === "完成");
-  const currentPhase = runningTask?.label ?? blockedTask?.label ?? failedTask?.label ?? (allDone ? "全部阶段" : "待开始");
-  const overallState = runningTask
+  const currentPhase = runningScript
+    ? getScriptDisplayName(runningScript[0], t)
+    : runningTask?.label ?? blockedTask?.label ?? failedTask?.label ?? blockedScript?.[0] ?? failedScript?.[0] ?? (allDone ? "全部阶段" : "待开始");
+  const overallState = runningScript || runningTask
     ? "进行中"
-    : failedTask
+    : failedScript || failedTask
       ? "失败"
-      : blockedTask
+      : blockedScript || blockedTask
         ? "阻塞"
         : allDone
           ? "完成"
           : "待开始";
-  const overallLight: TaskLightState = runningTask || blockedTask
+  const overallLight: TaskLightState = runningScript || runningTask || blockedScript || blockedTask
     ? "yellow"
-    : failedTask
+    : failedScript || failedTask
       ? "red"
       : allDone
         ? "green"
         : "red";
-  const latestTimestamp = [subtitleTask.endedAt, insightTask.endedAt, noteTask.endedAt, subtitleTask.startedAt, insightTask.startedAt, noteTask.startedAt]
-    .filter(Boolean)[0];
+  const latestTimestamp = [
+    runningScript?.[1].startedAt,
+    failedScript?.[1].endedAt,
+    blockedScript?.[1].endedAt,
+    subtitleTask.endedAt,
+    insightTask.endedAt,
+    noteTask.endedAt,
+    subtitleTask.startedAt,
+    insightTask.startedAt,
+    noteTask.startedAt,
+  ].filter(Boolean)[0];
 
   return (
     <section className="mac-toolbar-status">
@@ -1214,6 +1230,7 @@ function App() {
               noteContent={noteContent}
               subtitle={activeSubtitle}
               taskState={activeVideo ? (videoTaskStates[activeVideo.id] ?? null) : null}
+              scriptStates={scriptStates}
               video={activeVideo}
             />
           }
