@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import re
 import sys
 import urllib.request
 from datetime import datetime
@@ -21,6 +22,43 @@ def load_json(path: Path, default):
 def save_json(path: Path, payload) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+STOPWORDS = {
+    "什么", "如何", "一个", "我们", "你们", "他们", "这个", "那个", "就是", "然后", "因为",
+    "可以", "视频", "教程", "分享", "实战", "方法", "使用", "入门", "完整", "最新", "真的",
+}
+
+
+def extract_keywords(text: str) -> list[str]:
+    candidates = re.findall(r"[A-Za-z0-9.+#_-]{2,}|[\u4e00-\u9fff]{2,}", text or "")
+    results: list[str] = []
+    for raw in candidates:
+        token = raw.strip().lower()
+        if len(token) < 2 or token in STOPWORDS:
+            continue
+        results.append(token)
+    return list(dict.fromkeys(results))
+
+
+def validate_subtitle_against_video(video: dict, entry: dict) -> tuple[bool, str, list[str]]:
+    raw_text = str(entry.get("raw_text") or "").strip().lower()
+    if len(raw_text) < 40:
+        return False, "字幕文本过短，无法支撑笔记生成", []
+    title_keywords = extract_keywords(str(video.get("title") or ""))
+    metadata_keywords = extract_keywords(" ".join([
+        str(video.get("uploader") or ""),
+        str(video.get("favorite_folder") or ""),
+        str(video.get("category") or ""),
+    ]))
+    title_hits = [kw for kw in title_keywords if kw in raw_text]
+    meta_hits = [kw for kw in metadata_keywords if kw in raw_text]
+    if title_hits:
+        return True, "标题关键词命中字幕", title_hits[:8]
+    if len(meta_hits) >= 2 and len(title_keywords) <= 1:
+        return True, "元数据关键词命中字幕", meta_hits[:8]
+    expected = "、".join(title_keywords[:6]) or "标题关键词"
+    return False, f"字幕疑似错配：未命中 {expected}", (title_keywords + metadata_keywords)[:8]
 
 
 def load_bilibili_auth(root: Path) -> tuple[str, str]:
@@ -139,6 +177,7 @@ def main():
     existing_by_id = {item.get("video_id"): item for item in existing if isinstance(item, dict)}
     results = [item for item in existing if item.get("video_id") not in {video.get("id") for video in targets}]
 
+    failed = 0
     for video in targets:
         bvid = video.get("id", "")
         print(f"[字幕] 正在处理 {bvid} {video.get('title', '')}")
@@ -150,14 +189,26 @@ def main():
                 subtitle_url = fetch_ai_subtitle_url(int(player_data.get("aid", 0)), cid, cookie_header)
                 meta = {**meta, "subtitle_url": subtitle_url}
             body = fetch_subtitle_body(meta["subtitle_url"])
-            results.append(build_subtitle_entry(bvid, meta, body))
+            entry = build_subtitle_entry(bvid, meta, body)
+            is_valid, reason, matched_keywords = validate_subtitle_against_video(video, entry)
+            entry["validation"] = {
+                "status": "valid" if is_valid else "mismatch",
+                "reason": reason,
+                "matched_keywords": matched_keywords,
+            }
+            if not is_valid:
+                failed += 1
+                print(f"[错误] 字幕校验失败 {bvid}：{reason}")
+                continue
+            results.append(entry)
         except Exception as exc:
+            failed += 1
             print(f"[警告] 字幕抓取失败 {bvid}：{exc}")
-            if bvid in existing_by_id:
-                results.append(existing_by_id[bvid])
 
     save_json(root / "manifest" / "subtitles.json", results)
     print(f"[已写入] {root / 'manifest' / 'subtitles.json'}（共 {len(results)} 条）")
+    if failed and args.video_id:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ import argparse
 from datetime import datetime, timezone
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -112,6 +113,9 @@ def infer_named_terms(video: dict, insight: Optional[dict]) -> list[str]:
 
 def subtitle_matches_video(video: dict, subtitle: Optional[dict]) -> bool:
     if not subtitle or not isinstance(subtitle, dict):
+        return False
+    validation = subtitle.get("validation") if isinstance(subtitle.get("validation"), dict) else {}
+    if validation.get("status") == "mismatch":
         return False
     raw_text = str(subtitle.get("raw_text", "")).strip()
     if not raw_text:
@@ -343,11 +347,18 @@ def main():
         if not should_generate or generated >= args.limit:
             updated_videos.append(video)
             continue
+        subtitle = subtitle_by_id.get(video.get("id"))
+        if not subtitle_matches_video(video, subtitle):
+            print(f"[错误] 字幕缺失或疑似错配，已阻止生成笔记：{video.get('id', '')} {video.get('title', '')}")
+            if args.video_id:
+                sys.exit(1)
+            updated_videos.append(video)
+            continue
         note_path = notes_dir / f"{video.get('id', '')}.md"
         note_text = build_note(
             video,
             insight_by_id.get(video.get("id")),
-            subtitle_by_id.get(video.get("id")),
+            subtitle,
         )
         note_path.write_text(note_text, encoding="utf-8")
         next_video = dict(video)

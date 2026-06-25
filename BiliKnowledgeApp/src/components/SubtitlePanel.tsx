@@ -25,6 +25,26 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
+
+function extractSubtitleKeywords(text: string): string[] {
+  const stopwords = new Set(["什么", "如何", "一个", "我们", "你们", "他们", "这个", "那个", "就是", "然后", "因为", "可以", "视频", "教程", "分享", "实战", "方法", "使用", "入门", "完整", "最新", "真的"]);
+  const matches = text.match(/[A-Za-z0-9.+#_-]{2,}|[\u4e00-\u9fff]{2,}/g) ?? [];
+  return Array.from(new Set(matches.map((item) => item.trim().toLowerCase()).filter((item) => item.length >= 2 && !stopwords.has(item))));
+}
+
+function subtitleLooksMatched(video: Video, subtitle: VideoSubtitle): boolean {
+  const validation = subtitle.validation;
+  if (validation?.status === "valid") return true;
+  if (validation?.status === "mismatch") return false;
+  const rawText = (subtitle.raw_text || "").toLowerCase();
+  if (rawText.trim().length < 40) return false;
+  const titleKeywords = extractSubtitleKeywords(video.title || "");
+  const metadataKeywords = extractSubtitleKeywords(`${video.uploader || ""} ${video.favorite_folder || ""} ${video.category || ""}`);
+  if (titleKeywords.some((keyword) => rawText.includes(keyword))) return true;
+  const metadataHits = metadataKeywords.filter((keyword) => rawText.includes(keyword));
+  return titleKeywords.length <= 1 && metadataHits.length >= 2;
+}
+
 function SubtitlePanel({
   video,
   subtitle,
@@ -60,6 +80,34 @@ function SubtitlePanel({
           <MacToolbarButton
             icon={<Download size={14} />}
             label={isExtracting ? t("subtitle.extracting") : t("subtitle.extractSubtitle")}
+            onClick={() => onExtract(video.id)}
+            disabled={isExtracting}
+            primary
+          />
+        )}
+      </div>
+    );
+  }
+
+  const subtitleValidation = subtitle.validation;
+  const isSubtitleMismatch = !subtitleLooksMatched(video, subtitle);
+
+  if (isSubtitleMismatch) {
+    return (
+      <div className="subtitle-panel subtitle-no-data">
+        <div className="subtitle-no-data-icon">
+          <Captions size={24} />
+        </div>
+        <h3>字幕疑似错配</h3>
+        <p>{subtitleValidation?.reason || "当前字幕与视频标题/元数据不匹配，已阻止洞察和笔记生成。请重新抓取字幕。"}</p>
+        <div className="subtitle-video-context">
+          <span>{video.title}</span>
+          <span>{video.id}</span>
+        </div>
+        {onExtract && (
+          <MacToolbarButton
+            icon={<Download size={14} />}
+            label={isExtracting ? t("subtitle.extracting") : "重新抓取字幕"}
             onClick={() => onExtract(video.id)}
             disabled={isExtracting}
             primary

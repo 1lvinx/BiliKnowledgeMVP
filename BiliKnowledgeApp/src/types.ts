@@ -43,6 +43,11 @@ export interface VideoSubtitle {
   segments: SubtitleSegment[];
   raw_text: string;
   created_at: string;
+  validation?: {
+    status: "valid" | "mismatch";
+    reason?: string;
+    matched_keywords?: string[];
+  };
 }
 
 export interface VideoInsight {

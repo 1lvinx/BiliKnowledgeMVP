@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -77,6 +78,43 @@ def compact_subtitle_text(subtitle: dict, max_chars: int = 4500) -> str:
         raw = "\n".join(str(segment.get("text", "")).strip() for segment in segments if isinstance(segment, dict))
     raw = "\n".join(line.strip() for line in raw.splitlines() if line.strip())
     return raw[:max_chars]
+
+
+STOPWORDS = {
+    "什么", "如何", "一个", "我们", "你们", "他们", "这个", "那个", "就是", "然后", "因为",
+    "可以", "视频", "教程", "分享", "实战", "方法", "使用", "入门", "完整", "最新", "真的",
+}
+
+
+def extract_keywords(text: str) -> list[str]:
+    candidates = re.findall(r"[A-Za-z0-9.+#_-]{2,}|[\u4e00-\u9fff]{2,}", text or "")
+    results: list[str] = []
+    for raw in candidates:
+        token = raw.strip().lower()
+        if len(token) < 2 or token in STOPWORDS:
+            continue
+        results.append(token)
+    return list(dict.fromkeys(results))
+
+
+def subtitle_matches_video(video: dict, subtitle: dict | None) -> bool:
+    if not subtitle or not isinstance(subtitle, dict):
+        return False
+    validation = subtitle.get("validation") if isinstance(subtitle.get("validation"), dict) else {}
+    if validation.get("status") == "mismatch":
+        return False
+    raw_text = compact_subtitle_text(subtitle, max_chars=1600).lower()
+    if len(raw_text) < 40:
+        return False
+    title_keywords = extract_keywords(str(video.get("title") or ""))
+    metadata_keywords = extract_keywords(" ".join([
+        str(video.get("uploader") or ""),
+        str(video.get("favorite_folder") or ""),
+        str(video.get("category") or ""),
+    ]))
+    if any(kw in raw_text for kw in title_keywords):
+        return True
+    return len([kw for kw in metadata_keywords if kw in raw_text]) >= 2 and len(title_keywords) <= 1
 
 
 def build_prompt(video: dict, source_item: dict, subtitle: dict | None = None) -> str:
@@ -271,13 +309,19 @@ def main():
     for video in target_videos:
         video_id = video.get("id", "")
         source_item = source_lookup.get(video_id, {})
+        subtitle = subtitle_lookup.get(video_id)
+        if not subtitle_matches_video(video, subtitle):
+            print(f"[错误] 字幕缺失或疑似错配，已阻止生成洞察：{video_id} {video.get('title', '')}")
+            if args.video_id:
+                sys.exit(1)
+            continue
         print(f"[视频洞察] 正在分析 {video_id} {video.get('title', '')}")
         try:
             raw_text = call_chat_completion(
                 base_url=base_url,
                 api_key=api_key,
                 model=model,
-                prompt=build_prompt(video, source_item, subtitle_lookup.get(video_id)),
+                prompt=build_prompt(video, source_item, subtitle),
             )
             insight = normalize_insight(video_id, raw_text)
         except (urllib.error.URLError, KeyError, json.JSONDecodeError) as exc:
