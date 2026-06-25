@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Search } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import { cn } from "../lib/utils";
 import { t } from "../i18n";
 
@@ -7,11 +7,12 @@ interface ShellProps {
   sidebar: ReactNode;
   toolbar: ReactNode;
   children: ReactNode;
+  sidebarCollapsed?: boolean;
 }
 
-export function MacAppShell({ sidebar, toolbar, children }: ShellProps) {
+export function MacAppShell({ sidebar, toolbar, children, sidebarCollapsed = false }: ShellProps) {
   return (
-    <div className="mac-window">
+    <div className={cn("mac-window", sidebarCollapsed && "is-sidebar-collapsed")}>
       {sidebar}
       <main className="mac-main">
         {toolbar}
@@ -21,13 +22,32 @@ export function MacAppShell({ sidebar, toolbar, children }: ShellProps) {
   );
 }
 
-export function MacSidebar({ children }: { children: ReactNode }) {
+export function MacSidebar({
+  children,
+  collapsed = false,
+  onToggleCollapse,
+}: {
+  children: ReactNode;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+}) {
   return (
-    <aside className="mac-sidebar">
-      <div className="mac-sidebar-rail" aria-hidden="true">
-        <span className="is-active" />
-        <span />
-        <span />
+    <aside className={cn("mac-sidebar", collapsed && "is-collapsed")}>
+      <div className="mac-sidebar-chrome">
+        <div className="mac-sidebar-rail" aria-hidden="true">
+          <span className="is-active" />
+          <span />
+          <span />
+        </div>
+        <button
+          aria-label={collapsed ? "展开侧边栏" : "折叠侧边栏"}
+          className="mac-sidebar-collapse-button"
+          onClick={onToggleCollapse}
+          title={collapsed ? "展开侧边栏" : "折叠侧边栏"}
+          type="button"
+        >
+          {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+        </button>
       </div>
       <div className="mac-sidebar-brand">
         <div className="mac-sidebar-brand-mark">BK</div>

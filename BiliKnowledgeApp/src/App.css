@@ -4509,3 +4509,150 @@ textarea:focus-visible {
   padding-bottom: 16px;
   margin-bottom: 16px;
 }
+
+/* RC UI polish: single default font, lighter list typography, collapsible sidebar */
+:root {
+  --bk-font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei UI", "Helvetica Neue", Arial, sans-serif;
+  --bk-heading-weight: 600;
+  --bk-body-weight: 400;
+}
+
+:root[data-font="rounded"],
+:root[data-font="serif"],
+:root[data-font="mono"] {
+  --bk-font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei UI", "Helvetica Neue", Arial, sans-serif;
+  --bk-heading-weight: 600;
+}
+
+.mac-window {
+  transition: grid-template-columns var(--bk-motion-base);
+}
+
+.mac-window.is-sidebar-collapsed {
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+
+.mac-sidebar-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 4px 4px;
+}
+
+.mac-sidebar-collapse-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--bk-tertiary-label);
+  cursor: pointer;
+  transition: background var(--bk-motion-fast), color var(--bk-motion-fast);
+}
+
+.mac-sidebar-collapse-button:hover {
+  background: var(--bk-surface-hover);
+  color: var(--bk-label);
+}
+
+.mac-sidebar.is-collapsed {
+  gap: 12px;
+  padding: 14px 8px;
+  align-items: center;
+}
+
+.mac-sidebar.is-collapsed .mac-sidebar-chrome {
+  width: 100%;
+  justify-content: center;
+  padding: 0 0 2px;
+}
+
+.mac-sidebar.is-collapsed .mac-sidebar-rail,
+.mac-sidebar.is-collapsed .mac-sidebar-brand-copy,
+.mac-sidebar.is-collapsed .mac-sidebar-label,
+.mac-sidebar.is-collapsed .mac-sidebar-title,
+.mac-sidebar.is-collapsed .mac-sidebar-badge,
+.mac-sidebar.is-collapsed .mac-sidebar-footer {
+  display: none;
+}
+
+.mac-sidebar.is-collapsed .mac-sidebar-brand {
+  display: flex;
+  min-height: auto;
+  padding: 2px 0 8px;
+  border-bottom: 1px solid rgba(108, 123, 151, 0.14);
+}
+
+.mac-sidebar.is-collapsed .mac-sidebar-brand-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mac-sidebar.is-collapsed .mac-sidebar-section,
+.mac-sidebar.is-collapsed .mac-sidebar-items {
+  width: 100%;
+  align-items: center;
+  background: transparent;
+  padding: 0;
+}
+
+.mac-sidebar.is-collapsed .mac-sidebar-item {
+  display: flex;
+  justify-content: center;
+  width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border-radius: 12px;
+  transform: none;
+}
+
+.mac-sidebar.is-collapsed .mac-sidebar-item:hover,
+.mac-sidebar.is-collapsed .mac-sidebar-item.is-active {
+  transform: none;
+}
+
+.mac-sidebar.is-collapsed .mac-sidebar-item::before {
+  display: none;
+}
+
+.mac-sidebar.is-collapsed .mac-sidebar-icon {
+  color: inherit;
+}
+
+.mac-sidebar-brand-copy strong,
+.mac-toolbar-title-group h1,
+.mac-panel-header h2,
+.mac-inspector-title {
+  font-weight: 600;
+}
+
+.mac-sidebar-label,
+.mac-sidebar-item,
+.mac-sidebar-theme-toggle button,
+.mac-sidebar-footer-row strong {
+  font-weight: 500;
+}
+
+.mac-row-title {
+  font-size: 13px;
+  line-height: 1.42;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.mac-native-row.is-selected .mac-row-title {
+  font-weight: 550;
+}
+
+.mac-row-meta {
+  font-size: 12px;
+  line-height: 1.35;
+}

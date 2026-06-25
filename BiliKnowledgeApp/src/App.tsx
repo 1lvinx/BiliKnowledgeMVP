@@ -193,6 +193,7 @@ function App() {
   const [fontPreference, setFontPreference] = useState<FontPreference>("system");
   const [densityPreference, setDensityPreference] = useState<DensityPreference>("comfortable");
   const [timezonePreference, setTimezonePreference] = useState("Asia/Singapore");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [videos, setVideos] = useState<Video[]>([]);
   const [favoriteFolders, setFavoriteFolders] = useState<FavoriteFolder[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -1103,8 +1104,12 @@ function App() {
 
   return (
     <MacAppShell
+      sidebarCollapsed={sidebarCollapsed}
       sidebar={
-        <MacSidebar>
+        <MacSidebar
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
+        >
           <MacSidebarSection title={t("sidebar.library")}>
             <MacSidebarItem
               active={currentView === "dashboard"}
