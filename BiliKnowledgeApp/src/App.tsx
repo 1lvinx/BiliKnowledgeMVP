@@ -374,18 +374,21 @@ function App() {
     }));
   }
 
-  async function fetchVideos() {
+  async function fetchVideos(): Promise<Video[]> {
     if (!tauriAvailable) {
       setVideos(previewVideos);
       setError(null);
-      return;
+      return previewVideos;
     }
     try {
       const data: string = await invoke("get_videos");
-      setVideos(JSON.parse(data));
+      const parsed = JSON.parse(data) as Video[];
+      setVideos(parsed);
       setError(null);
+      return parsed;
     } catch {
       setError(t("error.syncFailed"));
+      return [];
     }
   }
 
@@ -829,11 +832,24 @@ function App() {
         scriptName: "generate_notes.py",
         args: ["--root", ".", "--video-id", videoId, "--limit", "1"],
       });
-      await fetchVideos();
+      const updatedVideos = await fetchVideos();
       const generatedNotePath = `${videoId}.md`;
       const generatedContent: string = await invoke("get_note", { notePath: generatedNotePath });
-      setSelectedVideo((prev) => prev && prev.id === videoId ? { ...prev, note_path: generatedNotePath, note_ready: true } : prev);
+      const materializedVideo = updatedVideos.find((video) => video.id === videoId);
+      setVideos((prev) =>
+        prev.map((video) =>
+          video.id === videoId
+            ? { ...video, ...(materializedVideo ?? {}), note_path: generatedNotePath, note_ready: true }
+            : video,
+        ),
+      );
+      setSelectedVideo((prev) => ({
+        ...(materializedVideo ?? prev ?? { id: videoId }),
+        note_path: generatedNotePath,
+        note_ready: true,
+      } as Video));
       setNoteContent(generatedContent);
+      setCurrentView("notes");
       appendLog(`笔记生成：已完成 ${videoId}`);
       updateScriptState("generate_notes.py", {
         state: "success",
@@ -1060,11 +1076,17 @@ function App() {
   }, [projects, searchTerm]);
 
   const viewScopedVideos = currentView === "favorites" ? favoriteVideos : filteredVideos;
-  const activeVideo =
-    (selectedVideo && viewScopedVideos.find((video) => video.id === selectedVideo.id)) ||
-    viewScopedVideos[0] ||
-    videos[0] ||
-    null;
+  const scopedSelectedVideo = selectedVideo
+    ? viewScopedVideos.find((video) => video.id === selectedVideo.id)
+    : null;
+  const activeVideo = selectedVideo
+    ? {
+        ...selectedVideo,
+        ...(scopedSelectedVideo ?? {}),
+        note_path: scopedSelectedVideo?.note_path || selectedVideo.note_path,
+        note_ready: Boolean(scopedSelectedVideo?.note_ready || selectedVideo.note_ready),
+      }
+    : viewScopedVideos[0] || videos[0] || null;
   const activeProject = selectedProject ?? filteredProjects[0] ?? projects[0] ?? null;
   const activeInsight = activeVideo
     ? insights.find((item) => item.video_id === activeVideo.id) ?? null
@@ -1075,7 +1097,7 @@ function App() {
   const reviewedCount = videos.filter((video) => video.status === "reviewed").length;
   const pendingCount = videos.filter((video) => video.status === "pending").length;
   const p0Count = videos.filter((video) => video.priority === "P0").length;
-  const noteCount = videos.length;
+  const noteCount = videos.filter((video) => video.note_ready && video.note_path).length;
 
   const toolbarAction = getToolbarAction({
     currentView,
@@ -1115,13 +1137,6 @@ function App() {
               icon={<Heart size={16} />}
               label={t("sidebar.favorites")}
               onClick={() => setCurrentView("favorites")}
-            />
-            <MacSidebarItem
-              active={currentView === "videos"}
-              badge={videos.length}
-              icon={<PlaySquare size={16} />}
-              label={t("sidebar.videos")}
-              onClick={() => setCurrentView("videos")}
             />
             <MacSidebarItem
               active={currentView === "notes"}

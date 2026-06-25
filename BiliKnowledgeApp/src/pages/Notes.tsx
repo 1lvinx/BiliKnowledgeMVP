@@ -19,15 +19,13 @@ function isPlaceholderNoteContent(content: string | null): boolean {
     "> 待补充。",
     "- 待补充",
     "问题定义待补充",
-    "## 内容概述",
-    "## 核心观点",
-    "## 适用场景",
-    "## 解决的问题",
-    "## 关键名词",
+    "适用场景待补充",
+    "解决的问题待补充",
+    "关键名词待补充",
   ];
 
   const hits = placeholderSignals.filter((signal) => normalized.includes(signal)).length;
-  return hits >= 4;
+  return hits >= 2;
 }
 
 interface NotesProps {
