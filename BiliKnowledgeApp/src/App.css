@@ -4656,3 +4656,11 @@ textarea:focus-visible {
   font-size: 12px;
   line-height: 1.35;
 }
+
+.mac-note-generation-state {
+  display: grid;
+  place-items: center;
+  gap: 14px;
+  min-height: 320px;
+  padding: 24px;
+}

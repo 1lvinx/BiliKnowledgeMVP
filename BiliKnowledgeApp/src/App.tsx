@@ -830,6 +830,10 @@ function App() {
         args: ["--root", ".", "--video-id", videoId, "--limit", "1"],
       });
       await fetchVideos();
+      const generatedNotePath = `${videoId}.md`;
+      const generatedContent: string = await invoke("get_note", { notePath: generatedNotePath });
+      setSelectedVideo((prev) => prev && prev.id === videoId ? { ...prev, note_path: generatedNotePath, note_ready: true } : prev);
+      setNoteContent(generatedContent);
       appendLog(`笔记生成：已完成 ${videoId}`);
       updateScriptState("generate_notes.py", {
         state: "success",
@@ -1332,6 +1336,7 @@ function App() {
               fetchNote={fetchNote}
               noteContent={noteContent}
               onExtractSubtitle={extractSubtitle}
+              onGenerateNote={generateNoteForVideo}
               subtitleExtracting={subtitleExtracting}
               videos={filteredVideos}
               insights={insights}

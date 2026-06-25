@@ -5,7 +5,7 @@ import type { Video, VideoInsight, VideoSubtitle } from "../types";
 import { t } from "../i18n";
 import { cn } from "../lib/utils";
 import { formatVideoTime, localizeLabel } from "../lib/video-utils";
-import { MacEmptyState, MacSplitView } from "../components/MacUI";
+import { MacEmptyState, MacSplitView, MacToolbarButton } from "../components/MacUI";
 import { InsightPanel } from "../components/InsightPanel";
 import { SubtitlePanel } from "../components/SubtitlePanel";
 
@@ -36,6 +36,7 @@ interface NotesProps {
   fetchNote: (video: Video) => void;
   noteContent: string | null;
   onExtractSubtitle?: (videoId: string) => void;
+  onGenerateNote?: (videoId: string) => void;
   subtitleExtracting?: boolean;
   videos: Video[];
   insights?: VideoInsight[];
@@ -47,6 +48,7 @@ export function Notes({
   fetchNote,
   noteContent,
   onExtractSubtitle,
+  onGenerateNote,
   subtitleExtracting = false,
   videos,
   insights = [],
@@ -116,11 +118,20 @@ export function Notes({
                   <ReactMarkdown>{noteContent ?? t("notes.chooseNoteHint")}</ReactMarkdown>
                 </div>
               ) : (
-                <MacEmptyState
-                  detail="当前只有占位模板，还没有形成可用的笔记。请先运行 AI 洞察或重新生成笔记。"
-                  icon={<FileText size={28} />}
-                  title="暂无有效笔记内容"
-                />
+                <div className="mac-note-generation-state">
+                  <MacEmptyState
+                    detail="当前视频还没有形成可用笔记。点击下方按钮，只为这条视频生成笔记。"
+                    icon={<FileText size={28} />}
+                    title="暂无有效笔记内容"
+                  />
+                  <MacToolbarButton
+                    disabled={!activeVideo}
+                    icon={<FileText size={14} />}
+                    label="生成笔记"
+                    onClick={() => activeVideo && onGenerateNote?.(activeVideo.id)}
+                    primary
+                  />
+                </div>
               )}
             </article>
           ) : (
