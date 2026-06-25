@@ -1333,12 +1333,10 @@ function App() {
           {currentView === "notes" && (
             <LazyNotes
               activeVideo={activeVideo}
-              fetchNote={fetchNote}
               noteContent={noteContent}
               onExtractSubtitle={extractSubtitle}
               onGenerateNote={generateNoteForVideo}
               subtitleExtracting={subtitleExtracting}
-              videos={filteredVideos}
               insights={insights}
               subtitles={subtitles}
             />
