@@ -847,6 +847,8 @@ function App() {
         ...(materializedVideo ?? prev ?? { id: videoId }),
         note_path: generatedNotePath,
         note_ready: true,
+        note_generated_at: materializedVideo?.note_generated_at ?? new Date().toISOString(),
+        note_generation_mode: "single",
       } as Video));
       setNoteContent(generatedContent);
       setCurrentView("notes");
@@ -1085,6 +1087,8 @@ function App() {
         ...(scopedSelectedVideo ?? {}),
         note_path: scopedSelectedVideo?.note_path || selectedVideo.note_path,
         note_ready: Boolean(scopedSelectedVideo?.note_ready || selectedVideo.note_ready),
+        note_generated_at: scopedSelectedVideo?.note_generated_at || selectedVideo.note_generated_at,
+        note_generation_mode: scopedSelectedVideo?.note_generation_mode || selectedVideo.note_generation_mode,
       }
     : viewScopedVideos[0] || videos[0] || null;
   const activeProject = selectedProject ?? filteredProjects[0] ?? projects[0] ?? null;
@@ -1097,7 +1101,7 @@ function App() {
   const reviewedCount = videos.filter((video) => video.status === "reviewed").length;
   const pendingCount = videos.filter((video) => video.status === "pending").length;
   const p0Count = videos.filter((video) => video.priority === "P0").length;
-  const noteCount = videos.filter((video) => video.note_ready && video.note_path).length;
+  const noteCount = videos.filter((video) => video.note_ready && video.note_path && video.note_generation_mode === "single").length;
 
   const toolbarAction = getToolbarAction({
     currentView,

@@ -66,7 +66,7 @@ export function Notes({
     ? insights.filter((i) => i.video_id !== activeVideo.id)
     : [];
 
-  const noteVideos = videos.filter((video) => Boolean(video.note_ready && video.note_path));
+  const noteVideos = videos.filter((video) => Boolean(video.note_ready && video.note_path && video.note_generation_mode === "single"));
   const hasSubstantiveNote = !isPlaceholderNoteContent(noteContent);
 
   return (

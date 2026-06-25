@@ -13,6 +13,8 @@ export interface Video {
   status: string;
   note_path: string;
   note_ready?: boolean;
+  note_generated_at?: string;
+  note_generation_mode?: "single" | "batch";
   project_extracted: boolean;
   remarks: string;
 }

@@ -2,9 +2,9 @@
 """Generate basic Markdown notes from videos, subtitles, and insights."""
 
 import argparse
+from datetime import datetime, timezone
 import json
 import re
-from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -314,6 +314,8 @@ def main():
         next_video = dict(video)
         next_video["note_path"] = note_path.name
         next_video["note_ready"] = True
+        next_video["note_generated_at"] = datetime.now(timezone.utc).isoformat()
+        next_video["note_generation_mode"] = "single" if args.video_id else "batch"
         updated_videos.append(next_video)
         generated += 1
         print(f"[笔记] 已生成 {note_path.name}")

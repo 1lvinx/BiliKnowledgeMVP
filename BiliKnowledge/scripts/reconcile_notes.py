@@ -18,6 +18,16 @@ def load_json(path: Path, default: Any) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def is_invalid_video(video: dict[str, Any]) -> bool:
+    title = str(video.get("title") or "").strip()
+    video_id = str(video.get("id") or "").strip()
+    return title == "已失效视频" or "已失效" in title or not video_id.startswith("BV")
+
+
+def is_single_generated_note(video: dict[str, Any]) -> bool:
+    return str(video.get("note_generation_mode") or "").strip() == "single"
+
+
 def resolve_existing_note(notes_dir: Path, video: dict[str, Any]) -> Path | None:
     video_id = str(video.get("id") or "").strip()
     raw_note_path = str(video.get("note_path") or "").strip()
@@ -54,6 +64,7 @@ def reconcile_videos(root: Path) -> tuple[list[dict[str, Any]], dict[str, int]]:
         "note_path_added": 0,
         "note_path_cleared": 0,
         "note_ready_changed": 0,
+        "invalid_removed": 0,
     }
     reconciled: list[dict[str, Any]] = []
     for item in videos:
@@ -61,6 +72,9 @@ def reconcile_videos(root: Path) -> tuple[list[dict[str, Any]], dict[str, int]]:
             continue
         metrics["total"] += 1
         video = dict(item)
+        if is_invalid_video(video):
+            metrics["invalid_removed"] += 1
+            continue
         previous_note_path = str(video.get("note_path") or "").strip()
         previous_note_ready = bool(video.get("note_ready"))
         note = resolve_existing_note(notes_dir, video)
@@ -70,7 +84,9 @@ def reconcile_videos(root: Path) -> tuple[list[dict[str, Any]], dict[str, int]]:
             metrics["materialized"] += 1
             if not previous_note_path:
                 metrics["note_path_added"] += 1
-            video["note_ready"] = True
+            video["note_ready"] = is_single_generated_note(video)
+            if not video["note_ready"]:
+                video["note_path"] = ""
         else:
             if previous_note_path:
                 metrics["note_path_cleared"] += 1
@@ -82,6 +98,35 @@ def reconcile_videos(root: Path) -> tuple[list[dict[str, Any]], dict[str, int]]:
     return reconciled, metrics
 
 
+
+
+
+def write_favorite_folders(entries: list[dict[str, Any]], output_path: Path) -> None:
+    folders: dict[str, dict[str, Any]] = {}
+    for entry in entries:
+        title = str(entry.get("favorite_folder") or "默认收藏夹")
+        current = folders.setdefault(
+            title,
+            {
+                "id": title,
+                "title": title,
+                "media_count": 0,
+                "latest_ts": 0,
+                "latest_collected_at": "",
+            },
+        )
+        current["media_count"] += 1
+        pubdate = str(entry.get("pubdate") or "").strip()
+        latest_ts = int(pubdate) if pubdate.isdigit() else 0
+        if latest_ts >= int(current.get("latest_ts") or 0):
+            current["latest_ts"] = latest_ts
+            current["latest_collected_at"] = str(entry.get("collected_at") or entry.get("pubdate") or "")
+    payload = sorted(
+        folders.values(),
+        key=lambda item: (int(item.get("latest_ts") or 0), int(item.get("media_count") or 0), str(item.get("title") or "")),
+        reverse=True,
+    )
+    output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 def write_csv(entries: list[dict[str, Any]], output_path: Path) -> None:
     if not entries:
@@ -116,8 +161,10 @@ def main() -> int:
         return 0
     manifest_path.write_text(json.dumps(reconciled, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     write_csv(reconciled, root / "manifest" / "videos.csv")
+    write_favorite_folders(reconciled, root / "manifest" / "favorite_folders.json")
     print(f"[已写入] {manifest_path}")
     print(f"[已写入] {root / 'manifest' / 'videos.csv'}")
+    print(f"[已写入] {root / 'manifest' / 'favorite_folders.json'}")
     return 0
 
 

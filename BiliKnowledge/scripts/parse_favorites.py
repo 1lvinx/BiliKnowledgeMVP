@@ -397,6 +397,12 @@ def build_manifest_entry(video: dict) -> dict:
 
 
 
+def is_invalid_video(entry: dict) -> bool:
+    title = str(entry.get("title") or "").strip()
+    video_id = str(entry.get("id") or "").strip()
+    return title == "已失效视频" or "已失效" in title or not video_id.startswith("BV")
+
+
 def reconcile_note_materialization(entries: list[dict], notes_dir: Path) -> dict[str, int]:
     metrics = {
         "materialized": 0,
@@ -404,6 +410,10 @@ def reconcile_note_materialization(entries: list[dict], notes_dir: Path) -> dict
         "note_path_cleared": 0,
     }
     for entry in entries:
+        if is_invalid_video(entry):
+            entry["note_path"] = ""
+            entry["note_ready"] = False
+            continue
         video_id = str(entry.get("id") or "").strip()
         current_note_path = str(entry.get("note_path") or "").strip()
         candidates: list[Path] = []
@@ -417,7 +427,8 @@ def reconcile_note_materialization(entries: list[dict], notes_dir: Path) -> dict
             if not current_note_path:
                 metrics["note_path_added"] += 1
             entry["note_path"] = note_path.name
-            entry["note_ready"] = True
+            entry["note_ready"] = False
+            entry.pop("note_generation_mode", None)
             metrics["materialized"] += 1
         else:
             if current_note_path:
@@ -529,6 +540,11 @@ def main():
         print(f"[处理] 本次处理全部 {len(limited)} 条")
 
     entries = [build_manifest_entry(v) for v in limited]
+    before_invalid_filter = len(entries)
+    entries = [entry for entry in entries if not is_invalid_video(entry)]
+    removed_invalid = before_invalid_filter - len(entries)
+    if removed_invalid:
+        print(f"[整理] 已剔除失效视频 {removed_invalid} 条")
     out = Path(args.output)
     note_metrics = reconcile_note_materialization(entries, out.parent / "notes" / "raw")
     print(f"[笔记状态] {note_metrics}")

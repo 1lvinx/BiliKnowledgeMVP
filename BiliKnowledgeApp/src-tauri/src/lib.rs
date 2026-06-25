@@ -252,6 +252,27 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+fn is_invalid_video_entry(video: &serde_json::Value) -> bool {
+    let title = video
+        .get("title")
+        .and_then(|value| value.as_str())
+        .unwrap_or("")
+        .trim();
+    let video_id = video
+        .get("id")
+        .and_then(|value| value.as_str())
+        .unwrap_or("")
+        .trim();
+    title.contains("已失效") || !video_id.starts_with("BV")
+}
+
+fn is_single_generated_note(video: &serde_json::Value) -> bool {
+    video
+        .get("note_generation_mode")
+        .and_then(|value| value.as_str())
+        == Some("single")
+}
+
 #[tauri::command]
 fn get_videos() -> Result<String, String> {
     let path = knowledge_path("manifest/videos.json")?;
@@ -262,6 +283,7 @@ fn get_videos() -> Result<String, String> {
     let mut videos: serde_json::Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
 
     if let Some(items) = videos.as_array_mut() {
+        items.retain(|video| !is_invalid_video_entry(video));
         for video in items.iter_mut() {
             let video_id = video
                 .get("id")
@@ -291,8 +313,12 @@ fn get_videos() -> Result<String, String> {
                 }
             }
 
-            let note_ready = !resolved_note_path.is_empty();
-            video["note_path"] = serde_json::Value::String(resolved_note_path);
+            let note_ready = !resolved_note_path.is_empty() && is_single_generated_note(video);
+            if note_ready {
+                video["note_path"] = serde_json::Value::String(resolved_note_path);
+            } else {
+                video["note_path"] = serde_json::Value::String(String::new());
+            }
             video["note_ready"] = serde_json::Value::Bool(note_ready);
         }
     }
