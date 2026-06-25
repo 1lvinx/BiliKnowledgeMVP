@@ -863,35 +863,6 @@ function App() {
     }
   }
 
-  async function runBatchNotePipeline() {
-    if (!tauriAvailable || isRunning || subtitleExtracting) return;
-    try {
-      const cookieCheck = await validateBilibiliCookie({ requiredFor: "抓取字幕" });
-      if (!cookieCheck.valid) {
-        appendLog(cookieCheck.message);
-        setError(cookieCheck.message);
-        return;
-      }
-      setIsRunning(true);
-      appendLog("批量笔记：抓取字幕 → 生成洞察 → 生成笔记");
-      showToast("开始批量生成笔记", "neutral");
-      await invoke("run_script", { scriptName: "fetch_subtitles.py", args: ["--root", ".", "--limit", "30"] });
-      await fetchSubtitles();
-      await invoke("run_script", { scriptName: "generate_insights.py", args: ["--root", ".", "--limit", "30"] });
-      await fetchInsights();
-      await invoke("run_script", { scriptName: "generate_notes.py", args: ["--root", ".", "--limit", "30"] });
-      await fetchVideos();
-      appendLog("批量笔记：已完成");
-      showToast("批量笔记生成完成", "success");
-    } catch (err) {
-      appendLog(`批量笔记生成失败：${String(err)}`);
-      setError(String(err));
-      showToast("批量笔记生成失败", "error");
-    } finally {
-      setIsRunning(false);
-    }
-  }
-
   async function validateBilibiliCookie(options?: {
     requiredFor?: string;
     silentOnSuccess?: boolean;
@@ -1327,8 +1298,8 @@ function App() {
               onExtractSubtitle={extractSubtitle}
               onGenerateInsight={generateInsightForVideo}
               onGenerateNote={generateNoteForVideo}
-              onRunBatchInsight={() => runPythonScript("generate_insights.py", ["--root", ".", "--limit", "30"])}
-              onRunBatchNote={runBatchNotePipeline}
+              onRunBatchInsight={() => activeVideo && generateInsightForVideo(activeVideo.id)}
+              onRunBatchNote={() => activeVideo && generateNoteForVideo(activeVideo.id)}
               setFilterPriority={setFilterPriority}
               setFilterStatus={setFilterStatus}
               title={t("view.favorites")}
@@ -1346,8 +1317,8 @@ function App() {
               onExtractSubtitle={extractSubtitle}
               onGenerateInsight={generateInsightForVideo}
               onGenerateNote={generateNoteForVideo}
-              onRunBatchInsight={() => runPythonScript("generate_insights.py", ["--root", ".", "--limit", "30"])}
-              onRunBatchNote={runBatchNotePipeline}
+              onRunBatchInsight={() => activeVideo && generateInsightForVideo(activeVideo.id)}
+              onRunBatchNote={() => activeVideo && generateNoteForVideo(activeVideo.id)}
               setFilterPriority={setFilterPriority}
               setFilterStatus={setFilterStatus}
               title={t("view.videos")}
