@@ -2,7 +2,7 @@
   "probe": "Phase RC-Validation-1",
   "root": "/Users/elvinx/DevCompany/products/bili-knowledge-mvp/BiliKnowledge",
   "external_knowledge": "/Users/elvinx/Knowledge",
-  "elapsed_ms": 692.73,
+  "elapsed_ms": 699.41,
   "checks": [
     {
       "name": "收藏夹导入清单",
@@ -16,7 +16,7 @@
         "duplicate_count": 0,
         "failed_folder_count": 0,
         "partial_folder_count": 10,
-        "probe_ms": 126.37
+        "probe_ms": 128.4
       },
       "issues": []
     },
@@ -31,8 +31,8 @@
         "pending_without_note": 0,
         "success_rate_percent": 100.0,
         "bytes_read": 22067,
-        "avg_open_ms": 0.15,
-        "p95_open_ms": 0.18,
+        "avg_open_ms": 0.11,
+        "p95_open_ms": 0.14,
         "seed": 20260624
       },
       "issues": []
@@ -40,17 +40,17 @@
     {
       "name": "关键词搜索探测",
       "status": "PASS",
-      "summary": "搜索 5 个关键词，语料 8280 篇，平均 9.43 ms。",
+      "summary": "搜索 5 个关键词，语料 8280 篇，平均 10.89 ms。",
       "metrics": {
         "keyword_count": 5,
         "document_count": 8280,
-        "collect_ms": 224.85,
-        "avg_search_ms": 9.43,
-        "max_search_ms": 9.66,
+        "collect_ms": 226.76,
+        "avg_search_ms": 10.89,
+        "max_search_ms": 15.65,
         "results": {
           "ComfyUI": {
             "hit_count": 22,
-            "elapsed_ms": 9.66,
+            "elapsed_ms": 9.87,
             "top_hits": [
               {
                 "doc": "video:BV1L9kFBvEhe",
@@ -76,7 +76,7 @@
           },
           "Claude": {
             "hit_count": 274,
-            "elapsed_ms": 9.3,
+            "elapsed_ms": 9.33,
             "top_hits": [
               {
                 "doc": "insight:BV1xK4y1E7pR",
@@ -102,7 +102,7 @@
           },
           "Agent": {
             "hit_count": 228,
-            "elapsed_ms": 9.38,
+            "elapsed_ms": 9.25,
             "top_hits": [
               {
                 "doc": "/Users/elvinx/Knowledge/AI/learning/Elvinx-AI-Workshop-L15/00_course/Topx_15天AI工程学习路径_逸峰AI工作坊.md",
@@ -128,7 +128,7 @@
           },
           "OpenWrt": {
             "hit_count": 19,
-            "elapsed_ms": 9.18,
+            "elapsed_ms": 15.65,
             "top_hits": [
               {
                 "doc": "BiliKnowledge/notes/raw/BV1mt4115718.md",
@@ -154,7 +154,7 @@
           },
           "MCP": {
             "hit_count": 34,
-            "elapsed_ms": 9.64,
+            "elapsed_ms": 10.36,
             "top_hits": [
               {
                 "doc": "insight:BV1oP6c5I1xY",
@@ -184,22 +184,23 @@
     },
     {
       "name": "重启持久化配置探测",
-      "status": "FAIL",
+      "status": "PASS",
       "summary": "模拟配置读写校验 20 次，文件哈希保持一致。",
       "metrics": {
         "cycles": 20,
         "config_path": "BiliKnowledge/config/config.json",
-        "before_sha256": "44bd88d9769437ce57145b7a29fbc670ce5709a9eb1b2fd519a5b3c0f2831d5c",
-        "after_sha256": "44bd88d9769437ce57145b7a29fbc670ce5709a9eb1b2fd519a5b3c0f2831d5c",
-        "avg_cycle_ms": 0.13,
+        "before_sha256": "e8df140b132c525d0eb2c9e9173d72e2395553e8624872d9af040c1118a8c6e7",
+        "after_sha256": "e8df140b132c525d0eb2c9e9173d72e2395553e8624872d9af040c1118a8c6e7",
+        "avg_cycle_ms": 0.11,
         "preferences": {
           "language": "zh-CN",
-          "appearance": "light"
+          "appearance": "light",
+          "timezone": "Asia/Singapore",
+          "fontFamily": "system",
+          "density": "comfortable"
         }
       },
-      "issues": [
-        "missing preference keys: timezone, fontFamily, density"
-      ]
+      "issues": []
     },
     {
       "name": "大知识库规模探测",
@@ -210,11 +211,11 @@
         "external_knowledge_path": "/Users/elvinx/Knowledge",
         "external_markdown_count": 28,
         "total_markdown_count": 1483,
-        "total_bytes": 747148,
-        "probe_ms": 28.04
+        "total_bytes": 747298,
+        "probe_ms": 35.22
       },
       "issues": []
     }
   ],
-  "overall_status": "ACTION_REQUIRED"
+  "overall_status": "PASS"
 }

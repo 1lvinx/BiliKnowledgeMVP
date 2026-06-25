@@ -355,3 +355,52 @@ note_ready changed: 1444
 Remaining unrelated RC gate:
 
 - Local real `BiliKnowledge/config/config.json` still needs one real app settings save to persist migrated preference defaults. The file contains local secrets and is intentionally not committed.
+
+---
+
+## RC-Validation-1B Update — 2026-06-25
+
+Local real config preference migration was completed without printing or committing secret-bearing config content.
+
+Migrated missing local preference keys:
+
+```text
+timezone
+fontFamily
+density
+```
+
+Updated probe results:
+
+```text
+All-video random 50: PASS
+- 10 materialized notes opened
+- 40 videos correctly marked pending
+- state correctness 100.0%
+
+Materialized-note random 50: PASS
+- 50/50 opened
+- success rate 100.0%
+
+Config persistence probe: PASS
+- 20 cycles
+- config hash stable
+- required preference keys present
+
+Search probe: PASS
+Large knowledge probe: PASS
+Favorite manifest probe: PASS
+```
+
+Updated decision:
+
+```text
+Phase RC-Validation-1: PASS
+RC2: READY FOR LOCAL TAG
+```
+
+Remaining release-only gate:
+
+```text
+Developer ID signing + notarization are still required before public distribution.
+```
