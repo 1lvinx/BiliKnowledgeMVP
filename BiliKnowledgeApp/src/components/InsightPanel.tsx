@@ -51,6 +51,10 @@ function InsightPanel({ video, insight, relatedInsights = [] }: InsightPanelProp
   const useCases = Array.isArray(insight.use_cases) ? insight.use_cases : [];
   const problems = Array.isArray(insight.problem_statements) ? insight.problem_statements : [];
   const actionItems = Array.isArray(insight.action_items) ? insight.action_items : [];
+  const reusableValue = Array.isArray(insight.reusable_value) ? insight.reusable_value : [];
+  const workflowSteps = Array.isArray(insight.workflow_steps) ? insight.workflow_steps : [];
+  const evidence = Array.isArray(insight.evidence) ? insight.evidence : [];
+  const limitations = Array.isArray(insight.limitations) ? insight.limitations : [];
   const tags = Array.isArray(insight.insight_tags) ? insight.insight_tags : [];
   const categories = Array.isArray(insight.category_paths) ? insight.category_paths : [];
   const coreAssets = Array.isArray(insight.core_assets) ? insight.core_assets : [];
@@ -104,6 +108,73 @@ function InsightPanel({ video, insight, relatedInsights = [] }: InsightPanelProp
             {useCases.map((item, index) => (
               <li className="insight-list-item" key={index}>
                 <CheckCircle2 size={14} className="insight-check" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {reusableValue.length > 0 && (
+        <section className="insight-section">
+          <h4 className="insight-section-title">
+            <Wrench size={14} />
+            可复用价值
+          </h4>
+          <ul className="insight-list">
+            {reusableValue.map((item, index) => (
+              <li className="insight-list-item" key={index}>
+                <CheckCircle2 size={14} className="insight-check" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {workflowSteps.length > 0 && (
+        <section className="insight-section">
+          <h4 className="insight-section-title">
+            <ListChecks size={14} />
+            操作流程 / 方法
+          </h4>
+          <ul className="insight-list">
+            {workflowSteps.map((item, index) => (
+              <li className="insight-list-item insight-action-item" key={index}>
+                <span className="insight-action-num">{index + 1}</span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {evidence.length > 0 && (
+        <section className="insight-section">
+          <h4 className="insight-section-title">
+            <CheckCircle2 size={14} />
+            判断依据
+          </h4>
+          <ul className="insight-list">
+            {evidence.map((item, index) => (
+              <li className="insight-list-item" key={index}>
+                <CheckCircle2 size={14} className="insight-check" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {limitations.length > 0 && (
+        <section className="insight-section">
+          <h4 className="insight-section-title">
+            <Circle size={14} />
+            限制与风险
+          </h4>
+          <ul className="insight-list">
+            {limitations.map((item, index) => (
+              <li className="insight-list-item" key={index}>
+                <Circle size={10} className="insight-check" />
                 <span>{item}</span>
               </li>
             ))}

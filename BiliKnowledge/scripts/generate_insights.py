@@ -62,14 +62,35 @@ def call_chat_completion(base_url: str, api_key: str, model: str, prompt: str) -
     return body["choices"][0]["message"]["content"]
 
 
-def build_prompt(video: dict, source_item: dict) -> str:
+
+def build_subtitle_lookup(root: Path) -> dict:
+    items = load_json(root / "manifest" / "subtitles.json", [])
+    if not isinstance(items, list):
+        return {}
+    return {item.get("video_id"): item for item in items if isinstance(item, dict) and item.get("video_id")}
+
+
+def compact_subtitle_text(subtitle: dict, max_chars: int = 4500) -> str:
+    raw = str((subtitle or {}).get("raw_text") or "").strip()
+    if not raw:
+        segments = (subtitle or {}).get("segments") or []
+        raw = "\n".join(str(segment.get("text", "")).strip() for segment in segments if isinstance(segment, dict))
+    raw = "\n".join(line.strip() for line in raw.splitlines() if line.strip())
+    return raw[:max_chars]
+
+
+def build_prompt(video: dict, source_item: dict, subtitle: dict | None = None) -> str:
     return json.dumps(
         {
-            "task": "分析这个 Bilibili 收藏视频，输出适合本地知识库沉淀的结构化洞察。",
+            "task": "从这个 Bilibili 收藏视频中抽取可复用的真实价值信息，而不是泛泛摘要。",
             "requirements": {
-                "summary": "2-4句中文，概括视频讲了什么",
-                "key_points": "3-5条，提炼关键观点或方法",
-                "action_items": "2-4条，后续值得跟进的动作",
+                "summary": "1-2句，只写视频真正提供的信息价值；不要复述标题",
+                "key_points": "3-6条，必须是具体观点、方法、参数、判断或步骤，不要泛泛概括",
+                "reusable_value": "2-5条，说明这条内容能被复用到哪个工作流/决策/工具链，具体怎么复用",
+                "workflow_steps": "3-8条，如果视频包含操作流程，抽取为可执行步骤；没有就写信息不足",
+                "evidence": "2-5条，引用字幕/标题/描述中的依据，说明为什么这样判断",
+                "limitations": "1-4条，说明适用前提、风险、缺失信息或需要人工复核的点",
+                "action_items": "2-4条，后续值得跟进的具体动作",
                 "insight_tags": "3-6个简短标签，适合本地知识库检索",
                 "use_cases": "2-4条，说明在什么场景使用会提升效率或解决什么问题",
                 "core_assets": "1-6个对象，列出视频中最核心的仓库、插件、Agent、Skill、工具、框架或方法",
@@ -86,6 +107,7 @@ def build_prompt(video: dict, source_item: dict) -> str:
                 "pubdate": video.get("pubdate", ""),
                 "description": source_item.get("desc", ""),
                 "tags": source_item.get("tags", []),
+                "subtitle_excerpt": compact_subtitle_text(subtitle or {}),
             },
             "output_schema": {
                 "summary": "string",
@@ -95,6 +117,10 @@ def build_prompt(video: dict, source_item: dict) -> str:
                 "use_cases": ["string"],
                 "problem_statements": ["string"],
                 "category_paths": ["string"],
+                "reusable_value": ["string"],
+                "workflow_steps": ["string"],
+                "evidence": ["string"],
+                "limitations": ["string"],
                 "core_assets": [
                     {
                         "name": "string",
@@ -107,7 +133,10 @@ def build_prompt(video: dict, source_item: dict) -> str:
                 ],
             },
             "rules": [
-                "不要空话，不要写'提升效率'这类泛泛描述，必须点明在哪种工作场景下提升什么效率。",
+                "不要空话，不要写'提升效率'这类泛泛描述，必须点明在哪种工作场景下、用什么方法、产出什么变化。",
+                "如果只有标题和很少上下文，不要装作看过完整视频；workflow_steps/evidence/limitations 必须写明信息不足。",
+                "优先从 subtitle_excerpt 中抽取事实、步骤、命令、工具名、配置项、约束和经验判断。",
+                "每条 key_points/reusable_value/action_items 都必须包含一个具体名词或动作，避免'了解/学习/提升'这类空泛动词。",
                 "如果视频提到 GitHub 仓库、插件、Agent、Skill、工具或框架，优先识别出来放入 core_assets。",
                 "core_assets.name 必须优先使用视频中出现的真实名称、原始产品名或英文名，例如 Codex、Claude Code、Skill、Agent、Prettier、Black。",
                 "不要自己发明泛化名称，例如'调试助手插件'、'自动补全插件'，除非视频里就是这么称呼它。",
@@ -147,6 +176,10 @@ def normalize_insight(video_id: str, raw_text: str) -> dict:
         "use_cases": [str(x).strip() for x in payload.get("use_cases", []) if str(x).strip()],
         "problem_statements": [str(x).strip() for x in payload.get("problem_statements", []) if str(x).strip()],
         "category_paths": [str(x).strip() for x in payload.get("category_paths", []) if str(x).strip()],
+        "reusable_value": [str(x).strip() for x in payload.get("reusable_value", []) if str(x).strip()],
+        "workflow_steps": [str(x).strip() for x in payload.get("workflow_steps", []) if str(x).strip()],
+        "evidence": [str(x).strip() for x in payload.get("evidence", []) if str(x).strip()],
+        "limitations": [str(x).strip() for x in payload.get("limitations", []) if str(x).strip()],
         "core_assets": [asset for asset in core_assets if asset.get("name")],
         "created_at": now,
         "updated_at": now,
@@ -165,6 +198,10 @@ def upgrade_existing_insight(payload: dict) -> dict:
         "use_cases": [str(x).strip() for x in payload.get("use_cases", []) if str(x).strip()],
         "problem_statements": [str(x).strip() for x in payload.get("problem_statements", []) if str(x).strip()],
         "category_paths": [str(x).strip() for x in payload.get("category_paths", []) if str(x).strip()],
+        "reusable_value": [str(x).strip() for x in payload.get("reusable_value", []) if str(x).strip()],
+        "workflow_steps": [str(x).strip() for x in payload.get("workflow_steps", []) if str(x).strip()],
+        "evidence": [str(x).strip() for x in payload.get("evidence", []) if str(x).strip()],
+        "limitations": [str(x).strip() for x in payload.get("limitations", []) if str(x).strip()],
         "core_assets": [
             {
                 "name": str(asset.get("name", "")).strip(),
@@ -220,6 +257,7 @@ def main():
         sys.exit(1)
 
     source_lookup = build_source_lookup(root / "manifest" / "source")
+    subtitle_lookup = build_subtitle_lookup(root)
     existing_insights = load_json(root / "manifest" / "insights.json", [])
     existing_insights = [upgrade_existing_insight(item) for item in existing_insights if isinstance(item, dict)]
     existing_by_id = {
@@ -239,7 +277,7 @@ def main():
                 base_url=base_url,
                 api_key=api_key,
                 model=model,
-                prompt=build_prompt(video, source_item),
+                prompt=build_prompt(video, source_item, subtitle_lookup.get(video_id)),
             )
             insight = normalize_insight(video_id, raw_text)
         except (urllib.error.URLError, KeyError, json.JSONDecodeError) as exc:

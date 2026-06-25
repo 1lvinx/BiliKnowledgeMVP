@@ -29,6 +29,13 @@ def format_tags(tags: list[str]) -> str:
     return " ".join(f"`#{tag}`" for tag in tags)
 
 
+def format_bullets(items: list[str], fallback: str = "信息不足，需人工复核原视频。") -> str:
+    cleaned = [str(item).strip() for item in items if str(item).strip()]
+    if not cleaned:
+        cleaned = [fallback]
+    return "\n".join(f"- {item}" for item in cleaned)
+
+
 STOPWORDS = {
     "什么", "如何", "一个", "我们", "你们", "他们", "这个", "那个", "就是", "然后", "因为",
     "可以", "视频", "教程", "分享", "实战", "方法", "使用", "入门", "完整", "最新", "真的",
@@ -189,7 +196,11 @@ def build_note(video: dict, insight: Optional[dict], subtitle: Optional[dict]) -
     summary = (insight or {}).get("summary") or "待补充。"
     key_points = (insight or {}).get("key_points") or ["待补充"]
     tags = (insight or {}).get("insight_tags") or video.get("tags", [])
-    use_cases = (insight or {}).get("use_cases") or ["待补充"]
+    use_cases = (insight or {}).get("use_cases") or ["信息不足，需人工复核原视频。"]
+    reusable_value = (insight or {}).get("reusable_value") or []
+    workflow_steps = (insight or {}).get("workflow_steps") or []
+    evidence = (insight or {}).get("evidence") or []
+    limitations = (insight or {}).get("limitations") or []
     problem_statements = (insight or {}).get("problem_statements") or ["待补充"]
     category_paths = (insight or {}).get("category_paths") or [video.get("category", "未分类") or "未分类"]
     core_assets = (insight or {}).get("core_assets") or []
@@ -206,7 +217,11 @@ def build_note(video: dict, insight: Optional[dict], subtitle: Optional[dict]) -
             subtitle_warning = "> 注意：当前抓取到的字幕与视频标题/上下文疑似不一致，已自动降级处理。\n"
 
     key_points_md = "\n".join(f"- {point}" for point in key_points)
-    use_cases_md = "\n".join(f"- {item}" for item in use_cases)
+    use_cases_md = format_bullets(use_cases)
+    reusable_value_md = format_bullets(reusable_value)
+    workflow_steps_md = format_bullets(workflow_steps)
+    evidence_md = format_bullets(evidence)
+    limitations_md = format_bullets(limitations)
     problem_md = "\n".join(f"- {professionalize_problem_statement(item)}" for item in problem_statements)
     category_md = "\n".join(f"- `{item}`" for item in category_paths)
     named_assets = []
@@ -235,6 +250,18 @@ def build_note(video: dict, insight: Optional[dict], subtitle: Optional[dict]) -
 
 ---
 
+## 可复用价值
+
+{reusable_value_md}
+
+---
+
+## 操作流程 / 方法
+
+{workflow_steps_md}
+
+---
+
 ## 适用场景
 
 {use_cases_md}
@@ -244,6 +271,18 @@ def build_note(video: dict, insight: Optional[dict], subtitle: Optional[dict]) -
 ## 解决的问题
 
 {problem_md}
+
+---
+
+## 判断依据
+
+{evidence_md}
+
+---
+
+## 限制与风险
+
+{limitations_md}
 
 ---
 

@@ -4724,3 +4724,41 @@ textarea:focus-visible {
 .mac-markdown li + li {
   margin-top: 4px;
 }
+
+
+/* RC typography fix 2: denser note reading for desktop panes. */
+.mac-note-reader {
+  padding: 14px 18px 24px;
+}
+
+.mac-note-reader article {
+  max-width: 720px;
+  padding: 20px 24px 28px;
+}
+
+.mac-markdown,
+.mac-markdown p,
+.mac-markdown li,
+.mac-markdown blockquote {
+  font-size: 13px;
+  line-height: 1.58;
+}
+
+.mac-markdown h1 {
+  font-size: 19px;
+  margin: 14px 0 8px;
+}
+
+.mac-markdown h2 {
+  font-size: 17px;
+  margin: 18px 0 8px;
+}
+
+.mac-markdown h3 {
+  font-size: 15px;
+  margin: 14px 0 6px;
+}
+
+.mac-markdown hr {
+  margin: 14px 0;
+}

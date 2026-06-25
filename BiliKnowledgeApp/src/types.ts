@@ -54,6 +54,10 @@ export interface VideoInsight {
   use_cases: string[];
   problem_statements: string[];
   category_paths: string[];
+  reusable_value?: string[];
+  workflow_steps?: string[];
+  evidence?: string[];
+  limitations?: string[];
   core_assets: Array<{
     name: string;
     asset_type: string;
