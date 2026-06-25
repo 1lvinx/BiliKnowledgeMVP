@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import type { Video, VideoInsight, VideoSubtitle } from "../types";
 import { t } from "../i18n";
 import { cn } from "../lib/utils";
+import { formatVideoTime, localizeLabel } from "../lib/video-utils";
 import { MacEmptyState, MacSplitView, MacToolbarButton } from "../components/MacUI";
 import { InsightPanel } from "../components/InsightPanel";
 import { SubtitlePanel } from "../components/SubtitlePanel";
@@ -30,20 +31,24 @@ function isPlaceholderNoteContent(content: string | null): boolean {
 
 interface NotesProps {
   activeVideo: Video | null;
+  fetchNote: (video: Video) => void;
   noteContent: string | null;
   onExtractSubtitle?: (videoId: string) => void;
   onGenerateNote?: (videoId: string) => void;
   subtitleExtracting?: boolean;
+  videos: Video[];
   insights?: VideoInsight[];
   subtitles?: VideoSubtitle[];
 }
 
 export function Notes({
   activeVideo,
+  fetchNote,
   noteContent,
   onExtractSubtitle,
   onGenerateNote,
   subtitleExtracting = false,
+  videos,
   insights = [],
   subtitles = [],
 }: NotesProps) {
@@ -61,10 +66,41 @@ export function Notes({
     ? insights.filter((i) => i.video_id !== activeVideo.id)
     : [];
 
+  const noteVideos = videos.filter((video) => Boolean(video.note_ready && video.note_path));
   const hasSubstantiveNote = !isPlaceholderNoteContent(noteContent);
 
   return (
-    <MacSplitView columns="minmax(0, 1fr) 360px">
+    <MacSplitView columns="300px minmax(0, 1fr) 360px">
+      <section className="mac-list-pane custom-scrollbar">
+        <div className="mac-panel-header">
+          <h2>{t("view.notes")}</h2>
+          <span>{noteVideos.length}</span>
+        </div>
+        <div className="mac-native-list">
+          {noteVideos.length === 0 ? (
+            <MacEmptyState
+              detail="为某条视频生成真实 Markdown 笔记后，这里会出现可浏览条目。"
+              icon={<FileText size={24} />}
+              title="暂无真实笔记"
+            />
+          ) : noteVideos.map((video) => (
+            <button
+              className={cn("mac-native-row", activeVideo?.id === video.id && "is-selected")}
+              key={video.id}
+              onClick={() => fetchNote(video)}
+              type="button"
+            >
+              <div>
+                <div className="mac-row-title">{video.title}</div>
+                <div className="mac-row-meta">
+                  <span>{localizeLabel(video.category)}</span>
+                  <span>{formatVideoTime(video.collected_at || video.pubdate)}</span>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
       <section className="mac-detail-pane">
         <div className="mac-note-reader custom-scrollbar">
           {activeVideo ? (

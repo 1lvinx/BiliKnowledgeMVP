@@ -34,11 +34,6 @@ export function MacSidebar({
   return (
     <aside className={cn("mac-sidebar", collapsed && "is-collapsed")}>
       <div className="mac-sidebar-chrome">
-        <div className="mac-sidebar-rail" aria-hidden="true">
-          <span className="is-active" />
-          <span />
-          <span />
-        </div>
         <button
           aria-label={collapsed ? "展开侧边栏" : "折叠侧边栏"}
           className="mac-sidebar-collapse-button"
