@@ -186,7 +186,7 @@ export function getScriptScopeLabel(scriptName: string, t: Translate) {
     "parse_favorites.py": "收藏导入与同步",
     "fetch_subtitles.py": "字幕抓取与补全",
     "generate_insights.py": "知识洞察与摘要",
-    "generate_notes.py": "基础笔记生成",
+    "generate_notes.py": "笔记生成",
     "extract_projects.py": "项目提取与归档",
     "build_index.py": "知识索引构建",
     "validate_knowledge_base.py": "结构校验与健康检查",

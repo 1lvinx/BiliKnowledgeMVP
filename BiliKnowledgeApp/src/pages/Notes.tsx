@@ -11,16 +11,6 @@ import { SubtitlePanel } from "../components/SubtitlePanel";
 
 type InspectorTab = "insight" | "subtitle";
 
-interface VideoTaskSnapshot {
-  state: "idle" | "running" | "blocked" | "success" | "error";
-}
-
-interface VideoTaskState {
-  subtitle?: VideoTaskSnapshot;
-  insight?: VideoTaskSnapshot;
-  note?: VideoTaskSnapshot;
-}
-
 function isPlaceholderNoteContent(content: string | null): boolean {
   if (!content) return true;
   const normalized = content.trim();
@@ -50,7 +40,6 @@ interface NotesProps {
   videos: Video[];
   insights?: VideoInsight[];
   subtitles?: VideoSubtitle[];
-  videoTaskStates?: Record<string, VideoTaskState>;
 }
 
 export function Notes({
@@ -62,7 +51,6 @@ export function Notes({
   videos,
   insights = [],
   subtitles = [],
-  videoTaskStates = {},
 }: NotesProps) {
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("insight");
 
@@ -82,32 +70,6 @@ export function Notes({
 
   const hasSubstantiveNote = !isPlaceholderNoteContent(noteContent);
 
-  function getStageTone(state?: VideoTaskSnapshot["state"]) {
-    if (state === "success") return "green";
-    if (state === "running" || state === "blocked") return "yellow";
-    if (state === "error") return "red";
-    return "neutral";
-  }
-
-  function getStageLabel(state?: VideoTaskSnapshot["state"]) {
-    if (state === "success") return "完成";
-    if (state === "running") return "进行中";
-    if (state === "blocked") return "阻塞";
-    if (state === "error") return "失败";
-    return "未开始";
-  }
-
-  function renderTaskStrip(videoId: string) {
-    const taskState = videoTaskStates[videoId];
-    return (
-      <div className="mac-row-taskstrip">
-        <span className={`mac-row-taskchip tone-${getStageTone(taskState?.subtitle?.state)}`}>字幕 {getStageLabel(taskState?.subtitle?.state)}</span>
-        <span className={`mac-row-taskchip tone-${getStageTone(taskState?.insight?.state)}`}>洞察 {getStageLabel(taskState?.insight?.state)}</span>
-        <span className={`mac-row-taskchip tone-${getStageTone(taskState?.note?.state)}`}>笔记 {getStageLabel(taskState?.note?.state)}</span>
-      </div>
-    );
-  }
-
   return (
     <MacSplitView columns="280px minmax(0, 1fr) 340px">
       <section className="mac-list-pane custom-scrollbar">
@@ -118,7 +80,7 @@ export function Notes({
         <div className="mac-native-list">
           {noteVideos.length === 0 ? (
             <MacEmptyState
-              detail="运行字幕提取、AI 洞察或基础笔记生成后，这里才会出现可浏览条目。"
+              detail="运行 AI 洞察或笔记生成后，这里会出现可浏览条目。"
               icon={<FileText size={24} />}
               title="暂无已生成内容"
             />
@@ -135,7 +97,6 @@ export function Notes({
                   <span>{localizeLabel(video.category)}</span>
                   <span>{formatVideoTime(video.collected_at || video.pubdate)}</span>
                 </div>
-                {renderTaskStrip(video.id)}
               </div>
             </button>
           ))}
@@ -156,7 +117,7 @@ export function Notes({
                 </div>
               ) : (
                 <MacEmptyState
-                  detail="当前只有占位模板，还没有形成可用的基础笔记。请先运行 AI 洞察或重新生成基础笔记。"
+                  detail="当前只有占位模板，还没有形成可用的笔记。请先运行 AI 洞察或重新生成笔记。"
                   icon={<FileText size={28} />}
                   title="暂无有效笔记内容"
                 />

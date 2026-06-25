@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronRight, FileText, Search, Sparkles, Subtitles } from "lucide-react";
+import { ChevronRight, FileText, Search, Sparkles } from "lucide-react";
 import type { FavoriteFolder, Video } from "../types";
 import { t } from "../i18n";
 import { cn } from "../lib/utils";
@@ -9,16 +9,6 @@ import { MacEmptyState, MacSplitView, MacStatusPill, MacToolbarButton } from "..
 
 const PAGE_SIZE = 200;
 const UNASSIGNED_FOLDER = "未归属";
-
-interface VideoTaskSnapshot {
-  state: "idle" | "running" | "blocked" | "success" | "error";
-}
-
-interface VideoTaskState {
-  subtitle?: VideoTaskSnapshot;
-  insight?: VideoTaskSnapshot;
-  note?: VideoTaskSnapshot;
-}
 
 interface VideosProps {
   activeVideo: Video | null;
@@ -30,14 +20,12 @@ interface VideosProps {
   onExtractSubtitle: (videoId: string) => void;
   onGenerateInsight: (videoId: string) => void;
   onGenerateNote: (videoId: string) => void;
-  onRunBatchSubtitle: () => void;
   onRunBatchInsight: () => void;
   onRunBatchNote: () => void;
   setFilterPriority: (value: string) => void;
   setFilterStatus: (value: string) => void;
   title: string;
   updateStatus: (id: string, status: string) => void;
-  videoTaskStates?: Record<string, VideoTaskState>;
   videos: Video[];
 }
 
@@ -51,13 +39,11 @@ export function Videos({
   onExtractSubtitle,
   onGenerateInsight,
   onGenerateNote,
-  onRunBatchSubtitle,
   onRunBatchInsight,
   onRunBatchNote,
   setFilterPriority,
   setFilterStatus,
   updateStatus,
-  videoTaskStates = {},
   videos,
 }: VideosProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -140,58 +126,11 @@ export function Videos({
     }
   }
 
-  function getStageTone(state?: VideoTaskSnapshot["state"]) {
-    if (state === "success") return "green";
-    if (state === "running" || state === "blocked") return "yellow";
-    if (state === "error") return "red";
-    return "neutral";
-  }
-
-  function getStageLabel(state?: VideoTaskSnapshot["state"]) {
-    if (state === "success") return "完成";
-    if (state === "running") return "进行中";
-    if (state === "blocked") return "阻塞";
-    if (state === "error") return "失败";
-    return "未开始";
-  }
-
-  function renderTaskStrip(videoId: string) {
-    const taskState = videoTaskStates[videoId];
-    const stages = [
-      { label: "字幕", state: taskState?.subtitle?.state },
-      { label: "洞察", state: taskState?.insight?.state },
-      { label: "笔记", state: taskState?.note?.state },
-    ].filter((item) => item.state && item.state !== "idle");
-
-    if (!stages.length) {
-      return (
-        <div className="mac-row-taskstrip">
-          <span className="mac-row-taskchip tone-neutral">流程 待开始</span>
-        </div>
-      );
-    }
-
-    return (
-      <div className="mac-row-taskstrip">
-        {stages.map((stage) => (
-          <span className={`mac-row-taskchip tone-${getStageTone(stage.state as VideoTaskSnapshot["state"])}`} key={`${videoId}-${stage.label}`}>
-            {stage.label} {getStageLabel(stage.state as VideoTaskSnapshot["state"])}
-          </span>
-        ))}
-      </div>
-    );
-  }
-
   return (
     <MacSplitView columns="minmax(430px, 1fr) 320px">
       <section className="mac-list-pane custom-scrollbar">
         <div className="mac-list-controls">
           <div className="mac-list-controls-row">
-            <MacToolbarButton
-              icon={<Subtitles size={14} />}
-              label={t("scripts.fetchSubtitles")}
-              onClick={onRunBatchSubtitle}
-            />
             <MacToolbarButton
               icon={<Sparkles size={14} />}
               label={t("scripts.generateInsights")}
@@ -296,7 +235,6 @@ export function Videos({
                         <span>{formatVideoTime(video.collected_at || video.pubdate)}</span>
                         <span>{video.id}</span>
                       </div>
-                      {renderTaskStrip(video.id)}
                     </div>
                     <MacStatusPill tone={statusTone(video.status)}>{statusLabel(video.status)}</MacStatusPill>
                   </button>
@@ -338,7 +276,6 @@ export function Videos({
                     <span>{formatVideoTime(video.collected_at || video.pubdate)}</span>
                     <span>{video.id}</span>
                   </div>
-                  {renderTaskStrip(video.id)}
                 </div>
                 <MacStatusPill tone={statusTone(video.status)}>{statusLabel(video.status)}</MacStatusPill>
               </button>

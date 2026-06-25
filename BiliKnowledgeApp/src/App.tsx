@@ -767,45 +767,47 @@ function App() {
 
   async function generateNoteForVideo(videoId: string) {
     if (!tauriAvailable || isRunning) return;
-    const hasSubtitle = subtitles.some((subtitle) => subtitle.video_id === videoId);
-    const hasInsight = insights.some((insight) => insight.video_id === videoId);
-    if (!hasSubtitle || !hasInsight) {
-      const missing = [
-        !hasSubtitle ? "字幕" : null,
-        !hasInsight ? "洞察" : null,
-      ].filter(Boolean).join("、");
-      updateVideoTaskState(videoId, "note", {
-        state: "blocked",
-        startedAt: nowStamp(),
-        endedAt: nowStamp(),
-        message: `缺少${missing}，无法生成有效笔记`,
-      });
-      updateScriptState("generate_notes.py", {
-        state: "blocked",
-        startedAt: nowStamp(),
-        endedAt: nowStamp(),
-        lastMessage: `缺少${missing}，无法生成笔记`,
-        lastOutput: `笔记生成受阻：缺少${missing}`,
-      });
-      showToast(`笔记生成受阻：缺少${missing}`, "error");
-      return;
-    }
     try {
       setIsRunning(true);
       updateScriptState("generate_notes.py", {
         state: "running",
         startedAt: nowStamp(),
         endedAt: undefined,
-        lastMessage: `正在生成基础笔记：${videoId}`,
+        lastMessage: `正在生成笔记：${videoId}`,
       });
       updateVideoTaskState(videoId, "note", {
         state: "running",
         startedAt: nowStamp(),
         endedAt: undefined,
-        message: "正在生成基础笔记",
+        message: "正在生成笔记",
       });
+
+      const hasSubtitle = subtitles.some((subtitle) => subtitle.video_id === videoId);
+      if (!hasSubtitle) {
+        const cookieCheck = await validateBilibiliCookie({ requiredFor: "抓取字幕" });
+        if (!cookieCheck.valid) {
+          throw new Error(cookieCheck.message);
+        }
+        appendLog(`笔记生成：先抓取字幕 ${videoId}`);
+        await invoke("run_script", {
+          scriptName: "fetch_subtitles.py",
+          args: ["--root", ".", "--video-id", videoId],
+        });
+        await fetchSubtitles();
+      }
+
+      const hasInsight = insights.some((insight) => insight.video_id === videoId);
+      if (!hasInsight) {
+        appendLog(`笔记生成：先生成洞察 ${videoId}`);
+        await invoke("run_script", {
+          scriptName: "generate_insights.py",
+          args: ["--root", ".", "--video-id", videoId, "--limit", "1"],
+        });
+        await fetchInsights();
+      }
+
       appendLog(`笔记生成：正在处理 ${videoId}`);
-      showToast(`开始生成基础笔记：${videoId}`, "neutral");
+      showToast(`开始生成笔记：${videoId}`, "neutral");
       await invoke("run_script", {
         scriptName: "generate_notes.py",
         args: ["--root", ".", "--video-id", videoId, "--limit", "1"],
@@ -815,15 +817,15 @@ function App() {
       updateScriptState("generate_notes.py", {
         state: "success",
         endedAt: nowStamp(),
-        lastMessage: `基础笔记生成完成：${videoId}`,
+        lastMessage: `笔记生成完成：${videoId}`,
         lastOutput: `笔记生成：已完成 ${videoId}`,
       });
       updateVideoTaskState(videoId, "note", {
         state: "success",
         endedAt: nowStamp(),
-        message: "基础笔记生成完成",
+        message: "笔记生成完成",
       });
-      showToast(`基础笔记生成完成：${videoId}`, "success");
+      showToast(`笔记生成完成：${videoId}`, "success");
     } catch (err) {
       appendLog(`笔记生成失败：${String(err)}`);
       setError(String(err));
@@ -838,7 +840,36 @@ function App() {
         endedAt: nowStamp(),
         message: String(err),
       });
-      showToast(`基础笔记生成失败：${videoId}`, "error");
+      showToast(`笔记生成失败：${videoId}`, "error");
+    } finally {
+      setIsRunning(false);
+    }
+  }
+
+  async function runBatchNotePipeline() {
+    if (!tauriAvailable || isRunning || subtitleExtracting) return;
+    try {
+      const cookieCheck = await validateBilibiliCookie({ requiredFor: "抓取字幕" });
+      if (!cookieCheck.valid) {
+        appendLog(cookieCheck.message);
+        setError(cookieCheck.message);
+        return;
+      }
+      setIsRunning(true);
+      appendLog("批量笔记：抓取字幕 → 生成洞察 → 生成笔记");
+      showToast("开始批量生成笔记", "neutral");
+      await invoke("run_script", { scriptName: "fetch_subtitles.py", args: ["--root", ".", "--limit", "30"] });
+      await fetchSubtitles();
+      await invoke("run_script", { scriptName: "generate_insights.py", args: ["--root", ".", "--limit", "30"] });
+      await fetchInsights();
+      await invoke("run_script", { scriptName: "generate_notes.py", args: ["--root", ".", "--limit", "30"] });
+      await fetchVideos();
+      appendLog("批量笔记：已完成");
+      showToast("批量笔记生成完成", "success");
+    } catch (err) {
+      appendLog(`批量笔记生成失败：${String(err)}`);
+      setError(String(err));
+      showToast("批量笔记生成失败", "error");
     } finally {
       setIsRunning(false);
     }
@@ -1274,14 +1305,12 @@ function App() {
               onExtractSubtitle={extractSubtitle}
               onGenerateInsight={generateInsightForVideo}
               onGenerateNote={generateNoteForVideo}
-              onRunBatchSubtitle={() => runPythonScript("fetch_subtitles.py", ["--root", ".", "--limit", "30"])}
               onRunBatchInsight={() => runPythonScript("generate_insights.py", ["--root", ".", "--limit", "30"])}
-              onRunBatchNote={() => runPythonScript("generate_notes.py", ["--root", ".", "--limit", "30"])}
+              onRunBatchNote={runBatchNotePipeline}
               setFilterPriority={setFilterPriority}
               setFilterStatus={setFilterStatus}
               title={t("view.favorites")}
               updateStatus={updateStatus}
-              videoTaskStates={videoTaskStates}
               videos={favoriteVideos}
             />
           )}
@@ -1295,14 +1324,12 @@ function App() {
               onExtractSubtitle={extractSubtitle}
               onGenerateInsight={generateInsightForVideo}
               onGenerateNote={generateNoteForVideo}
-              onRunBatchSubtitle={() => runPythonScript("fetch_subtitles.py", ["--root", ".", "--limit", "30"])}
               onRunBatchInsight={() => runPythonScript("generate_insights.py", ["--root", ".", "--limit", "30"])}
-              onRunBatchNote={() => runPythonScript("generate_notes.py", ["--root", ".", "--limit", "30"])}
+              onRunBatchNote={runBatchNotePipeline}
               setFilterPriority={setFilterPriority}
               setFilterStatus={setFilterStatus}
               title={t("view.videos")}
               updateStatus={updateStatus}
-              videoTaskStates={videoTaskStates}
               videos={filteredVideos}
             />
           )}
@@ -1316,7 +1343,6 @@ function App() {
               videos={filteredVideos}
               insights={insights}
               subtitles={subtitles}
-              videoTaskStates={videoTaskStates}
             />
           )}
           {currentView === "projects" && (
