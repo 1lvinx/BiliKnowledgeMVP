@@ -4664,3 +4664,63 @@ textarea:focus-visible {
   min-height: 320px;
   padding: 24px;
 }
+
+/* RC typography fix: keep note Markdown at desktop reading scale. */
+.mac-note-reader {
+  padding: 18px 22px 30px;
+}
+
+.mac-note-reader article {
+  max-width: 760px;
+  padding: 24px 28px 32px;
+}
+
+.mac-markdown {
+  font-size: 15px;
+  line-height: 1.68;
+  letter-spacing: 0;
+}
+
+.mac-markdown p,
+.mac-markdown li,
+.mac-markdown blockquote {
+  font-size: 15px;
+  line-height: 1.68;
+}
+
+.mac-markdown h1 {
+  font-size: 22px;
+  line-height: 1.35;
+  margin: 18px 0 10px;
+  font-weight: 650;
+}
+
+.mac-markdown h2 {
+  font-size: 20px;
+  line-height: 1.35;
+  margin: 22px 0 10px;
+  font-weight: 650;
+}
+
+.mac-markdown h3 {
+  font-size: 17px;
+  line-height: 1.4;
+  margin: 18px 0 8px;
+  font-weight: 620;
+}
+
+.mac-markdown hr {
+  margin: 18px 0;
+  border: 0;
+  border-top: 1px solid var(--bk-separator);
+}
+
+.mac-markdown ul,
+.mac-markdown ol {
+  margin: 8px 0 14px;
+  padding-left: 22px;
+}
+
+.mac-markdown li + li {
+  margin-top: 4px;
+}
