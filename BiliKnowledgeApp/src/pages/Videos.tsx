@@ -20,6 +20,7 @@ interface VideosProps {
   onExtractSubtitle: (videoId: string) => void;
   onGenerateInsight: (videoId: string) => void;
   onGenerateNote: (videoId: string) => void;
+  onTranscribeSubtitle?: (videoId: string) => void;
   onRunBatchInsight: () => void;
   onRunBatchNote: () => void;
   setFilterPriority: (value: string) => void;
@@ -39,6 +40,7 @@ export function Videos({
   onExtractSubtitle,
   onGenerateInsight,
   onGenerateNote,
+  onTranscribeSubtitle,
   onRunBatchInsight,
   onRunBatchNote,
   setFilterPriority,
@@ -137,6 +139,14 @@ export function Videos({
               label={t("scripts.fetchSubtitles")}
               onClick={() => activeVideo && onExtractSubtitle(activeVideo.id)}
             />
+            {onTranscribeSubtitle && (
+              <MacToolbarButton
+                disabled={!activeVideo}
+                icon={<Captions size={14} />}
+                label={t("scripts.transcribeSubtitles")}
+                onClick={() => activeVideo && onTranscribeSubtitle(activeVideo.id)}
+              />
+            )}
             <MacToolbarButton
               disabled={!activeVideo}
               icon={<Sparkles size={14} />}

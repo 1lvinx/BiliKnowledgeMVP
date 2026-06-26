@@ -11,6 +11,7 @@ const ALLOWED_SCRIPTS: &[&str] = &[
     "fetch_video_meta.py",
     "generate_insights.py",
     "fetch_subtitles.py",
+    "transcribe_subtitles.py",
     "generate_notes.py",
     "reconcile_notes.py",
     "extract_projects.py",

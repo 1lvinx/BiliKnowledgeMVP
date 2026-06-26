@@ -729,6 +729,64 @@ function App() {
     }
   }
 
+  async function transcribeSubtitle(videoId: string) {
+    if (!tauriAvailable || subtitleExtracting || isRunning) return;
+    try {
+      setSubtitleExtracting(true);
+      setIsRunning(true);
+      updateScriptState("transcribe_subtitles.py", {
+        state: "running",
+        startedAt: nowStamp(),
+        endedAt: undefined,
+        lastMessage: `正在本地转写：${videoId}`,
+      });
+      updateVideoTaskState(videoId, "subtitle", {
+        state: "running",
+        startedAt: nowStamp(),
+        endedAt: undefined,
+        message: "正在本地 ASR 转写",
+      });
+      appendLog(`本地转写：正在处理 ${videoId}`);
+      showToast(`开始本地转写：${videoId}`, "neutral");
+      await invoke("run_script", {
+        scriptName: "transcribe_subtitles.py",
+        args: ["--root", ".", "--video-id", videoId],
+      });
+      await fetchSubtitles();
+      appendLog(`本地转写：已完成 ${videoId}`);
+      updateScriptState("transcribe_subtitles.py", {
+        state: "success",
+        endedAt: nowStamp(),
+        lastMessage: `本地转写完成：${videoId}`,
+        lastOutput: `本地转写：已完成 ${videoId}`,
+      });
+      updateVideoTaskState(videoId, "subtitle", {
+        state: "success",
+        endedAt: nowStamp(),
+        message: "本地转写完成",
+      });
+      showToast(`本地转写完成：${videoId}`, "success");
+    } catch (err) {
+      appendLog(`本地转写失败：${String(err)}`);
+      setError(String(err));
+      updateScriptState("transcribe_subtitles.py", {
+        state: "error",
+        endedAt: nowStamp(),
+        lastMessage: String(err),
+        lastOutput: `本地转写失败：${String(err)}`,
+      });
+      updateVideoTaskState(videoId, "subtitle", {
+        state: "error",
+        endedAt: nowStamp(),
+        message: String(err),
+      });
+      showToast(`本地转写失败：${videoId}`, "error");
+    } finally {
+      setSubtitleExtracting(false);
+      setIsRunning(false);
+    }
+  }
+
   async function generateInsightForVideo(videoId: string) {
     if (!tauriAvailable || isRunning) return;
     try {
@@ -1321,6 +1379,7 @@ function App() {
               onExtractSubtitle={extractSubtitle}
               onGenerateInsight={generateInsightForVideo}
               onGenerateNote={generateNoteForVideo}
+              onTranscribeSubtitle={transcribeSubtitle}
               onRunBatchInsight={() => activeVideo && generateInsightForVideo(activeVideo.id)}
               onRunBatchNote={() => activeVideo && generateNoteForVideo(activeVideo.id)}
               setFilterPriority={setFilterPriority}
@@ -1340,6 +1399,7 @@ function App() {
               onExtractSubtitle={extractSubtitle}
               onGenerateInsight={generateInsightForVideo}
               onGenerateNote={generateNoteForVideo}
+              onTranscribeSubtitle={transcribeSubtitle}
               onRunBatchInsight={() => activeVideo && generateInsightForVideo(activeVideo.id)}
               onRunBatchNote={() => activeVideo && generateNoteForVideo(activeVideo.id)}
               setFilterPriority={setFilterPriority}
