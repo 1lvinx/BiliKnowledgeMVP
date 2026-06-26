@@ -113,6 +113,7 @@ def transcribe_wav(wav_path: Path) -> list[dict[str, Any]]:
     except ImportError as exc:
         raise RuntimeError(f"缺少 ASR 依赖：请安装 funasr modelscope torch torchaudio pydub yt-dlp，并确保 numpy<2；当前 Python：{sys.executable}") from exc
 
+    print("[ASR] 加载 SenseVoiceSmall 模型；首次运行会下载到 ~/.cache/modelscope", flush=True)
     model = AutoModel(model="iic/SenseVoiceSmall")
     result = model.generate(input=str(wav_path), use_itn=True)
     segments: list[dict[str, Any]] = []
