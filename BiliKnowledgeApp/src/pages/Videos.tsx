@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Captions, ChevronRight, FileText, Search, Sparkles } from "lucide-react";
-import type { FavoriteFolder, Video } from "../types";
+import type { FavoriteFolder, Video, VideoInsight, VideoSubtitle } from "../types";
 import { t } from "../i18n";
 import { cn } from "../lib/utils";
-import { compareVideosByRecency, formatVideoDuration, formatVideoTime, statusLabel, statusTone } from "../lib/video-utils";
+import { compareVideosByRecency, formatVideoDuration, formatVideoTime } from "../lib/video-utils";
 import { VideoInspector } from "../components/VideoInspector";
 import { MacEmptyState, MacSplitView, MacStatusPill, MacToolbarButton } from "../components/MacUI";
 
@@ -21,6 +21,8 @@ interface VideosProps {
   onGenerateInsight: (videoId: string) => void;
   onGenerateNote: (videoId: string) => void;
   onTranscribeSubtitle?: (videoId: string) => void;
+  insights?: VideoInsight[];
+  subtitles?: VideoSubtitle[];
   onRunBatchInsight: () => void;
   onRunBatchNote: () => void;
   setFilterPriority: (value: string) => void;
@@ -28,6 +30,17 @@ interface VideosProps {
   title: string;
   updateStatus: (id: string, status: string) => void;
   videos: Video[];
+}
+
+
+function getVideoWorkflowStatus(video: Video, subtitles: VideoSubtitle[], insights: VideoInsight[]) {
+  const subtitle = subtitles.find((item) => item.video_id === video.id);
+  const insight = insights.find((item) => item.video_id === video.id);
+  if (video.note_ready && video.note_path) return { label: "笔记完成", tone: "green" as const };
+  if (insight) return { label: "洞察完成", tone: "blue" as const };
+  if (subtitle?.validation?.status === "mismatch") return { label: "字幕错配", tone: "red" as const };
+  if (subtitle) return { label: "可生成洞察", tone: "blue" as const };
+  return { label: "无字幕", tone: "neutral" as const };
 }
 
 export function Videos({
@@ -41,6 +54,8 @@ export function Videos({
   onGenerateInsight,
   onGenerateNote,
   onTranscribeSubtitle,
+  insights = [],
+  subtitles = [],
   onRunBatchInsight,
   onRunBatchNote,
   setFilterPriority,
@@ -254,7 +269,10 @@ export function Videos({
                         <span>{video.id}</span>
                       </div>
                     </div>
-                    <MacStatusPill tone={statusTone(video.status)}>{statusLabel(video.status)}</MacStatusPill>
+                    {(() => {
+                      const workflow = getVideoWorkflowStatus(video, subtitles, insights);
+                      return <MacStatusPill tone={workflow.tone}>{workflow.label}</MacStatusPill>;
+                    })()}
                   </button>
                 )) : null}
                 {!collapsedFolders[group.title] && group.visibleItems.length < group.items.length ? (
@@ -295,7 +313,10 @@ export function Videos({
                     <span>{video.id}</span>
                   </div>
                 </div>
-                <MacStatusPill tone={statusTone(video.status)}>{statusLabel(video.status)}</MacStatusPill>
+                {(() => {
+                  const workflow = getVideoWorkflowStatus(video, subtitles, insights);
+                  return <MacStatusPill tone={workflow.tone}>{workflow.label}</MacStatusPill>;
+                })()}
               </button>
             ))
           )}
@@ -309,6 +330,8 @@ export function Videos({
       <VideoInspector
         activeVideo={activeVideo}
         fetchNote={fetchNote}
+        subtitle={activeVideo ? subtitles.find((item) => item.video_id === activeVideo.id) ?? null : null}
+        insight={activeVideo ? insights.find((item) => item.video_id === activeVideo.id) ?? null : null}
         onExtractSubtitle={onExtractSubtitle}
         onGenerateInsight={onGenerateInsight}
         onGenerateNote={onGenerateNote}

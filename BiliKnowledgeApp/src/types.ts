@@ -39,7 +39,7 @@ export interface SubtitleSegment {
 export interface VideoSubtitle {
   video_id: string;
   language: string;
-  source: "cc" | "ai";
+  source: "cc" | "ai" | "asr";
   segments: SubtitleSegment[];
   raw_text: string;
   created_at: string;

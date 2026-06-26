@@ -92,6 +92,27 @@ function isTauriRuntime() {
   return isTauri() || (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);
 }
 
+
+function humanizeScriptError(error: unknown, scriptName?: string): string {
+  const message = String(error);
+  if (message.includes("exit code")) {
+    if (scriptName === "fetch_subtitles.py") {
+      return "字幕抓取或校验失败：当前视频可能没有可用字幕，或字幕疑似错配。请重新抓取字幕，或使用本地转写。";
+    }
+    if (scriptName === "transcribe_subtitles.py") {
+      return "本地转写失败：请确认已安装 ffmpeg、yt-dlp 和 FunASR 依赖，或检查视频音频是否可访问。";
+    }
+    if (scriptName === "generate_insights.py") {
+      return "洞察生成失败：需要先获得有效字幕；如果字幕缺失或错配，请先抓取字幕或本地转写。";
+    }
+    if (scriptName === "generate_notes.py") {
+      return "笔记生成失败：需要有效字幕和已生成洞察。请先完成字幕校验和洞察生成。";
+    }
+    return "脚本执行失败：请查看日志中的具体错误，并按当前视频状态继续处理。";
+  }
+  return message;
+}
+
 function GlobalTaskStatusCard({ task }: { task: TaskDisplay }) {
   return (
     <article className={`global-task-card tone-${task.light}`}>
@@ -657,7 +678,7 @@ function App() {
       await fetchProcessingStatus();
       setError(null);
     } catch (err) {
-      const errMsg = String(err);
+      const errMsg = humanizeScriptError(err, name);
       appendLog(t("error.scriptError", { name: displayName, error: errMsg }));
       updateScriptState(name, {
         state: "error",
@@ -665,9 +686,7 @@ function App() {
         lastMessage: errMsg,
         lastOutput: t("error.scriptError", { name: displayName, error: errMsg }),
       });
-      if (!errMsg.includes("exit code") && !errMsg.includes("issues")) {
-        setError(t("error.scriptFailed"));
-      }
+      setError(errMsg);
     } finally {
       setIsRunning(false);
     }
@@ -710,18 +729,19 @@ function App() {
       });
       showToast(`字幕抓取完成：${videoId}`, "success");
     } catch (err) {
-      appendLog(`字幕提取失败：${String(err)}`);
-      setError(String(err));
+      const errMsg = humanizeScriptError(err, "fetch_subtitles.py");
+      appendLog(`字幕提取失败：${errMsg}`);
+      setError(errMsg);
       updateScriptState("fetch_subtitles.py", {
         state: "error",
         endedAt: nowStamp(),
-        lastMessage: String(err),
-        lastOutput: `字幕提取失败：${String(err)}`,
+        lastMessage: errMsg,
+        lastOutput: `字幕提取失败：${errMsg}`,
       });
       updateVideoTaskState(videoId, "subtitle", {
         state: "error",
         endedAt: nowStamp(),
-        message: String(err),
+        message: errMsg,
       });
       showToast(`字幕抓取失败：${videoId}`, "error");
     } finally {
@@ -767,18 +787,19 @@ function App() {
       });
       showToast(`本地转写完成：${videoId}`, "success");
     } catch (err) {
-      appendLog(`本地转写失败：${String(err)}`);
-      setError(String(err));
+      const errMsg = humanizeScriptError(err, "transcribe_subtitles.py");
+      appendLog(`本地转写失败：${errMsg}`);
+      setError(errMsg);
       updateScriptState("transcribe_subtitles.py", {
         state: "error",
         endedAt: nowStamp(),
-        lastMessage: String(err),
-        lastOutput: `本地转写失败：${String(err)}`,
+        lastMessage: errMsg,
+        lastOutput: `本地转写失败：${errMsg}`,
       });
       updateVideoTaskState(videoId, "subtitle", {
         state: "error",
         endedAt: nowStamp(),
-        message: String(err),
+        message: errMsg,
       });
       showToast(`本地转写失败：${videoId}`, "error");
     } finally {
@@ -824,18 +845,19 @@ function App() {
       });
       showToast(`笔记分析完成：${videoId}`, "success");
     } catch (err) {
-      appendLog(`视频洞察失败：${String(err)}`);
-      setError(String(err));
+      const errMsg = humanizeScriptError(err, "generate_insights.py");
+      appendLog(`视频洞察失败：${errMsg}`);
+      setError(errMsg);
       updateScriptState("generate_insights.py", {
         state: "error",
         endedAt: nowStamp(),
-        lastMessage: String(err),
-        lastOutput: `视频洞察失败：${String(err)}`,
+        lastMessage: errMsg,
+        lastOutput: `视频洞察失败：${errMsg}`,
       });
       updateVideoTaskState(videoId, "insight", {
         state: "error",
         endedAt: nowStamp(),
-        message: String(err),
+        message: errMsg,
       });
       showToast(`笔记分析失败：${videoId}`, "error");
     } finally {
@@ -924,18 +946,19 @@ function App() {
       });
       showToast(`笔记生成完成：${videoId}`, "success");
     } catch (err) {
-      appendLog(`笔记生成失败：${String(err)}`);
-      setError(String(err));
+      const errMsg = humanizeScriptError(err, "generate_notes.py");
+      appendLog(`笔记生成失败：${errMsg}`);
+      setError(errMsg);
       updateScriptState("generate_notes.py", {
         state: "error",
         endedAt: nowStamp(),
-        lastMessage: String(err),
-        lastOutput: `笔记生成失败：${String(err)}`,
+        lastMessage: errMsg,
+        lastOutput: `笔记生成失败：${errMsg}`,
       });
       updateVideoTaskState(videoId, "note", {
         state: "error",
         endedAt: nowStamp(),
-        message: String(err),
+        message: errMsg,
       });
       showToast(`笔记生成失败：${videoId}`, "error");
     } finally {
@@ -1382,6 +1405,8 @@ function App() {
               onTranscribeSubtitle={transcribeSubtitle}
               onRunBatchInsight={() => activeVideo && generateInsightForVideo(activeVideo.id)}
               onRunBatchNote={() => activeVideo && generateNoteForVideo(activeVideo.id)}
+              insights={insights}
+              subtitles={subtitles}
               setFilterPriority={setFilterPriority}
               setFilterStatus={setFilterStatus}
               title={t("view.favorites")}
@@ -1402,6 +1427,8 @@ function App() {
               onTranscribeSubtitle={transcribeSubtitle}
               onRunBatchInsight={() => activeVideo && generateInsightForVideo(activeVideo.id)}
               onRunBatchNote={() => activeVideo && generateNoteForVideo(activeVideo.id)}
+              insights={insights}
+              subtitles={subtitles}
               setFilterPriority={setFilterPriority}
               setFilterStatus={setFilterStatus}
               title={t("view.videos")}
