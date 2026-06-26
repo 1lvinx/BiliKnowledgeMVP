@@ -156,6 +156,11 @@ export function buildScriptCatalog(t: Translate): ScriptItem[] {
       detail: t("scripts.transcribeSubtitlesDesc"),
     },
     {
+      name: "fetch_comments.py",
+      title: t("scripts.fetchComments"),
+      detail: t("scripts.fetchCommentsDesc"),
+    },
+    {
       name: "generate_notes.py",
       title: t("scripts.generateNotes"),
       detail: t("scripts.generateNotesDesc"),
@@ -185,6 +190,7 @@ export function getScriptDisplayName(scriptName: string, t: Translate) {
     "generate_insights.py": t("scripts.generateInsights"),
     "fetch_subtitles.py": t("scripts.fetchSubtitles"),
     "transcribe_subtitles.py": t("scripts.transcribeSubtitles"),
+    "fetch_comments.py": t("scripts.fetchComments"),
     "generate_notes.py": t("scripts.generateNotes"),
     "extract_projects.py": t("scripts.extractProjects"),
     "build_index.py": t("scripts.buildIndex"),
