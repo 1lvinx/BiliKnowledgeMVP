@@ -136,6 +136,11 @@ export function buildScriptCatalog(t: Translate): ScriptItem[] {
       detail: t("scripts.parseFavoritesDesc"),
     },
     {
+      name: "fetch_video_meta.py",
+      title: t("scripts.fetchVideoMeta"),
+      detail: t("scripts.fetchVideoMetaDesc"),
+    },
+    {
       name: "generate_insights.py",
       title: t("scripts.generateInsights"),
       detail: t("scripts.generateInsightsDesc"),
@@ -171,6 +176,7 @@ export function buildScriptCatalog(t: Translate): ScriptItem[] {
 export function getScriptDisplayName(scriptName: string, t: Translate) {
   const labels: Record<string, string> = {
     "parse_favorites.py": t("scripts.parseFavorites"),
+    "fetch_video_meta.py": t("scripts.fetchVideoMeta"),
     "generate_insights.py": t("scripts.generateInsights"),
     "fetch_subtitles.py": t("scripts.fetchSubtitles"),
     "generate_notes.py": t("scripts.generateNotes"),

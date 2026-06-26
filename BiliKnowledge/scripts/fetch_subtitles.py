@@ -5,9 +5,12 @@ import argparse
 import json
 import re
 import sys
+import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+
+BASE = "https://api.bilibili.com"
 
 
 def load_json(path: Path, default):
@@ -86,6 +89,72 @@ def api_get_json(url: str, cookie_header: str) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
+def fetch_video_view(bvid: str, cookie_header: str) -> dict:
+    query = urllib.parse.urlencode({"bvid": bvid})
+    payload = api_get_json(f"{BASE}/x/web-interface/view?{query}", cookie_header)
+    if payload.get("code") != 0:
+        raise RuntimeError(f"view 接口失败: code={payload.get('code')} {payload.get('message')}")
+    return payload.get("data") or {}
+
+
+def update_video_with_view_meta(video: dict, data: dict) -> dict:
+    owner = data.get("owner") or {}
+    subtitle = data.get("subtitle") or {}
+    subtitle_list = [
+        {
+            "id": item.get("id"),
+            "lan": item.get("lan"),
+            "lan_doc": item.get("lan_doc"),
+            "is_lock": item.get("is_lock"),
+            "subtitle_url": str(item.get("subtitle_url") or "").strip(),
+        }
+        for item in subtitle.get("list") or []
+        if isinstance(item, dict)
+    ]
+    next_video = dict(video)
+    next_video["aid"] = data.get("aid")
+    next_video["cid"] = data.get("cid")
+    next_video["desc"] = data.get("desc") or next_video.get("desc", "")
+    next_video["subtitle_available"] = bool(subtitle_list)
+    next_video["subtitle_list"] = subtitle_list
+    if data.get("title"):
+        next_video["title"] = data["title"]
+    if owner.get("name"):
+        next_video["uploader"] = owner["name"]
+    if data.get("duration"):
+        next_video["duration"] = str(data["duration"])
+    if data.get("pubdate"):
+        next_video["pubdate"] = str(data["pubdate"])
+    if data.get("tname"):
+        next_video["category"] = data["tname"]
+    return next_video
+
+
+def choose_subtitle_meta(video: dict, bvid: str, cookie_header: str) -> tuple[dict, dict]:
+    subtitle_list = video.get("subtitle_list") if isinstance(video.get("subtitle_list"), list) else []
+    cid = video.get("cid")
+    aid = video.get("aid")
+    refreshed_video = video
+    if not subtitle_list or not cid:
+        view_data = fetch_video_view(bvid, cookie_header)
+        refreshed_video = update_video_with_view_meta(video, view_data)
+        subtitle_list = refreshed_video.get("subtitle_list") or []
+        cid = refreshed_video.get("cid")
+        aid = refreshed_video.get("aid")
+    if not subtitle_list:
+        raise RuntimeError(f"No subtitles available for {bvid}")
+    # Prefer human/CC Chinese, then any Chinese, then first usable subtitle.
+    preferred = None
+    for item in subtitle_list:
+        lan = str(item.get("lan") or "").lower()
+        if item.get("subtitle_url") and lan in {"zh-cn", "zh-hans", "zh", "zh-tw"}:
+            preferred = item
+            break
+    if preferred is None:
+        preferred = next((item for item in subtitle_list if item.get("subtitle_url")), subtitle_list[0])
+    return {**preferred, "cid": cid, "aid": aid}, refreshed_video
+
+
 def fetch_cid(bvid: str, cookie_header: str) -> int:
     payload = api_get_json(
         f"https://api.bilibili.com/x/player/pagelist?bvid={bvid}",
@@ -142,7 +211,10 @@ def build_subtitle_entry(video_id: str, meta: dict, body: dict) -> dict:
     return {
         "video_id": video_id,
         "language": meta.get("lan", body.get("lang", "zh")),
-        "source": "ai" if body.get("type") == "AIsubtitle" else "cc",
+        "source": "ai" if str(meta.get("lan", "")).startswith("ai-") or body.get("type") == "AIsubtitle" else "cc",
+        "subtitle_url": meta.get("subtitle_url", ""),
+        "cid": meta.get("cid"),
+        "aid": meta.get("aid"),
         "segments": segments,
         "raw_text": raw_text,
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -178,17 +250,15 @@ def main():
     results = [item for item in existing if item.get("video_id") not in {video.get("id") for video in targets}]
 
     failed = 0
+    refreshed_by_id = {}
     for video in targets:
         bvid = video.get("id", "")
         print(f"[字幕] 正在处理 {bvid} {video.get('title', '')}")
         try:
-            cid = fetch_cid(bvid, cookie_header)
-            meta, player_data = fetch_subtitle_meta(bvid, cid, cookie_header)
-            subtitle_url = meta.get("subtitle_url") or ""
-            if not subtitle_url and str(meta.get("lan", "")).startswith("ai-"):
-                subtitle_url = fetch_ai_subtitle_url(int(player_data.get("aid", 0)), cid, cookie_header)
-                meta = {**meta, "subtitle_url": subtitle_url}
+            meta, refreshed_video = choose_subtitle_meta(video, bvid, cookie_header)
             body = fetch_subtitle_body(meta["subtitle_url"])
+            video = refreshed_video
+            refreshed_by_id[bvid] = refreshed_video
             entry = build_subtitle_entry(bvid, meta, body)
             is_valid, reason, matched_keywords = validate_subtitle_against_video(video, entry)
             entry["validation"] = {
@@ -205,6 +275,9 @@ def main():
             failed += 1
             print(f"[警告] 字幕抓取失败 {bvid}：{exc}")
 
+    if refreshed_by_id:
+        save_json(root / "manifest" / "videos.json", [refreshed_by_id.get(item.get("id"), item) for item in videos])
+        print(f"[已写入] {root / 'manifest' / 'videos.json'}（已补齐元数据 {len(refreshed_by_id)} 条）")
     save_json(root / "manifest" / "subtitles.json", results)
     print(f"[已写入] {root / 'manifest' / 'subtitles.json'}（共 {len(results)} 条）")
     if failed and args.video_id:

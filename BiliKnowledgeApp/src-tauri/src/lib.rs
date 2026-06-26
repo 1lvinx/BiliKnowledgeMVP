@@ -8,6 +8,7 @@ use which::which;
 
 const ALLOWED_SCRIPTS: &[&str] = &[
     "parse_favorites.py",
+    "fetch_video_meta.py",
     "generate_insights.py",
     "fetch_subtitles.py",
     "generate_notes.py",
