@@ -4781,3 +4781,36 @@ textarea:focus-visible {
 .mac-note-reader .mac-row-meta {
   margin-bottom: 12px;
 }
+
+
+/* Notes hierarchy: make the generated Markdown feel like a focused reading note. */
+.mac-note-reader article {
+  max-width: 780px;
+}
+
+.mac-markdown {
+  color: color-mix(in srgb, var(--bk-label) 88%, var(--bk-secondary-label));
+}
+
+.mac-markdown h1,
+.mac-markdown h2,
+.mac-markdown h3 {
+  color: var(--bk-label);
+  font-weight: 620;
+}
+
+.mac-markdown h2 {
+  margin-top: 20px;
+  padding-top: 2px;
+  font-size: 16px;
+}
+
+.mac-markdown p,
+.mac-markdown li {
+  max-width: 68ch;
+}
+
+.mac-markdown hr {
+  margin: 16px 0;
+  border-top-color: color-mix(in srgb, var(--bk-separator) 58%, transparent);
+}

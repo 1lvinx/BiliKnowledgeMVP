@@ -5,6 +5,28 @@ import { t } from "../i18n";
 import { cn } from "../lib/utils";
 import { formatVideoTime, localizeLabel } from "../lib/video-utils";
 import { MacEmptyState, MacSplitView, MacToolbarButton } from "../components/MacUI";
+
+function compactNoteForReading(content: string | null): string | null {
+  if (!content) return content;
+
+  const sections = content.split(/\n(?=##\s+)/);
+  if (sections.length <= 1) return content;
+
+  const lowSignalPattern = /信息不足|待补充|人工复核原视频|暂无足够信息/;
+  const compacted = sections.filter((section, index) => {
+    if (index === 0) return true;
+    const lines = section
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const bodyLines = lines.filter((line) => !line.startsWith("##") && !line.startsWith("---"));
+    if (bodyLines.length === 0) return false;
+    return !bodyLines.every((line) => lowSignalPattern.test(line));
+  });
+
+  return compacted.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function isPlaceholderNoteContent(content: string | null): boolean {
   if (!content) return true;
   const normalized = content.trim();
@@ -40,6 +62,7 @@ export function Notes({
 }: NotesProps) {
   const noteVideos = videos.filter((video) => Boolean(video.note_ready && video.note_path && video.note_generation_mode === "single"));
   const hasSubstantiveNote = !isPlaceholderNoteContent(noteContent);
+  const readingContent = compactNoteForReading(noteContent);
 
   return (
     <MacSplitView columns="300px minmax(0, 1fr)">
@@ -84,7 +107,7 @@ export function Notes({
               </div>
               {hasSubstantiveNote ? (
                 <div className="mac-markdown">
-                  <ReactMarkdown>{noteContent ?? t("notes.chooseNoteHint")}</ReactMarkdown>
+                  <ReactMarkdown>{readingContent ?? t("notes.chooseNoteHint")}</ReactMarkdown>
                 </div>
               ) : (
                 <div className="mac-note-generation-state">
