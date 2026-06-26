@@ -161,6 +161,11 @@ export function buildScriptCatalog(t: Translate): ScriptItem[] {
       detail: t("scripts.fetchCommentsDesc"),
     },
     {
+      name: "fetch_danmaku.py",
+      title: t("scripts.fetchDanmaku"),
+      detail: t("scripts.fetchDanmakuDesc"),
+    },
+    {
       name: "generate_notes.py",
       title: t("scripts.generateNotes"),
       detail: t("scripts.generateNotesDesc"),
@@ -191,6 +196,7 @@ export function getScriptDisplayName(scriptName: string, t: Translate) {
     "fetch_subtitles.py": t("scripts.fetchSubtitles"),
     "transcribe_subtitles.py": t("scripts.transcribeSubtitles"),
     "fetch_comments.py": t("scripts.fetchComments"),
+    "fetch_danmaku.py": t("scripts.fetchDanmaku"),
     "generate_notes.py": t("scripts.generateNotes"),
     "extract_projects.py": t("scripts.extractProjects"),
     "build_index.py": t("scripts.buildIndex"),

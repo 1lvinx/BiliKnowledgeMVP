@@ -13,6 +13,7 @@ const ALLOWED_SCRIPTS: &[&str] = &[
     "fetch_subtitles.py",
     "transcribe_subtitles.py",
     "fetch_comments.py",
+    "fetch_danmaku.py",
     "generate_notes.py",
     "reconcile_notes.py",
     "extract_projects.py",

@@ -78,6 +78,30 @@ def build_comment_lookup(root: Path) -> dict:
     return {item.get("video_id"): item for item in items if isinstance(item, dict) and item.get("video_id")}
 
 
+def build_danmaku_lookup(root: Path) -> dict:
+    items = load_json(root / "manifest" / "danmaku.json", [])
+    if not isinstance(items, list):
+        return {}
+    return {item.get("video_id"): item for item in items if isinstance(item, dict) and item.get("video_id")}
+
+
+def compact_danmaku(danmaku: dict | None, max_hotspots: int = 6) -> list[dict]:
+    if not danmaku or not isinstance(danmaku, dict):
+        return []
+    hotspots = danmaku.get("hotspots") or []
+    if not isinstance(hotspots, list):
+        return []
+    return [
+        {
+            "minute": item.get("minute"),
+            "count": item.get("count"),
+            "samples": [str(sample)[:120] for sample in (item.get("samples") or [])[:3]],
+        }
+        for item in hotspots[:max_hotspots]
+        if isinstance(item, dict)
+    ]
+
+
 def compact_comments(comments: dict | None, max_items: int = 20) -> list[dict]:
     if not comments or not isinstance(comments, dict):
         return []
@@ -145,7 +169,7 @@ def subtitle_matches_video(video: dict, subtitle: dict | None) -> bool:
     return len([kw for kw in metadata_keywords if kw in raw_text]) >= 2 and len(title_keywords) <= 1
 
 
-def build_prompt(video: dict, source_item: dict, subtitle: dict | None = None, comments: dict | None = None) -> str:
+def build_prompt(video: dict, source_item: dict, subtitle: dict | None = None, comments: dict | None = None, danmaku: dict | None = None) -> str:
     return json.dumps(
         {
             "task": "从这个 Bilibili 收藏视频中抽取可复用的真实价值信息，而不是泛泛摘要。",
@@ -175,6 +199,7 @@ def build_prompt(video: dict, source_item: dict, subtitle: dict | None = None, c
                 "tags": source_item.get("tags", []),
                 "subtitle_excerpt": compact_subtitle_text(subtitle or {}),
                 "comment_signals": compact_comments(comments),
+                "danmaku_hotspots": compact_danmaku(danmaku),
             },
             "output_schema": {
                 "summary": "string",
@@ -204,6 +229,7 @@ def build_prompt(video: dict, source_item: dict, subtitle: dict | None = None, c
                 "如果只有标题和很少上下文，不要装作看过完整视频；workflow_steps/evidence/limitations 必须写明信息不足。",
                 "优先从 subtitle_excerpt 中抽取事实、步骤、命令、工具名、配置项、约束和经验判断。",
                 "comment_signals 只能作为受众反馈/坑点/补充线索，不能替代视频事实；评论观点必须标为评论区反馈。",
+                "danmaku_hotspots 只能作为观众集中反应和关键时间点线索；不能把弹幕当成视频事实。",
                 "每条 key_points/reusable_value/action_items 都必须包含一个具体名词或动作，避免'了解/学习/提升'这类空泛动词。",
                 "如果视频提到 GitHub 仓库、插件、Agent、Skill、工具或框架，优先识别出来放入 core_assets。",
                 "core_assets.name 必须优先使用视频中出现的真实名称、原始产品名或英文名，例如 Codex、Claude Code、Skill、Agent、Prettier、Black。",
@@ -327,6 +353,7 @@ def main():
     source_lookup = build_source_lookup(root / "manifest" / "source")
     subtitle_lookup = build_subtitle_lookup(root)
     comment_lookup = build_comment_lookup(root)
+    danmaku_lookup = build_danmaku_lookup(root)
     existing_insights = load_json(root / "manifest" / "insights.json", [])
     existing_insights = [upgrade_existing_insight(item) for item in existing_insights if isinstance(item, dict)]
     existing_by_id = {
@@ -352,7 +379,7 @@ def main():
                 base_url=base_url,
                 api_key=api_key,
                 model=model,
-                prompt=build_prompt(video, source_item, subtitle, comment_lookup.get(video_id)),
+                prompt=build_prompt(video, source_item, subtitle, comment_lookup.get(video_id), danmaku_lookup.get(video_id)),
             )
             insight = normalize_insight(video_id, raw_text)
         except (urllib.error.URLError, KeyError, json.JSONDecodeError) as exc:
