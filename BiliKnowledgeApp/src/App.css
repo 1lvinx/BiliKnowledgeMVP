@@ -4855,3 +4855,112 @@ textarea:focus-visible {
   padding-top: 10px;
   padding-bottom: 10px;
 }
+
+/* Fit the whole right-side video inspector in one glance. */
+.mac-inspector > .mac-inspector-content {
+  gap: 8px;
+  padding: 8px 12px 14px;
+}
+
+.mac-inspector .flex.flex-wrap.gap-2 {
+  gap: 5px;
+}
+
+.mac-inspector .mac-status-pill,
+.mac-inspector .mac-tag-pill {
+  min-height: 22px;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.mac-inspector .mac-stat {
+  min-height: 46px;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
+.mac-inspector .mac-stat strong {
+  font-size: 14px;
+}
+
+.mac-inspector .mac-stat span {
+  font-size: 11px;
+}
+
+.mac-inspector .mac-panel {
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.mac-inspector .mac-panel:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.mac-inspector .mac-panel-header {
+  padding: 9px 12px 5px;
+}
+
+.mac-inspector .mac-panel-header h2 {
+  font-size: 13px;
+}
+
+.mac-inspector .mac-native-row {
+  min-height: 34px;
+  padding: 7px 10px;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.mac-inspector .mac-row-title {
+  font-size: 12px;
+}
+
+.mac-inspector .mac-row-meta,
+.mac-inspector .mac-native-row > span:not(.mac-row-title) {
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.mac-inspector-compact-section {
+  border: 1px solid var(--bk-separator);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bk-elevated-bg) 98%, transparent);
+}
+
+.mac-inspector-compact-section > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 9px 12px;
+  color: var(--bk-secondary-label);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.mac-inspector-compact-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mac-inspector-compact-section > summary::after {
+  content: "展开";
+  float: right;
+  color: var(--bk-tertiary-label);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.mac-inspector-compact-section[open] > summary::after {
+  content: "收起";
+}
+
+.mac-inspector-compact-section .mac-panel {
+  border: 0;
+  border-top: 1px solid var(--bk-separator);
+  border-radius: 0 0 14px 14px;
+  background: transparent;
+}
+
+.mac-inspector-compact-section .mac-inspector-content {
+  gap: 6px;
+  padding: 8px 10px 10px;
+}

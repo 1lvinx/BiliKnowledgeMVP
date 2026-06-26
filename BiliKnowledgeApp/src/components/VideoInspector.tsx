@@ -122,7 +122,9 @@ export function VideoInspector({
             </div>
           </div>
         </MacPanel>
-        <MacPanel title={t("inspector.importedData")}>
+        <details className="mac-inspector-compact-section">
+          <summary>{t("inspector.importedData")}</summary>
+          <MacPanel>
           <div className="mac-inspector-content">
             <p className="mac-inspector-meta">
               {t("inspector.importedDataHint")}
@@ -157,8 +159,11 @@ export function VideoInspector({
               </div>
             </div>
           </div>
-        </MacPanel>
-        <MacPanel title={t("inspector.aiSummary")}>
+          </MacPanel>
+        </details>
+        <details className="mac-inspector-compact-section">
+          <summary>{t("inspector.aiSummary")}</summary>
+          <MacPanel>
           <div className="mac-inspector-content">
             <p className="mac-inspector-meta">
               {hasTags ? t("inspector.transcriptNote") : t("inspector.summaryPending")}
@@ -169,8 +174,11 @@ export function VideoInspector({
               </p>
             )}
           </div>
-        </MacPanel>
-        <MacPanel title={t("inspector.actions")}>
+          </MacPanel>
+        </details>
+        <details className="mac-inspector-compact-section">
+          <summary>{t("inspector.actions")}</summary>
+          <MacPanel>
           <div className="mac-native-list">
             <button
               className="mac-native-row"
@@ -228,7 +236,8 @@ export function VideoInspector({
               <ExternalLink size={14} />
             </a>
           </div>
-        </MacPanel>
+          </MacPanel>
+        </details>
       </div>
     </aside>
   );
