@@ -4814,3 +4814,44 @@ textarea:focus-visible {
   margin: 16px 0;
   border-top-color: color-mix(in srgb, var(--bk-separator) 58%, transparent);
 }
+
+/* Compact right inspector: remove the oversized hero gap in video detail. */
+.mac-inspector > .mac-inspector-content {
+  gap: 10px;
+  padding: 10px 14px 18px;
+}
+
+.mac-inspector .mac-inspector-title {
+  font-size: 14px;
+  line-height: 1.42;
+}
+
+.mac-inspector .mac-inspector-meta {
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.mac-inspector .mac-stat-grid {
+  gap: 8px;
+}
+
+.mac-inspector .mac-stat {
+  padding: 12px 14px;
+  min-height: 58px;
+}
+
+.mac-inspector .bk-panel {
+  margin-top: 0;
+}
+
+.mac-inspector .bk-panel-header,
+.mac-inspector .mac-panel-header {
+  padding-top: 12px;
+  padding-bottom: 8px;
+}
+
+.mac-inspector .mac-native-row {
+  min-height: 42px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
