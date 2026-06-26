@@ -6,9 +6,116 @@ from datetime import datetime, timezone
 import json
 import re
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Optional
 
+
+GITHUB_RE = re.compile(r"https?://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+
+
+def infer_name_from_url(url: str) -> str:
+    parts = url.rstrip("/").split("/")
+    return f"{parts[-2]}/{parts[-1]}" if len(parts) >= 2 else url
+
+
+def fetch_github_repo_metadata(url: str) -> dict:
+    parts = url.rstrip("/").split("/")
+    if len(parts) < 5:
+        return {}
+    owner, repo = parts[3], parts[4]
+    api_url = f"https://api.github.com/repos/{owner}/{repo}"
+    request = urllib.request.Request(
+        api_url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "BiliKnowledgeLocal/1.0",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError):
+        return {}
+    return {
+        "repo_full_name": payload.get("full_name", ""),
+        "description": payload.get("description") or "",
+        "homepage": payload.get("homepage") or "",
+        "stars": int(payload.get("stargazers_count") or 0),
+        "forks": int(payload.get("forks_count") or 0),
+        "watchers": int(payload.get("subscribers_count") or payload.get("watchers_count") or 0),
+        "open_issues": int(payload.get("open_issues_count") or 0),
+        "language": payload.get("language") or "",
+        "license": ((payload.get("license") or {}).get("spdx_id") or ""),
+        "topics": payload.get("topics") or [],
+        "archived": bool(payload.get("archived") or False),
+        "default_branch": payload.get("default_branch") or "",
+        "pushed_at": payload.get("pushed_at") or "",
+        "html_url": payload.get("html_url") or url,
+    }
+
+
+def collect_github_urls(insight: Optional[dict], note_text: str) -> list[str]:
+    urls = set(GITHUB_RE.findall(note_text or ""))
+    for asset in (insight or {}).get("core_assets", []) or []:
+        if not isinstance(asset, dict):
+            continue
+        url = str(asset.get("url") or "").strip()
+        if GITHUB_RE.fullmatch(url):
+            urls.add(url)
+    return sorted(urls)
+
+
+def sync_open_source_candidates(root: Path, video: dict, insight: Optional[dict], note_text: str) -> int:
+    urls = collect_github_urls(insight, note_text)
+    if not urls:
+        return 0
+    candidates_path = root / "projects" / "project_candidates.json"
+    candidates = load_json(candidates_path, [])
+    if not isinstance(candidates, list):
+        candidates = []
+    by_url = {str(item.get("url") or ""): item for item in candidates if isinstance(item, dict)}
+    added = 0
+    for url in urls:
+        metadata = fetch_github_repo_metadata(url)
+        existing = by_url.get(url) or {}
+        item = {
+            **existing,
+            "name": existing.get("name") or metadata.get("repo_full_name") or infer_name_from_url(url),
+            "url": metadata.get("html_url") or url,
+            "source_note": f"{video.get('id', '')}.md",
+            "source_video": video.get("url", ""),
+            "type": "github",
+            "tech_stack": existing.get("tech_stack") or metadata.get("topics") or [],
+            "description": existing.get("description") or metadata.get("description") or "",
+            "mentioned_context": existing.get("mentioned_context") or str((insight or {}).get("summary") or ""),
+            "reusable_value": existing.get("reusable_value") or "；".join(str(x) for x in (insight or {}).get("reusable_value", [])[:3]),
+            "commercial_value": existing.get("commercial_value") or "",
+            "risk": existing.get("risk") or "",
+            "priority": existing.get("priority") or video.get("priority") or "P1",
+            "status": existing.get("status") or "candidate",
+            "need_verify": True,
+            "homepage": existing.get("homepage") or metadata.get("homepage") or "",
+            "stars": existing.get("stars") or metadata.get("stars") or 0,
+            "forks": existing.get("forks") or metadata.get("forks") or 0,
+            "watchers": existing.get("watchers") or metadata.get("watchers") or 0,
+            "open_issues": existing.get("open_issues") or metadata.get("open_issues") or 0,
+            "language": existing.get("language") or metadata.get("language") or "",
+            "license": existing.get("license") or metadata.get("license") or "",
+            "archived": existing.get("archived") if "archived" in existing else metadata.get("archived", False),
+            "default_branch": existing.get("default_branch") or metadata.get("default_branch") or "",
+            "pushed_at": existing.get("pushed_at") or metadata.get("pushed_at") or "",
+        }
+        if url not in by_url:
+            candidates.append(item)
+            added += 1
+        else:
+            idx = candidates.index(by_url[url])
+            candidates[idx] = item
+        by_url[url] = item
+    save_json(candidates_path, candidates)
+    return added
 
 def load_json(path: Path, default):
     if not path.exists():
@@ -243,6 +350,34 @@ def insight_has_value(insight: Optional[dict]) -> bool:
         return False
     return len(key_points) >= 2 and len(evidence) >= 1
 
+
+def format_open_source_assets(insight: Optional[dict]) -> str:
+    assets = []
+    for asset in (insight or {}).get("core_assets", []) or []:
+        if not isinstance(asset, dict):
+            continue
+        name = str(asset.get("name") or "").strip()
+        asset_type = str(asset.get("asset_type") or "").strip()
+        url = str(asset.get("url") or "").strip()
+        role = str(asset.get("role") or asset.get("solves") or "").strip()
+        if not name:
+            continue
+        normalized_type = asset_type.lower()
+        is_repo_like = bool(url.startswith("https://github.com/")) or any(kw in normalized_type for kw in ["github", "repo", "repository", "仓库", "开源项目"])
+        if not is_repo_like:
+            continue
+        label = f"`{name}`"
+        if asset_type:
+            label += f"（{asset_type}）"
+        if url:
+            label += f"：{url}"
+        else:
+            label += "：仓库地址待确认"
+        if role:
+            label += f" — {role}"
+        assets.append(f"- {label}")
+    return "\n".join(assets) if assets else "- 未提取到明确开源仓库或项目地址。"
+
 def build_note(video: dict, insight: Optional[dict], subtitle: Optional[dict]) -> str:
     summary = (insight or {}).get("summary") or "待补充。"
     key_points = (insight or {}).get("key_points") or ["待补充"]
@@ -290,6 +425,7 @@ def build_note(video: dict, insight: Optional[dict], subtitle: Optional[dict]) -
         fallback_terms = infer_named_terms(video, insight)
         named_assets = [f"- `{item}`" for item in fallback_terms]
     core_terms_md = "\n".join(named_assets) if named_assets else "- 待补充"
+    open_source_assets_md = format_open_source_assets(insight)
 
     return f"""## 内容概述
 
@@ -338,6 +474,12 @@ def build_note(video: dict, insight: Optional[dict], subtitle: Optional[dict]) -
 ## 限制与风险
 
 {limitations_md}
+
+---
+
+## 开源仓库 / 项目
+
+{open_source_assets_md}
 
 ---
 
@@ -425,6 +567,9 @@ def main():
             subtitle,
         )
         note_path.write_text(note_text, encoding="utf-8")
+        synced_projects = sync_open_source_candidates(root, video, insight, note_text)
+        if synced_projects:
+            print(f"[开源候选] 已同步 {synced_projects} 个 GitHub 项目")
         next_video = dict(video)
         next_video["note_path"] = note_path.name
         next_video["note_ready"] = True
