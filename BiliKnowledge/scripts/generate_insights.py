@@ -9,6 +9,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 
 def load_json(path: Path, default):
@@ -85,7 +86,7 @@ def build_danmaku_lookup(root: Path) -> dict:
     return {item.get("video_id"): item for item in items if isinstance(item, dict) and item.get("video_id")}
 
 
-def compact_danmaku(danmaku: dict | None, max_hotspots: int = 6) -> list[dict]:
+def compact_danmaku(danmaku: Optional[dict], max_hotspots: int = 6) -> list[dict]:
     if not danmaku or not isinstance(danmaku, dict):
         return []
     hotspots = danmaku.get("hotspots") or []
@@ -102,7 +103,7 @@ def compact_danmaku(danmaku: dict | None, max_hotspots: int = 6) -> list[dict]:
     ]
 
 
-def compact_comments(comments: dict | None, max_items: int = 20) -> list[dict]:
+def compact_comments(comments: Optional[dict], max_items: int = 20) -> list[dict]:
     if not comments or not isinstance(comments, dict):
         return []
     items = comments.get("comments") or []
@@ -149,7 +150,7 @@ def extract_keywords(text: str) -> list[str]:
     return list(dict.fromkeys(results))
 
 
-def subtitle_matches_video(video: dict, subtitle: dict | None) -> bool:
+def subtitle_matches_video(video: dict, subtitle: Optional[dict]) -> bool:
     if not subtitle or not isinstance(subtitle, dict):
         return False
     validation = subtitle.get("validation") if isinstance(subtitle.get("validation"), dict) else {}
@@ -169,7 +170,7 @@ def subtitle_matches_video(video: dict, subtitle: dict | None) -> bool:
     return len([kw for kw in metadata_keywords if kw in raw_text]) >= 2 and len(title_keywords) <= 1
 
 
-def build_prompt(video: dict, source_item: dict, subtitle: dict | None = None, comments: dict | None = None, danmaku: dict | None = None) -> str:
+def build_prompt(video: dict, source_item: dict, subtitle: Optional[dict] = None, comments: Optional[dict] = None, danmaku: Optional[dict] = None) -> str:
     return json.dumps(
         {
             "task": "从这个 Bilibili 收藏视频中抽取可复用的真实价值信息，而不是泛泛摘要。",
@@ -234,6 +235,8 @@ def build_prompt(video: dict, source_item: dict, subtitle: dict | None = None, c
                 "danmaku_hotspots 只能作为观众集中反应和关键时间点线索；不能把弹幕当成视频事实。",
                 "evidence_quality 必须根据输入证据诚实评估；证据不足时写 low，并在 limitations 中说明缺口。",
                 "每条 key_points/reusable_value/action_items 都必须包含一个具体名词或动作，避免'了解/学习/提升'这类空泛动词。",
+                "如果 subtitle_excerpt 足够长，必须优先基于字幕内容输出具体流程、适用边界和可复用步骤，不要停留在标题摘要。",
+                "如果无法从字幕中提取具体操作、配置、步骤或判断，evidence_quality 必须为 low，且不要编造可复用价值。",
                 "如果视频提到 GitHub 仓库、插件、Agent、Skill、工具或框架，优先识别出来放入 core_assets。",
                 "core_assets.name 必须优先使用视频中出现的真实名称、原始产品名或英文名，例如 Codex、Claude Code、Skill、Agent、Prettier、Black。",
                 "不要自己发明泛化名称，例如'调试助手插件'、'自动补全插件'，除非视频里就是这么称呼它。",
@@ -388,7 +391,9 @@ def main():
             )
             insight = normalize_insight(video_id, raw_text)
         except (urllib.error.URLError, KeyError, json.JSONDecodeError) as exc:
-            print(f"[警告] 视频洞察生成失败 {video_id}：{exc}")
+            print(f"[错误] 视频洞察生成失败 {video_id}：{exc}")
+            if args.video_id:
+                sys.exit(1)
             insight = existing_by_id.get(video_id) or {
                 "video_id": video_id,
                 "summary": "",

@@ -196,6 +196,53 @@ def professionalize_problem_statement(text: str) -> str:
     return result
 
 
+
+def parse_loose_datetime(value: str) -> Optional[datetime]:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    candidates = [raw, raw.replace("Z", "+00:00")]
+    for candidate in candidates:
+        try:
+            return datetime.fromisoformat(candidate)
+        except ValueError:
+            pass
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(raw, fmt)
+        except ValueError:
+            pass
+    return None
+
+
+def is_insight_stale(insight: Optional[dict], subtitle: Optional[dict]) -> bool:
+    if not insight or not subtitle:
+        return True
+    insight_time = parse_loose_datetime(str(insight.get("updated_at") or insight.get("created_at") or ""))
+    subtitle_time = parse_loose_datetime(str(subtitle.get("created_at") or ""))
+    if not insight_time or not subtitle_time:
+        return False
+    if insight_time.tzinfo is not None:
+        insight_time = insight_time.replace(tzinfo=None)
+    if subtitle_time.tzinfo is not None:
+        subtitle_time = subtitle_time.replace(tzinfo=None)
+    return insight_time < subtitle_time
+
+
+def insight_has_value(insight: Optional[dict]) -> bool:
+    if not insight:
+        return False
+    quality = str(insight.get("evidence_quality") or "").lower().strip()
+    if quality == "low":
+        return False
+    reusable = [x for x in insight.get("reusable_value", []) if str(x).strip()]
+    evidence = [x for x in insight.get("evidence", []) if str(x).strip()]
+    key_points = [x for x in insight.get("key_points", []) if str(x).strip()]
+    low_signal = " ".join(key_points + reusable + evidence)
+    if "信息不足" in low_signal or "人工复核" in low_signal:
+        return False
+    return len(key_points) >= 2 and len(evidence) >= 1
+
 def build_note(video: dict, insight: Optional[dict], subtitle: Optional[dict]) -> str:
     summary = (insight or {}).get("summary") or "待补充。"
     key_points = (insight or {}).get("key_points") or ["待补充"]
@@ -358,10 +405,23 @@ def main():
                 sys.exit(1)
             updated_videos.append(video)
             continue
+        insight = insight_by_id.get(video.get("id"))
+        if is_insight_stale(insight, subtitle):
+            print(f"[错误] 洞察早于当前字幕或不存在，已阻止生成笔记：{video.get('id', '')}。请先重新生成视频洞察。")
+            if args.video_id:
+                sys.exit(1)
+            updated_videos.append(video)
+            continue
+        if not insight_has_value(insight):
+            print(f"[错误] 洞察价值不足，已阻止生成笔记：{video.get('id', '')}。请先基于有效字幕重新生成洞察。")
+            if args.video_id:
+                sys.exit(1)
+            updated_videos.append(video)
+            continue
         note_path = notes_dir / f"{video.get('id', '')}.md"
         note_text = build_note(
             video,
-            insight_by_id.get(video.get("id")),
+            insight,
             subtitle,
         )
         note_path.write_text(note_text, encoding="utf-8")
