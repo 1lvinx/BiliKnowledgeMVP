@@ -56,3 +56,7 @@ BiliKnowledge/projects/project_candidates.json
 
 # local backup files
 *.bak_*
+
+# Python virtual environments
+.venv/
+venv/

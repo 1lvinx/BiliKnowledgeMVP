@@ -111,7 +111,7 @@ def transcribe_wav(wav_path: Path) -> list[dict[str, Any]]:
         from funasr import AutoModel
         from funasr.utils.postprocess_utils import rich_transcription_postprocess
     except ImportError as exc:
-        raise RuntimeError(f"缺少 ASR 依赖：请安装 funasr modelscope torch pydub yt-dlp；当前 Python：{sys.executable}") from exc
+        raise RuntimeError(f"缺少 ASR 依赖：请安装 funasr modelscope torch torchaudio pydub yt-dlp，并确保 numpy<2；当前 Python：{sys.executable}") from exc
 
     model = AutoModel(model="iic/SenseVoiceSmall")
     result = model.generate(input=str(wav_path), use_itn=True)
