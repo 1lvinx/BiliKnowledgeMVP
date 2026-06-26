@@ -180,6 +180,7 @@ def build_prompt(video: dict, source_item: dict, subtitle: dict | None = None, c
                 "workflow_steps": "3-8条，如果视频包含操作流程，抽取为可执行步骤；没有就写信息不足",
                 "evidence": "2-5条，引用字幕/标题/描述中的依据，说明为什么这样判断",
                 "limitations": "1-4条，说明适用前提、风险、缺失信息或需要人工复核的点",
+                "evidence_quality": "high/medium/low 之一。high=字幕证据充分且有元数据/评论辅助；medium=字幕可用但辅助材料少；low=信息少，只能保守记录",
                 "action_items": "2-4条，后续值得跟进的具体动作",
                 "insight_tags": "3-6个简短标签，适合本地知识库检索",
                 "use_cases": "2-4条，说明在什么场景使用会提升效率或解决什么问题",
@@ -213,6 +214,7 @@ def build_prompt(video: dict, source_item: dict, subtitle: dict | None = None, c
                 "workflow_steps": ["string"],
                 "evidence": ["string"],
                 "limitations": ["string"],
+                "evidence_quality": "string",
                 "core_assets": [
                     {
                         "name": "string",
@@ -230,6 +232,7 @@ def build_prompt(video: dict, source_item: dict, subtitle: dict | None = None, c
                 "优先从 subtitle_excerpt 中抽取事实、步骤、命令、工具名、配置项、约束和经验判断。",
                 "comment_signals 只能作为受众反馈/坑点/补充线索，不能替代视频事实；评论观点必须标为评论区反馈。",
                 "danmaku_hotspots 只能作为观众集中反应和关键时间点线索；不能把弹幕当成视频事实。",
+                "evidence_quality 必须根据输入证据诚实评估；证据不足时写 low，并在 limitations 中说明缺口。",
                 "每条 key_points/reusable_value/action_items 都必须包含一个具体名词或动作，避免'了解/学习/提升'这类空泛动词。",
                 "如果视频提到 GitHub 仓库、插件、Agent、Skill、工具或框架，优先识别出来放入 core_assets。",
                 "core_assets.name 必须优先使用视频中出现的真实名称、原始产品名或英文名，例如 Codex、Claude Code、Skill、Agent、Prettier、Black。",
@@ -274,6 +277,7 @@ def normalize_insight(video_id: str, raw_text: str) -> dict:
         "workflow_steps": [str(x).strip() for x in payload.get("workflow_steps", []) if str(x).strip()],
         "evidence": [str(x).strip() for x in payload.get("evidence", []) if str(x).strip()],
         "limitations": [str(x).strip() for x in payload.get("limitations", []) if str(x).strip()],
+        "evidence_quality": str(payload.get("evidence_quality", "medium")).strip() or "medium",
         "core_assets": [asset for asset in core_assets if asset.get("name")],
         "created_at": now,
         "updated_at": now,
@@ -296,6 +300,7 @@ def upgrade_existing_insight(payload: dict) -> dict:
         "workflow_steps": [str(x).strip() for x in payload.get("workflow_steps", []) if str(x).strip()],
         "evidence": [str(x).strip() for x in payload.get("evidence", []) if str(x).strip()],
         "limitations": [str(x).strip() for x in payload.get("limitations", []) if str(x).strip()],
+        "evidence_quality": str(payload.get("evidence_quality", "")).strip() or "medium",
         "core_assets": [
             {
                 "name": str(asset.get("name", "")).strip(),

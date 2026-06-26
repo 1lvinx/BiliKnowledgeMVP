@@ -55,6 +55,7 @@ function InsightPanel({ video, insight, relatedInsights = [] }: InsightPanelProp
   const workflowSteps = Array.isArray(insight.workflow_steps) ? insight.workflow_steps : [];
   const evidence = Array.isArray(insight.evidence) ? insight.evidence : [];
   const limitations = Array.isArray(insight.limitations) ? insight.limitations : [];
+  const evidenceQuality = insight.evidence_quality || "medium";
   const tags = Array.isArray(insight.insight_tags) ? insight.insight_tags : [];
   const categories = Array.isArray(insight.category_paths) ? insight.category_paths : [];
   const coreAssets = Array.isArray(insight.core_assets) ? insight.core_assets : [];
@@ -80,6 +81,7 @@ function InsightPanel({ video, insight, relatedInsights = [] }: InsightPanelProp
           {t("insight.summary")}
         </h4>
         <p className="insight-summary-text">{insight.summary}</p>
+        <div className="mac-row-meta mt-3">证据质量：{evidenceQuality}</div>
       </section>
 
       {/* Key Points */}

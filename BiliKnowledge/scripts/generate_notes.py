@@ -205,6 +205,7 @@ def build_note(video: dict, insight: Optional[dict], subtitle: Optional[dict]) -
     workflow_steps = (insight or {}).get("workflow_steps") or []
     evidence = (insight or {}).get("evidence") or []
     limitations = (insight or {}).get("limitations") or []
+    evidence_quality = str((insight or {}).get("evidence_quality") or "medium").strip() or "medium"
     problem_statements = (insight or {}).get("problem_statements") or ["待补充"]
     category_paths = (insight or {}).get("category_paths") or [video.get("category", "未分类") or "未分类"]
     core_assets = (insight or {}).get("core_assets") or []
@@ -226,6 +227,7 @@ def build_note(video: dict, insight: Optional[dict], subtitle: Optional[dict]) -
     workflow_steps_md = format_bullets(workflow_steps)
     evidence_md = format_bullets(evidence)
     limitations_md = format_bullets(limitations)
+    evidence_quality_label = {"high": "高", "medium": "中", "low": "低"}.get(evidence_quality.lower(), evidence_quality)
     problem_md = "\n".join(f"- {professionalize_problem_statement(item)}" for item in problem_statements)
     category_md = "\n".join(f"- `{item}`" for item in category_paths)
     named_assets = []
@@ -279,6 +281,8 @@ def build_note(video: dict, insight: Optional[dict], subtitle: Optional[dict]) -
 ---
 
 ## 判断依据
+
+证据质量：**{evidence_quality_label}**
 
 {evidence_md}
 

@@ -63,6 +63,7 @@ export interface VideoInsight {
   workflow_steps?: string[];
   evidence?: string[];
   limitations?: string[];
+  evidence_quality?: "high" | "medium" | "low" | string;
   core_assets: Array<{
     name: string;
     asset_type: string;
