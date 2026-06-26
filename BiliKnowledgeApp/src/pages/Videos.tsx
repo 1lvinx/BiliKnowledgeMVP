@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronRight, FileText, Search, Sparkles } from "lucide-react";
+import { Captions, ChevronRight, FileText, Search, Sparkles } from "lucide-react";
 import type { FavoriteFolder, Video } from "../types";
 import { t } from "../i18n";
 import { cn } from "../lib/utils";
@@ -132,11 +132,19 @@ export function Videos({
         <div className="mac-list-controls">
           <div className="mac-list-controls-row">
             <MacToolbarButton
+              disabled={!activeVideo}
+              icon={<Captions size={14} />}
+              label={t("scripts.fetchSubtitles")}
+              onClick={() => activeVideo && onExtractSubtitle(activeVideo.id)}
+            />
+            <MacToolbarButton
+              disabled={!activeVideo}
               icon={<Sparkles size={14} />}
               label={t("scripts.generateInsights")}
               onClick={onRunBatchInsight}
             />
             <MacToolbarButton
+              disabled={!activeVideo}
               icon={<FileText size={14} />}
               label={t("scripts.generateNotes")}
               onClick={onRunBatchNote}
