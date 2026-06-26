@@ -114,11 +114,27 @@ fn resolve_python_executable(project_root: &Path) -> Result<PathBuf, String> {
         ));
     }
 
-    let local_candidates = [
-        project_root.join(".venv/bin/python"),
-        project_root.join("venv/bin/python"),
-        project_root.join("external/bilibili-favorites/.venv/bin/python"),
-    ];
+    let mut search_roots = vec![project_root.to_path_buf()];
+    if let Ok(cwd) = std::env::current_dir() {
+        search_roots.push(cwd.clone());
+        if let Some(parent) = cwd.parent() {
+            search_roots.push(parent.to_path_buf());
+        }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        let mut cursor = exe.parent().map(|path| path.to_path_buf());
+        while let Some(dir) = cursor {
+            search_roots.push(dir.clone());
+            cursor = dir.parent().map(|path| path.to_path_buf());
+        }
+    }
+
+    let mut local_candidates = Vec::new();
+    for root in search_roots {
+        local_candidates.push(root.join(".venv/bin/python"));
+        local_candidates.push(root.join("venv/bin/python"));
+        local_candidates.push(root.join("external/bilibili-favorites/.venv/bin/python"));
+    }
 
     for candidate in local_candidates {
         if candidate.exists() {
