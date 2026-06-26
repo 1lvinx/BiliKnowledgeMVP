@@ -4762,3 +4762,22 @@ textarea:focus-visible {
 .mac-markdown hr {
   margin: 14px 0;
 }
+
+
+/* Notes should read like a document workspace, not another inspection dashboard. */
+.mac-note-reader {
+  padding: 18px 28px 32px;
+}
+
+.mac-note-reader article {
+  max-width: 860px;
+  padding: 18px 8px 32px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.mac-note-reader .mac-row-meta {
+  margin-bottom: 12px;
+}
