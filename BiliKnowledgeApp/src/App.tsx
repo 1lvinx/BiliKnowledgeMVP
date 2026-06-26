@@ -93,24 +93,35 @@ function isTauriRuntime() {
 }
 
 
+function extractScriptFailureReason(message: string): string | null {
+  const lines = message
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\[ERROR\]\s*/, "").trim())
+    .filter(Boolean);
+  const reasonLine = [...lines].reverse().find((line) => /\[错误\]|失败|缺少|not found|No module named|ModuleNotFoundError|校验/.test(line));
+  if (!reasonLine) return null;
+  return reasonLine.replace(/^\[错误\]\s*/, "");
+}
+
 function humanizeScriptError(error: unknown, scriptName?: string): string {
   const message = String(error);
+  const scriptReason = extractScriptFailureReason(message);
   if (message.includes("exit code")) {
     if (scriptName === "fetch_subtitles.py") {
-      return "字幕抓取或校验失败：当前视频可能没有可用字幕，或字幕疑似错配。请重新抓取字幕，或使用本地转写。";
+      return scriptReason ?? "字幕抓取或校验失败：当前视频可能没有可用字幕，或字幕疑似错配。请重新抓取字幕，或使用本地转写。";
     }
     if (scriptName === "transcribe_subtitles.py") {
-      return "本地转写失败：请确认已安装 ffmpeg、yt-dlp 和 FunASR 依赖，或检查视频音频是否可访问。";
+      return scriptReason ?? "本地转写失败：缺少 Python 依赖或视频音频不可访问。请安装 yt-dlp、FunASR、modelscope、torch、pydub 后重试。";
     }
     if (scriptName === "generate_insights.py") {
-      return "洞察生成失败：需要先获得有效字幕；如果字幕缺失或错配，请先抓取字幕或本地转写。";
+      return scriptReason ?? "洞察生成失败：需要先获得有效字幕；如果字幕缺失或错配，请先抓取字幕或本地转写。";
     }
     if (scriptName === "generate_notes.py") {
-      return "笔记生成失败：需要有效字幕和已生成洞察。请先完成字幕校验和洞察生成。";
+      return scriptReason ?? "笔记生成失败：需要有效字幕和已生成洞察。请先完成字幕校验和洞察生成。";
     }
-    return "脚本执行失败：请查看日志中的具体错误，并按当前视频状态继续处理。";
+    return scriptReason ?? "脚本执行失败：请查看日志中的具体错误，并按当前视频状态继续处理。";
   }
-  return message;
+  return scriptReason ?? message;
 }
 
 function GlobalTaskStatusCard({ task }: { task: TaskDisplay }) {

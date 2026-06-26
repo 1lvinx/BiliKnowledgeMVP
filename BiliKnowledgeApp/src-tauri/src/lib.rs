@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::{Arc, Mutex};
 use serde::Serialize;
 use tauri::{Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
 use which::which;
@@ -488,19 +489,30 @@ async fn run_script<R: Runtime>(
         .take()
         .ok_or_else(|| "Failed to capture script stderr".to_string())?;
 
+    let captured_output = Arc::new(Mutex::new(Vec::<String>::new()));
+
     let app_clone = app.clone();
+    let output_clone = Arc::clone(&captured_output);
     let stdout_handle = std::thread::spawn(move || {
         let reader = BufReader::new(stdout);
         for line in reader.lines().map_while(|line| line.ok()) {
+            if let Ok(mut output) = output_clone.lock() {
+                output.push(line.clone());
+            }
             let _ = app_clone.emit("script-log", line);
         }
     });
 
     let app_clone = app.clone();
+    let output_clone = Arc::clone(&captured_output);
     let stderr_handle = std::thread::spawn(move || {
         let reader = BufReader::new(stderr);
         for line in reader.lines().map_while(|line| line.ok()) {
-            let _ = app_clone.emit("script-log", format!("[ERROR] {}", line));
+            let formatted = format!("[ERROR] {}", line);
+            if let Ok(mut output) = output_clone.lock() {
+                output.push(formatted.clone());
+            }
+            let _ = app_clone.emit("script-log", formatted);
         }
     });
 
@@ -511,7 +523,25 @@ async fn run_script<R: Runtime>(
     if status.success() {
         Ok("Script executed successfully".into())
     } else {
-        Err(format!("Script failed with exit code: {:?}", status.code()))
+        let tail = captured_output
+            .lock()
+            .ok()
+            .map(|output| {
+                let start = output.len().saturating_sub(8);
+                output[start..].join("
+")
+            })
+            .unwrap_or_default();
+        if tail.trim().is_empty() {
+            Err(format!("Script failed with exit code: {:?}", status.code()))
+        } else {
+            Err(format!(
+                "Script failed with exit code: {:?}
+{}",
+                status.code(),
+                tail.trim()
+            ))
+        }
     }
 }
 
