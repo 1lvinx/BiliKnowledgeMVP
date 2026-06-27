@@ -14,6 +14,8 @@ import os
 import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -124,6 +126,14 @@ print(json.dumps(result, ensure_ascii=False))
     return ok
 
 
+def check_ytdlp_runtime(python: Path) -> bool:
+    proc = subprocess.run([str(python), "-m", "yt_dlp", "--version"], capture_output=True, text=True)
+    ok = proc.returncode == 0
+    detail = proc.stdout.strip() or proc.stderr.strip()[-300:] or "yt-dlp 不可运行"
+    status_line(ok, "yt-dlp 运行态", detail)
+    return ok
+
+
 def fix_modules(python: Path, project_root: Path) -> bool:
     pip = [str(python), "-m", "pip"]
     run(pip + ["install", "--upgrade", "pip"], cwd=project_root)
@@ -142,6 +152,62 @@ def check_model_cache() -> bool:
     return True
 
 
+def build_cookie_header(config: dict) -> str:
+    bilibili = config.get("bilibili") or {}
+    raw_cookie = str(bilibili.get("cookie") or "").strip()
+    sessdata = str(bilibili.get("sessdata") or "").strip()
+    if raw_cookie:
+        return raw_cookie
+    if sessdata:
+        return f"SESSDATA={sessdata}"
+    return ""
+
+
+def check_bilibili_login(config: dict) -> bool:
+    cookie = build_cookie_header(config)
+    if not cookie:
+        status_line(False, "B站登录态", "未配置 Cookie/SESSDATA；收藏夹同步和部分字幕抓取可能失败")
+        return False
+    request = urllib.request.Request(
+        "https://api.bilibili.com/x/web-interface/nav",
+        headers={
+            "Cookie": cookie,
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            "Referer": "https://www.bilibili.com/",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            payload = json.loads(response.read().decode("utf-8", errors="ignore"))
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError) as exc:
+        status_line(False, "B站登录态", f"校验失败：{exc}")
+        return False
+    data = payload.get("data") or {}
+    if data.get("isLogin"):
+        status_line(True, "B站登录态", f"已登录：{data.get('uname') or data.get('mid') or '未知账号'}")
+        return True
+    status_line(False, "B站登录态", payload.get("message") or "Cookie/SESSDATA 无效或已过期")
+    return False
+
+
+def check_ai_config(config: dict) -> bool:
+    ai = config.get("ai") or {}
+    provider = str(ai.get("provider") or "").strip()
+    base_url = str(ai.get("base_url") or "").strip()
+    model = str(ai.get("model") or "").strip()
+    api_key = str(ai.get("api_key") or "").strip()
+    ok = True
+    status_line(bool(provider), "AI Provider", provider or "未配置")
+    status_line(bool(base_url), "AI Base URL", base_url or "未配置")
+    status_line(bool(model), "AI Model", model or "未配置")
+    if api_key:
+        status_line(True, "AI API Key", "已配置")
+    else:
+        status_line(False, "AI API Key", "未配置，洞察/笔记会失败")
+        ok = False
+    return ok and bool(provider and base_url and model)
+
+
 def check_knowledge_root(root: Path) -> bool:
     ok = root.exists()
     status_line(ok, "知识库目录", str(root))
@@ -150,8 +216,8 @@ def check_knowledge_root(root: Path) -> bool:
         status_line(path.exists(), f"知识库子目录 {rel}", str(path))
         ok = ok and path.exists()
     config = load_json(root / "config" / "config.json", {})
-    ai = config.get("ai") or {}
-    status_line(bool(str(ai.get("api_key") or "").strip()), "AI API Key", "已配置" if str(ai.get("api_key") or "").strip() else "未配置，洞察/笔记会失败")
+    ok = check_ai_config(config) and ok
+    ok = check_bilibili_login(config) and ok
     return ok
 
 
@@ -179,6 +245,7 @@ def main() -> int:
         if not module_ok and args.fix:
             print("\n[修复] 正在安装/修复 ASR 依赖...")
             module_ok = fix_modules(python, project_root) and check_modules(python)
+        module_ok = check_ytdlp_runtime(python) and module_ok
         ok = module_ok and ok
     check_model_cache()
 

@@ -1883,6 +1883,59 @@ textarea:focus-visible {
   width: auto;
 }
 
+.manual-video-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--bk-separator);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bk-card-bg) 92%, transparent);
+}
+
+.manual-video-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.manual-video-copy strong {
+  color: var(--bk-label);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.manual-video-copy span {
+  color: var(--bk-tertiary-label);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.manual-video-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(110px, 0.45fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.manual-video-input,
+.manual-video-title {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--bk-separator);
+  border-radius: 12px;
+  background: var(--bk-input-bg);
+  color: var(--bk-label);
+  font-size: 12px;
+  outline: none;
+  padding: 0 12px;
+}
+
+.manual-video-input:focus,
+.manual-video-title:focus {
+  border-color: color-mix(in srgb, var(--bk-accent) 60%, var(--bk-separator));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bk-accent) 14%, transparent);
+}
+
 .mac-list-context-note {
   font-size: 12px;
   color: var(--bk-tertiary-label);

@@ -3,6 +3,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use tauri::{Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
 use which::which;
@@ -294,6 +295,191 @@ fn is_single_generated_note(video: &serde_json::Value) -> bool {
         .get("note_generation_mode")
         .and_then(|value| value.as_str())
         == Some("single")
+}
+
+fn find_bvid(text: &str) -> Option<String> {
+    for (index, _) in text.match_indices("BV") {
+        let candidate: String = text[index..]
+            .chars()
+            .take_while(|ch| ch.is_ascii_alphanumeric())
+            .take(12)
+            .collect();
+        if candidate.len() == 12 && candidate.starts_with("BV") {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+fn find_aid(text: &str) -> Option<String> {
+    for (index, _) in text.match_indices("av") {
+        let digits: String = text[index + 2..]
+            .chars()
+            .take_while(|ch| ch.is_ascii_digit())
+            .collect();
+        if !digits.is_empty() {
+            return Some(digits);
+        }
+    }
+    None
+}
+
+fn find_b23_url(text: &str) -> Option<String> {
+    text.split_whitespace()
+        .map(|token| token.trim_matches(|ch: char| ch == '"' || ch == '\'' || ch == '，' || ch == ',' || ch == '。'))
+        .find(|token| token.contains("b23.tv/") || token.contains("bili2233.cn/"))
+        .map(|token| {
+            if token.starts_with("http://") || token.starts_with("https://") {
+                token.to_string()
+            } else {
+                format!("https://{token}")
+            }
+        })
+}
+
+fn resolve_bilibili_short_url(input: &str) -> Option<String> {
+    let short_url = find_b23_url(input)?;
+    let client = reqwest::blocking::Client::builder()
+        .redirect(reqwest::redirect::Policy::limited(8))
+        .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+        .build()
+        .ok()?;
+    let response = client.get(short_url).send().ok()?;
+    Some(response.url().to_string())
+}
+
+fn bilibili_api_url(video_ref: &str, is_aid: bool) -> String {
+    if is_aid {
+        format!("https://api.bilibili.com/x/web-interface/view?aid={video_ref}")
+    } else {
+        format!("https://api.bilibili.com/x/web-interface/view?bvid={video_ref}")
+    }
+}
+
+fn format_seconds(seconds: u64) -> String {
+    let hours = seconds / 3600;
+    let minutes = (seconds % 3600) / 60;
+    let secs = seconds % 60;
+    if hours > 0 {
+        format!("{hours:02}:{minutes:02}:{secs:02}")
+    } else {
+        format!("{minutes:02}:{secs:02}")
+    }
+}
+
+fn fetch_bilibili_video_metadata(video_ref: &str, is_aid: bool) -> Option<serde_json::Value> {
+    let client = reqwest::blocking::Client::builder()
+        .user_agent(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 \
+             (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+        )
+        .build()
+        .ok()?;
+    let response = client
+        .get(bilibili_api_url(video_ref, is_aid))
+        .header("Referer", "https://www.bilibili.com/")
+        .send()
+        .ok()?;
+    let payload: serde_json::Value = response.json().ok()?;
+    if payload.get("code").and_then(|v| v.as_i64()) != Some(0) {
+        return None;
+    }
+    payload.get("data").cloned()
+}
+
+fn resolve_video_input(input: &str) -> Result<(String, serde_json::Value), String> {
+    let mut source = input.trim().to_string();
+    if source.is_empty() {
+        return Err("请输入 B站视频链接、BV 号、av 号或 b23.tv 短链。".into());
+    }
+    if source.contains("b23.tv/") || source.contains("bili2233.cn/") {
+        source = resolve_bilibili_short_url(&source)
+            .ok_or_else(|| "无法解析 b23.tv 短链，请粘贴完整 B站链接或 BV 号。".to_string())?;
+    }
+
+    if let Some(bvid) = find_bvid(&source) {
+        let data = fetch_bilibili_video_metadata(&bvid, false).unwrap_or(serde_json::Value::Null);
+        return Ok((bvid, data));
+    }
+
+    if let Some(aid) = find_aid(&source) {
+        let data = fetch_bilibili_video_metadata(&aid, true)
+            .ok_or_else(|| "无法通过 av 号获取视频信息，请改用 BV 号或完整链接。".to_string())?;
+        let bvid = data
+            .get("bvid")
+            .and_then(|v| v.as_str())
+            .filter(|v| v.starts_with("BV"))
+            .ok_or_else(|| "B站接口未返回 BV 号，请改用 BV 号或完整链接。".to_string())?
+            .to_string();
+        return Ok((bvid, data));
+    }
+
+    Err("未识别到有效 B站视频编号；支持 BV、av、完整链接和 b23.tv 短链。".into())
+}
+
+#[tauri::command]
+fn add_manual_video(input: String, title: Option<String>) -> Result<String, String> {
+    let (bvid, metadata) = resolve_video_input(&input)?;
+    let path = knowledge_path("manifest/videos.json")?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    let content = fs::read_to_string(&path).unwrap_or_else(|_| "[]".into());
+    let mut videos: serde_json::Value = serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!([]));
+    let items = videos
+        .as_array_mut()
+        .ok_or_else(|| "manifest/videos.json 不是有效数组。".to_string())?;
+
+    if items.iter().any(|video| video.get("id").and_then(|v| v.as_str()) == Some(bvid.as_str())) {
+        return Ok(format!("视频已存在：{bvid}"));
+    }
+
+    let title_value = title
+        .as_deref()
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let api_title = metadata.get("title").and_then(|v| v.as_str()).unwrap_or("").trim();
+    let owner_name = metadata
+        .get("owner")
+        .and_then(|v| v.get("name"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let duration = metadata.get("duration").and_then(|v| v.as_u64()).unwrap_or(0);
+    let pubdate = metadata
+        .get("pubdate")
+        .and_then(|v| v.as_i64())
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|v| v.as_secs().to_string())
+        .unwrap_or_else(|_| "手动添加".into());
+
+    let video = serde_json::json!({
+        "id": bvid.clone(),
+        "title": if !title_value.is_empty() { title_value } else if !api_title.is_empty() { api_title.to_string() } else { "手动添加的视频".to_string() },
+        "url": format!("https://www.bilibili.com/video/{bvid}"),
+        "uploader": owner_name,
+        "collected_at": now,
+        "favorite_folder": "手动添加",
+        "category": "",
+        "tags": ["manual"],
+        "duration": if duration > 0 { format_seconds(duration) } else { String::new() },
+        "pubdate": pubdate,
+        "priority": "P1",
+        "status": "pending",
+        "note_path": "",
+        "project_extracted": false,
+        "remarks": "手动添加：支持 BV / av / b23.tv / 完整链接",
+        "note_ready": false
+    });
+
+    items.insert(0, video);
+    let updated = serde_json::to_string_pretty(&videos).map_err(|e| e.to_string())?;
+    fs::write(path, updated).map_err(|e| e.to_string())?;
+    Ok(format!("已添加视频：{bvid}"))
 }
 
 #[tauri::command]
@@ -998,6 +1184,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             greet,
+            add_manual_video,
             get_videos,
             get_favorite_folders,
             validate_bilibili_cookie,
@@ -1138,6 +1325,41 @@ mod tests {
                 "Whitelisted script {name} should be accepted"
             );
         }
+    }
+
+    // ── Bilibili video input parsing ──
+
+    #[test]
+    fn extracts_bvid_from_plain_and_url_input() {
+        assert_eq!(
+            find_bvid("BV1LY7K6dEnd").as_deref(),
+            Some("BV1LY7K6dEnd")
+        );
+        assert_eq!(
+            find_bvid("https://www.bilibili.com/video/BV1DVj46KEmQ?p=1").as_deref(),
+            Some("BV1DVj46KEmQ")
+        );
+    }
+
+    #[test]
+    fn extracts_aid_from_url_input() {
+        assert_eq!(
+            find_aid("https://www.bilibili.com/video/av170001").as_deref(),
+            Some("170001")
+        );
+        assert_eq!(find_aid("av123456").as_deref(), Some("123456"));
+    }
+
+    #[test]
+    fn detects_b23_short_url_input() {
+        assert_eq!(
+            find_b23_url("复制这条链接 https://b23.tv/abc123 看视频").as_deref(),
+            Some("https://b23.tv/abc123")
+        );
+        assert_eq!(
+            find_b23_url("b23.tv/abc123").as_deref(),
+            Some("https://b23.tv/abc123")
+        );
     }
 
     // ── Manifest read / update round-trip ──

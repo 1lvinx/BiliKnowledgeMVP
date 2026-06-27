@@ -686,6 +686,26 @@ function App() {
     setNoteContent(null);
   }
 
+  async function addManualVideo(input: string, title?: string) {
+    if (!tauriAvailable) {
+      showToast("预览模式不能写入视频清单。", "error");
+      return;
+    }
+    try {
+      const message: string = await invoke("add_manual_video", { input, title: title ?? null });
+      showToast(message, "success");
+      appendLog(message);
+      await fetchVideos();
+      await fetchFavoriteFolders();
+      setCurrentView("favorites");
+    } catch (err) {
+      const message = `添加视频失败：${String(err)}`;
+      showToast(message, "error");
+      appendLog(message);
+      throw err;
+    }
+  }
+
   async function updateStatus(id: string, status: string) {
     if (!tauriAvailable) {
       setVideos((prev) => prev.map((video) => (video.id === id ? { ...video, status } : video)));
@@ -1482,6 +1502,7 @@ function App() {
               filterPriority={filterPriority}
               filterStatus={filterStatus}
               groupByFolder
+              onAddManualVideo={addManualVideo}
               onExtractSubtitle={extractSubtitle}
               onGenerateInsight={generateInsightForVideo}
               onGenerateNote={generateNoteForVideo}

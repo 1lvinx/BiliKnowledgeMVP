@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Captions, ChevronRight, FileText, Search, Sparkles } from "lucide-react";
+import { Captions, ChevronRight, FileText, Plus, Search, Sparkles } from "lucide-react";
 import type { FavoriteFolder, Video, VideoInsight, VideoSubtitle } from "../types";
 import { t } from "../i18n";
 import { cn } from "../lib/utils";
@@ -20,6 +20,7 @@ interface VideosProps {
   onExtractSubtitle: (videoId: string) => void;
   onGenerateInsight: (videoId: string) => void;
   onGenerateNote: (videoId: string) => void;
+  onAddManualVideo?: (input: string, title?: string) => Promise<void>;
   onTranscribeSubtitle?: (videoId: string) => void;
   insights?: VideoInsight[];
   subtitles?: VideoSubtitle[];
@@ -53,6 +54,7 @@ export function Videos({
   onExtractSubtitle,
   onGenerateInsight,
   onGenerateNote,
+  onAddManualVideo,
   onTranscribeSubtitle,
   insights = [],
   subtitles = [],
@@ -66,6 +68,9 @@ export function Videos({
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
   const [folderVisibleCounts, setFolderVisibleCounts] = useState<Record<string, number>>({});
+  const [manualVideoInput, setManualVideoInput] = useState("");
+  const [manualVideoTitle, setManualVideoTitle] = useState("");
+  const [manualAdding, setManualAdding] = useState(false);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -143,10 +148,54 @@ export function Videos({
     }
   }
 
+  async function handleAddManualVideo() {
+    if (!onAddManualVideo || !manualVideoInput.trim() || manualAdding) return;
+    setManualAdding(true);
+    try {
+      await onAddManualVideo(manualVideoInput.trim(), manualVideoTitle.trim() || undefined);
+      setManualVideoInput("");
+      setManualVideoTitle("");
+    } finally {
+      setManualAdding(false);
+    }
+  }
+
   return (
     <MacSplitView columns="minmax(430px, 1fr) 320px">
       <section className="mac-list-pane custom-scrollbar">
         <div className="mac-list-controls">
+          {onAddManualVideo ? (
+            <div className="manual-video-card">
+              <div className="manual-video-copy">
+                <strong>手动添加视频</strong>
+                <span>支持 BV、av、完整 B站链接和 b23.tv 短链；适合临时补充收藏夹外的视频。</span>
+              </div>
+              <div className="manual-video-row">
+                <input
+                  className="manual-video-input"
+                  onChange={(event) => setManualVideoInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void handleAddManualVideo();
+                  }}
+                  placeholder="粘贴 BV / av / b23.tv / B站视频链接"
+                  value={manualVideoInput}
+                />
+                <input
+                  className="manual-video-title"
+                  onChange={(event) => setManualVideoTitle(event.target.value)}
+                  placeholder="标题兜底（可选）"
+                  value={manualVideoTitle}
+                />
+                <MacToolbarButton
+                  disabled={!manualVideoInput.trim() || manualAdding}
+                  icon={<Plus size={14} />}
+                  label={manualAdding ? "添加中" : "添加"}
+                  onClick={() => void handleAddManualVideo()}
+                  primary
+                />
+              </div>
+            </div>
+          ) : null}
           <div className="mac-list-controls-row">
             <MacToolbarButton
               disabled={!activeVideo}
