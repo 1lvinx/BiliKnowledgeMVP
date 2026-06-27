@@ -15,7 +15,7 @@ const translations: Record<string, Record<string, string>> = {
     "sidebar.healthCheck": "处理中心",
     "sidebar.settings": "设置",
     "sidebar.preferences": "偏好设置",
-    "sidebar.localIntelligenceStudio": "本地智能工作室",
+    "sidebar.localIntelligenceStudio": "B站AI知识库",
 
     /* ── Toolbar ── */
     "toolbar.search": "搜索",
@@ -188,7 +188,7 @@ const translations: Record<string, Record<string, string>> = {
     "projects.candidatesCount": "{count} 个候选",
 
     /* ── Knowledge Base ── */
-    "kb.biliKnowledge": "BiliKnowledge",
+    "kb.biliKnowledge": "哔知",
     "kb.knowledgeBasePath": "知识库路径",
     "kb.location": "位置",
     "kb.type": "类型",
@@ -518,7 +518,7 @@ const translations: Record<string, Record<string, string>> = {
     "bilibili.retry": "重试",
 
     /* ── Onboarding ── */
-    "onboarding.title": "开始使用 BiliKnowledge",
+    "onboarding.title": "开始使用哔知",
     "onboarding.step1": "创建知识库",
     "onboarding.step1Desc": "创建本地 Markdown 工作区，用于保存收藏、笔记和项目数据。",
     "onboarding.step2": "连接 Bilibili",
@@ -549,7 +549,7 @@ const translations: Record<string, Record<string, string>> = {
     "sidebar.healthCheck": "Processing Center",
     "sidebar.settings": "Settings",
     "sidebar.preferences": "Preferences",
-    "sidebar.localIntelligenceStudio": "Local intelligence studio",
+    "sidebar.localIntelligenceStudio": "Bilibili AI Knowledge Base",
 
     /* ── Toolbar ── */
     "toolbar.search": "Search",
@@ -722,7 +722,7 @@ const translations: Record<string, Record<string, string>> = {
     "projects.candidatesCount": "{count} candidates",
 
     /* ── Knowledge Base ── */
-    "kb.biliKnowledge": "BiliKnowledge",
+    "kb.biliKnowledge": "哔知",
     "kb.knowledgeBasePath": "Knowledge Base Path",
     "kb.location": "Location",
     "kb.type": "Type",

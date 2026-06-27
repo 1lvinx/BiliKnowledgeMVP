@@ -1343,14 +1343,6 @@ function App() {
           </MacSidebarSection>
 
           <div className="mac-sidebar-footer">
-            <div className="mac-sidebar-footer-row">
-              <span>{t("dashboard.reviewed")}</span>
-              <strong>{reviewedCount}</strong>
-            </div>
-            <div className="mac-sidebar-footer-row">
-              <span>{t("kb.p0Items")}</span>
-              <strong>{p0Count}</strong>
-            </div>
             <div className="mac-sidebar-theme-toggle" aria-label={t("settings.theme")}>
               <button
                 aria-pressed={resolvedAppearance === "light"}

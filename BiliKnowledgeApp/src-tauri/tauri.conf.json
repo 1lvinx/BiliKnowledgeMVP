@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "biliknowledgeapp",
+  "productName": "哔知",
   "version": "0.1.0",
   "identifier": "com.elvinx.biliknowledgeapp",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "BiliKnowledge",
+        "title": "哔知",
         "width": 1280,
         "height": 820,
         "minWidth": 1180,

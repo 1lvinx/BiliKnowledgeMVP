@@ -45,9 +45,9 @@ export function MacSidebar({
         </button>
       </div>
       <div className="mac-sidebar-brand">
-        <div className="mac-sidebar-brand-mark">BK</div>
+        <div className="mac-sidebar-brand-mark">哔</div>
         <div className="mac-sidebar-brand-copy">
-          <strong>BiliKnowledge</strong>
+          <strong>哔知</strong>
           <span>{t("sidebar.localIntelligenceStudio")}</span>
         </div>
       </div>
