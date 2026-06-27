@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, ExternalLink, X } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import {
   MacInlineNotice,
   MacSettingsGroup,
@@ -67,6 +68,108 @@ const timezoneOptions = [
   { value: "UTC", label: "UTC" },
 ];
 
+
+type HelpDocKey = "usage" | "workflow" | "qa";
+
+const feedbackIssueUrl = "https://github.com/1lvinx/BiliKnowledgeMVP/issues/new?title=%5BFeedback%5D%20BiliKnowledge%20Beta&body=%E8%AF%B7%E5%A1%AB%E5%86%99%EF%BC%9A%0A%0A-%20%E6%88%AA%E5%9B%BE%EF%BC%9A%0A-%20Doctor%20%E6%97%A5%E5%BF%97%EF%BC%9A%0A-%20%E8%A7%86%E9%A2%91%20BV%20%E5%8F%B7%EF%BC%9A%0A-%20%E7%82%B9%E5%87%BB%E7%9A%84%E6%8C%89%E9%92%AE%EF%BC%9A%0A-%20%E6%9C%9F%E6%9C%9B%E7%BB%93%E6%9E%9C%EF%BC%9A%0A-%20%E5%AE%9E%E9%99%85%E7%BB%93%E6%9E%9C%EF%BC%9A%0A";
+const feedbackEmail = "mailto:feedback@biliknowledge.local?subject=BiliKnowledge%20Beta%20Feedback&body=%E8%AF%B7%E9%99%84%E4%B8%8A%EF%BC%9A%E6%88%AA%E5%9B%BE%2C%20Doctor%20%E6%97%A5%E5%BF%97%2C%20BV%20%E5%8F%B7%2C%20%E6%93%8D%E4%BD%9C%E6%AD%A5%E9%AA%A4%2C%20%E6%9C%9F%E6%9C%9B%E7%BB%93%E6%9E%9C%E3%80%82";
+
+function helpDocMarkdown(key: HelpDocKey): string {
+  const docs: Record<HelpDocKey, string> = {
+    usage: `# 使用方法
+
+## 每天建议怎么用
+
+每天只挑你真正需要沉淀的 10 条左右视频，不建议后台全量批量生成。
+
+## 单条视频标准链路
+
+1. 在「收藏夹」选择视频。
+2. 如果有原生字幕，点击「抓取字幕」。
+3. 如果没有字幕或字幕错配，点击「本地转写」。
+4. 字幕状态变为有效后，点击「生成视频洞察」。
+5. 洞察生成后，点击「生成笔记」。
+6. 如果视频明确提到 GitHub 仓库，笔记会尝试同步到「开源候选」。
+
+## 什么情况下不要生成笔记
+
+- 字幕明显和视频不匹配。
+- ASR 转写只有几句话，信息量不足。
+- 洞察提示证据不足。
+- 视频只是娱乐/新闻片段，没有复用价值。
+
+## 好笔记应该包含什么
+
+- 具体工具、仓库、命令、步骤或判断。
+- 可复用到哪个工作流。
+- 限制与风险。
+- 判断依据来自字幕或视频信息，而不是标题脑补。`,
+    workflow: `# 推荐处理流程
+
+## 最短稳定路径
+
+\`\`\`text
+抓字幕 / 本地转写
+→ 生成视频洞察
+→ 生成笔记
+→ 明确 GitHub 仓库自动进入开源候选
+\`\`\`
+
+## 为什么不建议全量批量跑
+
+批量跑会导致：
+
+- 后台并发高，App 容易卡顿。
+- 低质量字幕也被拿去生成洞察。
+- 旧洞察可能污染新笔记。
+- 你真正需要的内容反而被淹没。
+
+## 推荐节奏
+
+- 每天 10 条以内。
+- 先处理 P0 / P1。
+- 先确认字幕有效，再生成洞察。
+- 笔记只保留有复用价值的视频。
+
+## GitHub 仓库同步规则
+
+只有明确识别到 \`https://github.com/owner/repo\` 才会进入开源候选。
+
+如果只是提到项目名但没有仓库地址，系统不会编造 URL。`,
+    qa: `# Q&A
+
+## Q: 字幕抓取失败怎么办？
+
+先确认视频是否有 Bilibili 原生字幕。如果没有，使用「本地转写」。
+
+## Q: 本地转写失败怎么办？
+
+先运行「环境诊断 Doctor」。如果缺 Python 依赖、ffmpeg、torch/torchaudio 或模型缓存，再运行「环境修复 Doctor」。
+
+## Q: 生成洞察失败怎么办？
+
+常见原因：
+
+- 字幕缺失。
+- 字幕错配。
+- AI API Key 未配置。
+- 字幕信息量太低。
+
+## Q: 笔记内容很空怎么办？
+
+不要继续保存这条。先重新抓字幕/转写，再重新生成洞察。系统会阻止旧洞察生成新笔记，但低信息量视频本身也可能不值得做笔记。
+
+## Q: 什么是未关联笔记？
+
+指 \`notes/raw\` 里存在，但没有被视频清单 \`note_path\` 引用的 Markdown。通常是旧测试笔记、历史残留文件，或者需要重新关联/清理的笔记。
+
+## Q: Doctor 修复后还是不行怎么办？
+
+反馈给作者，并附上：截图、Doctor 日志、视频 BV 号、点击了哪个按钮、期望结果和实际结果。`,
+  };
+  return docs[key];
+}
+
 const fontOptions: Array<{ value: FontPreference; label: string; detail: string }> = [
   { value: "system", label: "System UI", detail: "SF Pro / Inter / PingFang SC" },
   { value: "rounded", label: "Rounded", detail: "SF Pro Rounded / Nunito / PingFang SC" },
@@ -129,6 +232,7 @@ export function SettingsView({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [doctorRunning, setDoctorRunning] = useState<"diagnose" | "repair" | null>(null);
+  const [helpDoc, setHelpDoc] = useState<HelpDocKey | null>(null);
   const [activeSection, setActiveSection] = useState<SettingsSection>("settings.general");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
@@ -449,11 +553,14 @@ export function SettingsView({
 
         {activeSection === "settings.helpFeedback" && (
           <MacSettingsGroup title={t("settings.helpFeedback")}>
-            <MacSettingsRow detail={t("settings.helpHowToUseDesc")} label={t("settings.helpHowToUse")}>
-              <span className="mac-inspector-meta">1. {t("scripts.fetchSubtitles")} / {t("scripts.transcribeSubtitles")} → 2. {t("scripts.generateInsights")} → 3. {t("scripts.generateNotes")}</span>
+            <MacSettingsRow detail={t("settings.usageMethodDesc")} label={t("settings.usageMethod")}>
+              <MacToolbarButton label={t("settings.openGuide")} onClick={() => setHelpDoc("usage")} />
             </MacSettingsRow>
             <MacSettingsRow detail={t("settings.helpWorkflowDesc")} label={t("settings.helpWorkflow")}>
-              <span className="mac-inspector-meta">{t("settings.helpWorkflowValue")}</span>
+              <MacToolbarButton label={t("settings.openWorkflow")} onClick={() => setHelpDoc("workflow")} />
+            </MacSettingsRow>
+            <MacSettingsRow detail={t("settings.qaDesc")} label={t("settings.qa")}>
+              <MacToolbarButton label={t("settings.openQa")} onClick={() => setHelpDoc("qa")} />
             </MacSettingsRow>
             <MacSettingsRow detail={t("settings.doctorDesc")} label={t("scripts.doctor")}>
               <MacToolbarButton
@@ -470,11 +577,16 @@ export function SettingsView({
                 primary
               />
             </MacSettingsRow>
-            <MacSettingsRow detail={t("settings.helpTroubleshootingDesc")} label={t("settings.helpTroubleshooting")}>
-              <span className="mac-inspector-meta">{t("settings.helpTroubleshootingValue")}</span>
-            </MacSettingsRow>
             <MacSettingsRow detail={t("settings.feedbackDesc")} label={t("settings.feedback")}>
-              <span className="mac-inspector-meta">{t("settings.feedbackValue")}</span>
+              <div className="settings-feedback-actions">
+                <a className="mac-toolbar-button" href={feedbackIssueUrl} rel="noreferrer" target="_blank">
+                  <ExternalLink size={14} />
+                  {t("settings.openIssue")}
+                </a>
+                <a className="mac-toolbar-button" href={feedbackEmail}>
+                  {t("settings.sendEmail")}
+                </a>
+              </div>
             </MacSettingsRow>
           </MacSettingsGroup>
         )}
@@ -580,6 +692,24 @@ export function SettingsView({
               </select>
             </MacSettingsRow>
           </MacSettingsGroup>
+        )}
+
+
+        {helpDoc && (
+          <div className="settings-help-modal" role="dialog" aria-modal="true">
+            <div className="settings-help-backdrop" onClick={() => setHelpDoc(null)} />
+            <section className="settings-help-dialog">
+              <header className="settings-help-header">
+                <strong>{helpDoc === "usage" ? t("settings.usageMethod") : helpDoc === "workflow" ? t("settings.helpWorkflow") : t("settings.qa")}</strong>
+                <button aria-label="Close" onClick={() => setHelpDoc(null)} type="button">
+                  <X size={16} />
+                </button>
+              </header>
+              <div className="settings-help-markdown custom-scrollbar">
+                <ReactMarkdown>{helpDocMarkdown(helpDoc)}</ReactMarkdown>
+              </div>
+            </section>
+          </div>
         )}
 
         <div className="flex justify-end pb-10">
