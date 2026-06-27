@@ -383,11 +383,96 @@ def scan_notes(notes_dir: str) -> list[tuple[Path, str]]:
     return results
 
 
-def extract_projects(notes: list[tuple[Path, str]]) -> dict:
+def default_insights_path(notes_dir: str) -> Path:
+    notes_path = Path(notes_dir)
+    if notes_path.name == "raw" and notes_path.parent.name == "notes":
+        return notes_path.parent.parent / "manifest" / "insights.json"
+    return Path("manifest/insights.json")
+
+
+def load_insights(insights_path: str) -> list[dict]:
+    path = Path(insights_path)
+    if not path.exists():
+        print(f"[提示] 未找到洞察文件：{path}")
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"[警告] 洞察文件读取失败：{exc}")
+        return []
+    if not isinstance(payload, list):
+        print(f"[警告] 洞察文件不是列表：{path}")
+        return []
+    insights = [item for item in payload if isinstance(item, dict)]
+    print(f"[SCAN] Found {len(insights)} insights in {path}")
+    return insights
+
+
+def is_valid_github_repo_url(url: str) -> bool:
+    owner, repo = parse_github_repo(url)
+    return bool(owner and repo and owner not in GITHUB_NON_REPOS)
+
+
+def extract_projects(notes: list[tuple[Path, str]], insights: Optional[list[dict]] = None) -> dict:
     github_projects = []
     tools = []
     seen = set()
     github_meta_cache: dict[str, dict] = {}
+
+    def _add_project(
+        url,
+        ptype="github",
+        source_note="",
+        source_video="",
+        mentioned_context="",
+        reusable_value="",
+        priority="P1",
+        match_source="note_url",
+        match_confidence=None,
+        match_reason="",
+        matched_terms=None,
+    ):
+        if url in seen:
+            return
+        seen.add(url)
+        repo_metadata = {}
+        if ptype == "github":
+            repo_metadata = github_meta_cache.get(url)
+            if repo_metadata is None:
+                repo_metadata = {}
+            if not repo_metadata:
+                repo_metadata = fetch_github_repo_metadata(url)
+                github_meta_cache[url] = repo_metadata
+        github_projects.append({
+            "name": repo_metadata.get("repo_full_name") or infer_name_from_url(url),
+            "url": repo_metadata.get("html_url") or url,
+            "source_note": source_note,
+            "source_video": source_video,
+            "type": ptype,
+            "tech_stack": repo_metadata.get("topics") or [],
+            "description": repo_metadata.get("description") or "",
+            "mentioned_context": mentioned_context,
+            "reusable_value": reusable_value,
+            "commercial_value": "",
+            "risk": "",
+            "priority": priority,
+            "status": "candidate",
+            "need_verify": True,
+            "homepage": repo_metadata.get("homepage") or "",
+            "stars": repo_metadata.get("stars") or 0,
+            "forks": repo_metadata.get("forks") or 0,
+            "watchers": repo_metadata.get("watchers") or 0,
+            "open_issues": repo_metadata.get("open_issues") or 0,
+            "language": repo_metadata.get("language") or "",
+            "license": repo_metadata.get("license") or "",
+            "archived": repo_metadata.get("archived") or False,
+            "default_branch": repo_metadata.get("default_branch") or "",
+            "pushed_at": repo_metadata.get("pushed_at") or "",
+            "match_source": match_source,
+            "match_confidence": match_confidence,
+            "match_reason": match_reason,
+            "matched_terms": matched_terms or [],
+        })
 
     for note_path, content in notes:
         source_note = str(note_path.name)
@@ -395,45 +480,6 @@ def extract_projects(notes: list[tuple[Path, str]]) -> dict:
         m = re.search(r"(https?://www\.bilibili\.com/video/\S+)", content)
         if m:
             source_video = m.group(1).rstrip(")")
-
-        def _add_project(url, ptype="github"):
-            if url in seen:
-                return
-            seen.add(url)
-            repo_metadata = {}
-            if ptype == "github":
-                repo_metadata = github_meta_cache.get(url)
-                if repo_metadata is None:
-                    repo_metadata = {}
-                if not repo_metadata:
-                    repo_metadata = fetch_github_repo_metadata(url)
-                    github_meta_cache[url] = repo_metadata
-            github_projects.append({
-                "name": repo_metadata.get("repo_full_name") or infer_name_from_url(url),
-                "url": repo_metadata.get("html_url") or url,
-                "source_note": source_note,
-                "source_video": source_video,
-                "type": ptype,
-                "tech_stack": repo_metadata.get("topics") or [],
-                "description": repo_metadata.get("description") or "",
-                "mentioned_context": "",
-                "reusable_value": "",
-                "commercial_value": "",
-                "risk": "",
-                "priority": "P1",
-                "status": "candidate",
-                "need_verify": True,
-                "homepage": repo_metadata.get("homepage") or "",
-                "stars": repo_metadata.get("stars") or 0,
-                "forks": repo_metadata.get("forks") or 0,
-                "watchers": repo_metadata.get("watchers") or 0,
-                "open_issues": repo_metadata.get("open_issues") or 0,
-                "language": repo_metadata.get("language") or "",
-                "license": repo_metadata.get("license") or "",
-                "archived": repo_metadata.get("archived") or False,
-                "default_branch": repo_metadata.get("default_branch") or "",
-                "pushed_at": repo_metadata.get("pushed_at") or "",
-            })
 
         def _add_tool(name, url, tool_type, category):
             key = f"{tool_type}:{name}"
@@ -454,11 +500,11 @@ def extract_projects(notes: list[tuple[Path, str]]) -> dict:
             parts = url.rstrip("/").split("/")
             if len(parts) >= 5 and parts[3] in GITHUB_NON_REPOS:
                 continue
-            _add_project(url, "github")
+            _add_project(url, "github", source_note=source_note, source_video=source_video)
 
         # GitLab repos
         for url in extract_urls(content, GITLAB_RE):
-            _add_project(url, "gitlab")
+            _add_project(url, "gitlab", source_note=source_note, source_video=source_video)
 
         # HuggingFace
         for url in extract_urls(content, HF_RE):
@@ -475,6 +521,41 @@ def extract_projects(notes: list[tuple[Path, str]]) -> dict:
         # Docker images (tokenizer-based)
         for img in extract_docker_images(content):
             _add_tool(img, f"https://hub.docker.com/r/{img}", "docker", "Docker镜像")
+
+
+    for insight in insights or []:
+        source_note = f"{insight.get('video_id')}.md" if insight.get("video_id") else "insights.json"
+        source_video = insight.get("url") or ""
+        summary = clean_text(insight.get("summary") or "")
+        reusable_items = insight.get("reusable_value") or []
+        if not isinstance(reusable_items, list):
+            reusable_items = []
+        reusable_value = "；".join(clean_text(str(item)) for item in reusable_items[:3] if item)
+        for asset in insight.get("core_assets") or []:
+            if not isinstance(asset, dict):
+                continue
+            url = clean_text(asset.get("url") or "")
+            if not url or not is_valid_github_repo_url(url):
+                continue
+            asset_name = clean_text(asset.get("name") or infer_name_from_url(url))
+            context_parts = [summary]
+            for key in ("role", "solves"):
+                value = clean_text(asset.get(key) or "")
+                if value:
+                    context_parts.append(value)
+            _add_project(
+                url,
+                "github",
+                source_note=source_note,
+                source_video=source_video,
+                mentioned_context="；".join(part for part in context_parts if part),
+                reusable_value=reusable_value,
+                priority="P1",
+                match_source="insight_core_asset",
+                match_confidence=1.0,
+                match_reason="洞察 core_assets 中包含明确 GitHub 仓库 URL。",
+                matched_terms=[asset_name] if asset_name else [],
+            )
 
     return {"github_projects": github_projects, "tools": tools}
 
@@ -644,6 +725,7 @@ def main():
     parser = argparse.ArgumentParser(description="提取项目候选")
     parser.add_argument("--notes", default="notes/raw", help="Markdown notes directory")
     parser.add_argument("--output", default="projects", help="Output directory")
+    parser.add_argument("--insights", default="", help="Insights manifest path")
     parser.add_argument("--dry-run", action="store_true", help="Preview only")
     parser.add_argument("--self-test", action="store_true", help="Run built-in tests")
     args = parser.parse_args()
@@ -653,11 +735,13 @@ def main():
         sys.exit(0 if success else 1)
 
     notes = scan_notes(args.notes)
+    insights_path = args.insights or str(default_insights_path(args.notes))
+    insights = load_insights(insights_path)
     if not notes:
         print("[提示] 未找到笔记，无需提取项目。")
         sys.exit(0)
 
-    result = extract_projects(notes)
+    result = extract_projects(notes, insights)
     github = result["github_projects"]
     tools = result["tools"]
 
