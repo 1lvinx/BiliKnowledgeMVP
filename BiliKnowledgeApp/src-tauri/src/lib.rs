@@ -20,6 +20,8 @@ const ALLOWED_SCRIPTS: &[&str] = &[
     "extract_projects.py",
     "build_index.py",
     "validate_knowledge_base.py",
+    "doctor.py",
+    "doctor_fix.py",
 ];
 
 const DEFAULT_CONFIG: &str = r#"{

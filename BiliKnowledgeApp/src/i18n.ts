@@ -266,6 +266,10 @@ const translations: Record<string, Record<string, string>> = {
     "scripts.buildIndexDesc": "重新生成知识库索引和报告。",
     "scripts.healthCheck": "健康检查",
     "scripts.healthCheckDesc": "检查结构、内部链接和敏感数据。",
+    "scripts.doctor": "环境诊断 Doctor",
+    "scripts.doctorDesc": "检查 Python、ffmpeg、ASR 依赖、模型缓存和配置；不主动修改环境。",
+    "scripts.doctorFix": "环境修复 Doctor",
+    "scripts.doctorFixDesc": "创建/修复项目 .venv，安装 ASR 依赖，并复查到环境可用。",
     "scripts.items": "{count} 条",
 
     /* ── Settings ── */
@@ -768,6 +772,10 @@ const translations: Record<string, Record<string, string>> = {
     "scripts.buildIndexDesc": "Regenerate the knowledge base index and report.",
     "scripts.healthCheck": "Health Check",
     "scripts.healthCheckDesc": "Check structure, internal links, and sensitive data.",
+    "scripts.doctor": "Environment Doctor",
+    "scripts.doctorDesc": "Check Python, ffmpeg, ASR dependencies, model cache, and configuration without changing the environment.",
+    "scripts.doctorFix": "Repair Doctor",
+    "scripts.doctorFixDesc": "Create/repair the project .venv, install ASR dependencies, and re-check the runtime.",
     "scripts.items": "{count} entries",
 
     /* ── Settings ── */

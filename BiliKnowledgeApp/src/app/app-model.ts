@@ -185,6 +185,16 @@ export function buildScriptCatalog(t: Translate): ScriptItem[] {
       title: t("scripts.healthCheck"),
       detail: t("scripts.healthCheckDesc"),
     },
+    {
+      name: "doctor.py",
+      title: t("scripts.doctor"),
+      detail: t("scripts.doctorDesc"),
+    },
+    {
+      name: "doctor_fix.py",
+      title: t("scripts.doctorFix"),
+      detail: t("scripts.doctorFixDesc"),
+    },
   ];
 }
 
@@ -201,6 +211,8 @@ export function getScriptDisplayName(scriptName: string, t: Translate) {
     "extract_projects.py": t("scripts.extractProjects"),
     "build_index.py": t("scripts.buildIndex"),
     "validate_knowledge_base.py": t("scripts.healthCheck"),
+    "doctor.py": t("scripts.doctor"),
+    "doctor_fix.py": t("scripts.doctorFix"),
   };
   return labels[scriptName] ?? t("toolbar.runSelected");
 }
@@ -214,6 +226,8 @@ export function getScriptScopeLabel(scriptName: string, t: Translate) {
     "extract_projects.py": "项目提取与归档",
     "build_index.py": "知识索引构建",
     "validate_knowledge_base.py": "结构校验与健康检查",
+    "doctor.py": "环境诊断与依赖修复",
+    "doctor_fix.py": "环境诊断与依赖修复",
   };
   return scopes[scriptName] ?? t("scripts.scriptDetail.knowledgeValidation");
 }
