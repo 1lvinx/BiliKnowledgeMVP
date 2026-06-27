@@ -72,19 +72,11 @@
 
   /* ── Typography ── */
   --bk-font-body:
-    "Avenir Next",
-    "SF Pro Display",
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    "PingFang SC",
-    "Noto Sans SC",
-    "Microsoft YaHei UI",
-    "Microsoft YaHei",
-    "Helvetica Neue",
-    "Hiragino Sans GB",
-    Arial,
-    sans-serif;
+    "Songti SC",
+    "STSong",
+    "SimSun",
+    "Noto Serif SC",
+    serif;
   --bk-font-mono: "SF Mono", "Cascadia Code", Menlo, Monaco, Consolas, monospace;
   --bk-heading-weight: 680;
   --bk-body-weight: 400;
@@ -4512,7 +4504,7 @@ textarea:focus-visible {
 
 /* RC UI polish: single default font, lighter list typography, collapsible sidebar */
 :root {
-  --bk-font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei UI", "Helvetica Neue", Arial, sans-serif;
+  --bk-font-body: "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif;
   --bk-heading-weight: 600;
   --bk-body-weight: 400;
 }
@@ -4520,7 +4512,7 @@ textarea:focus-visible {
 :root[data-font="rounded"],
 :root[data-font="serif"],
 :root[data-font="mono"] {
-  --bk-font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei UI", "Helvetica Neue", Arial, sans-serif;
+  --bk-font-body: "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif;
   --bk-heading-weight: 600;
 }
 
