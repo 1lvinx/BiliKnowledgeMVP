@@ -21,6 +21,7 @@ Recommended positioning:
 - Single-video workflow: fetch subtitles or local ASR, generate insight, generate concise note
 - GitHub project candidate extraction from generated notes and insights
 - Per-video Token metering for AI insight, note generation, and AI-assisted GitHub matching
+- Built-in AI model presets plus custom OpenAI-Compatible API configuration
 - Doctor diagnostics for Python, ffmpeg, yt-dlp, ASR dependencies, model cache, Bilibili login state, AI config, and workspace health
 - Script execution for manifest generation, project extraction, index build, and validation
 - CI checks for frontend build, Rust tests, and Python script tests
@@ -146,6 +147,23 @@ Privacy notes:
 - API 不返回 `usage` 或本地模板生成时显示估算值。
 - Token 计量是成本预警和透明提示，不等同于最终账单；实际费用以用户所配置模型服务商的账单为准。
 - 建议继续按“每天精选 5–10 条视频”的方式使用，不建议批量高并发生成。
+
+## AI Model Presets
+
+设置页内置了几类模型入口，方便新用户先跑通体验：
+
+- DeepSeek Chat：低成本云端模型预设。
+- SiliconFlow Qwen：常见免费额度/国产模型体验入口。
+- OpenRouter Free Router：免费模型路由入口。
+- Ollama Local：本机本地模型入口，不要求云端 API Key。
+- Custom：自定义 OpenAI-Compatible API。
+
+注意：
+
+- “免费额度 / 免费模型”会随服务商政策变化，最终以服务商控制台为准。
+- 云端模型通常仍需要用户自己填写 API Key。
+- 本地 Ollama 需要用户自行安装 Ollama 并提前拉取对应模型。
+- 所有模型调用都会继续记录 Token 用量，帮助用户预估成本。
 
 ## Legal and Platform Notes
 

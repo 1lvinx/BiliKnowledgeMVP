@@ -23,6 +23,7 @@ interface Config {
   };
   ai: {
     provider: string;
+    preset?: string;
     api_key: string;
     base_url: string;
     model: string;
@@ -40,9 +41,10 @@ const defaultConfig: Config = {
   bilibili: { cookie: "", sessdata: "", bili_jct: "", buvid3: "", dedeuserid: "" },
   ai: {
     provider: "deepseek",
+    preset: "deepseek-chat",
     api_key: "",
     base_url: "https://api.deepseek.com",
-    model: "deepseek-v4-flash",
+    model: "deepseek-chat",
   },
   preferences: {
     language: "zh-CN",
@@ -67,6 +69,85 @@ const timezoneOptions = [
   { value: "Europe/London", label: "London (UTC+00:00/UTC+01:00)" },
   { value: "UTC", label: "UTC" },
 ];
+
+const aiModelPresets = [
+  {
+    value: "deepseek-chat",
+    label: "DeepSeek Chat（低成本体验）",
+    provider: "deepseek",
+    base_url: "https://api.deepseek.com",
+    model: "deepseek-chat",
+    apiKeyHint: "需要 DeepSeek API Key",
+  },
+  {
+    value: "siliconflow-qwen",
+    label: "SiliconFlow Qwen（常见免费额度）",
+    provider: "siliconflow",
+    base_url: "https://api.siliconflow.cn/v1",
+    model: "Qwen/Qwen2.5-72B-Instruct",
+    apiKeyHint: "需要 SiliconFlow API Key；免费额度和可用模型以平台为准",
+  },
+  {
+    value: "openrouter-free",
+    label: "OpenRouter Free Router（免费模型路由）",
+    provider: "openrouter",
+    base_url: "https://openrouter.ai/api/v1",
+    model: "openrouter/free",
+    apiKeyHint: "需要 OpenRouter API Key；免费模型和限额以平台为准",
+  },
+  {
+    value: "ollama-local",
+    label: "Ollama 本地模型（本机免费）",
+    provider: "ollama",
+    base_url: "http://localhost:11434/v1",
+    model: "qwen2.5:7b",
+    apiKeyHint: "无需云端 API Key；需先安装 Ollama 并 pull 对应模型",
+  },
+  {
+    value: "custom",
+    label: "自定义 OpenAI-Compatible API",
+    provider: "custom",
+    base_url: "",
+    model: "",
+    apiKeyHint: "填写兼容 /chat/completions 的 Base URL、模型名和 API Key",
+  },
+];
+
+function inferAiPreset(ai: Config["ai"]) {
+  const matched = aiModelPresets.find(
+    (preset) =>
+      preset.value !== "custom" &&
+      preset.provider === ai.provider &&
+      preset.base_url === ai.base_url &&
+      preset.model === ai.model,
+  );
+  return ai.preset || matched?.value || "custom";
+}
+
+function applyAiPreset(config: Config, presetValue: string): Config {
+  const preset = aiModelPresets.find((item) => item.value === presetValue) || aiModelPresets[0];
+  if (preset.value === "custom") {
+    return {
+      ...config,
+      ai: {
+        ...config.ai,
+        preset: "custom",
+        provider: config.ai.provider || "custom",
+      },
+    };
+  }
+  return {
+    ...config,
+    ai: {
+      ...config.ai,
+      preset: preset.value,
+      provider: preset.provider,
+      base_url: preset.base_url,
+      model: preset.model,
+      api_key: preset.provider === "ollama" ? "" : config.ai.api_key,
+    },
+  };
+}
 
 
 type HelpDocKey = "usage" | "workflow" | "qa";
@@ -490,39 +571,46 @@ export function SettingsView({
 
         {activeSection === "settings.ai" && (
           <MacSettingsGroup title={t("settings.ai")}>
-            <MacSettingsRow label={t("settings.provider")}>
+            <MacSettingsRow detail={t("settings.aiPresetDesc")} label={t("settings.aiPreset")}>
               <select
                 className="mac-select"
-                onChange={(event) =>
-                  setConfig({ ...config, ai: { ...config.ai, provider: event.target.value } })
-                }
-                value={config.ai.provider}
+                onChange={(event) => setConfig(applyAiPreset(config, event.target.value))}
+                value={inferAiPreset(config.ai)}
               >
-                <option value="deepseek">DeepSeek</option>
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-                <option value="local">Local</option>
+                {aiModelPresets.map((preset) => (
+                  <option key={preset.value} value={preset.value}>{preset.label}</option>
+                ))}
               </select>
             </MacSettingsRow>
-            <MacSettingsRow label={t("settings.apiKey")}>
+            <MacSettingsRow detail={t("settings.providerDesc")} label={t("settings.provider")}>
+              <SettingInput
+                onChange={(value) => setConfig({ ...config, ai: { ...config.ai, preset: "custom", provider: value } })}
+                value={config.ai.provider}
+              />
+            </MacSettingsRow>
+            <MacSettingsRow detail={aiModelPresets.find((preset) => preset.value === inferAiPreset(config.ai))?.apiKeyHint || t("settings.apiKeyDesc")} label={t("settings.apiKey")}>
               <SettingInput
                 onChange={(value) => setConfig({ ...config, ai: { ...config.ai, api_key: value } })}
+                placeholder={config.ai.provider === "ollama" ? t("settings.apiKeyOptional") : undefined}
                 type="password"
                 value={config.ai.api_key}
               />
             </MacSettingsRow>
-            <MacSettingsRow label={t("settings.model")}>
+            <MacSettingsRow detail={t("settings.modelDesc")} label={t("settings.model")}>
               <SettingInput
-                onChange={(value) => setConfig({ ...config, ai: { ...config.ai, model: value } })}
+                onChange={(value) => setConfig({ ...config, ai: { ...config.ai, preset: "custom", model: value } })}
                 value={config.ai.model}
               />
             </MacSettingsRow>
-            <MacSettingsRow label={t("settings.baseUrl")}>
+            <MacSettingsRow detail={t("settings.baseUrlDesc")} label={t("settings.baseUrl")}>
               <SettingInput
-                onChange={(value) => setConfig({ ...config, ai: { ...config.ai, base_url: value } })}
+                onChange={(value) => setConfig({ ...config, ai: { ...config.ai, preset: "custom", base_url: value } })}
                 value={config.ai.base_url}
               />
             </MacSettingsRow>
+            <MacInlineNotice>
+              {t("settings.aiCostNotice")}
+            </MacInlineNotice>
           </MacSettingsGroup>
         )}
 
@@ -696,17 +784,19 @@ export function SettingsView({
 function SettingInput({
   value,
   onChange,
+  placeholder = "Not set",
   type = "text",
 }: {
   value: string;
   onChange: (value: string) => void;
+  placeholder?: string;
   type?: string;
 }) {
   return (
     <input
       className="mac-input"
       onChange={(event) => onChange(event.target.value)}
-      placeholder="Not set"
+      placeholder={placeholder}
       type={type}
       value={value}
     />

@@ -36,9 +36,10 @@ const DEFAULT_CONFIG: &str = r#"{
   },
   "ai": {
     "provider": "deepseek",
+    "preset": "deepseek-chat",
     "api_key": "",
     "base_url": "https://api.deepseek.com",
-    "model": "deepseek-v4-flash"
+    "model": "deepseek-chat"
   },
   "preferences": {
     "language": "zh-CN",

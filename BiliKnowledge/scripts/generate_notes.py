@@ -121,10 +121,13 @@ def call_chat_completion(base_url: str, api_key: str, model: str, prompt: str, p
         ],
         "response_format": {"type": "json_object"},
     }
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=90) as response:
@@ -358,8 +361,9 @@ def precise_match_github_repos(root: Path, video: dict, insight: Optional[dict],
     base_url = str(ai.get("base_url") or "https://api.deepseek.com").strip()
     model = str(ai.get("model") or "deepseek-chat").strip()
     provider = str(ai.get("provider") or "openai-compatible").strip()
+    api_key_optional = provider in {"ollama", "local"} or base_url.startswith("http://localhost") or base_url.startswith("http://127.0.0.1")
     selection = {}
-    if api_key:
+    if api_key or api_key_optional:
         try:
             prompt = build_repo_match_prompt(video, insight, search_terms, candidates)
             raw, token_usage = call_chat_completion(base_url, api_key, model, prompt, provider=provider)

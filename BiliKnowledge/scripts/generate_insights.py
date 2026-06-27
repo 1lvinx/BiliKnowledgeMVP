@@ -103,13 +103,13 @@ def call_chat_completion(base_url: str, api_key: str, model: str, prompt: str, p
         ],
         "response_format": {"type": "json_object"},
     }
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
+        headers=headers,
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=90) as response:
@@ -414,8 +414,9 @@ def main():
     model = (ai.get("model") or "deepseek-chat").strip()
     provider = str(ai.get("provider") or "openai-compatible").strip()
 
-    if not api_key:
-        print("[错误] 未配置 AI 密钥。")
+    api_key_optional = provider in {"ollama", "local"} or base_url.startswith("http://localhost") or base_url.startswith("http://127.0.0.1")
+    if not api_key and not api_key_optional:
+        print("[错误] 未配置 AI 密钥。云端模型需要 API Key；本地 Ollama 可留空。")
         sys.exit(1)
 
     videos_path = root / "manifest" / "videos.json"
