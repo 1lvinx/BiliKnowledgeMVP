@@ -77,7 +77,7 @@
     "SimSun",
     "Noto Serif SC",
     serif;
-  --bk-font-mono: "SF Mono", "Cascadia Code", Menlo, Monaco, Consolas, monospace;
+  --bk-font-mono: var(--bk-font-body);
   --bk-heading-weight: 680;
   --bk-body-weight: 400;
   --bk-letter-tight: -0.01em;
@@ -88,41 +88,32 @@
 
 :root[data-font="rounded"] {
   --bk-font-body:
-    "SF Pro Rounded",
-    "Nunito",
-    "Avenir Next",
-    -apple-system,
-    BlinkMacSystemFont,
-    "PingFang SC",
-    "Noto Sans SC",
-    "Microsoft YaHei UI",
-    sans-serif;
-  --bk-heading-weight: 720;
+    "Songti SC",
+    "STSong",
+    "SimSun",
+    "Noto Serif SC",
+    serif;
+  --bk-heading-weight: 680;
 }
 
 :root[data-font="serif"] {
   --bk-font-body:
-    "New York",
-    "Iowan Old Style",
-    "Noto Serif SC",
     "Songti SC",
-    Georgia,
+    "STSong",
+    "SimSun",
+    "Noto Serif SC",
     serif;
-  --bk-heading-weight: 700;
+  --bk-heading-weight: 680;
 }
 
 :root[data-font="mono"] {
   --bk-font-body:
-    "SF Mono",
-    "JetBrains Mono",
-    "Cascadia Code",
-    Menlo,
-    Monaco,
-    Consolas,
-    "PingFang SC",
-    "Noto Sans SC",
-    monospace;
-  --bk-heading-weight: 650;
+    "Songti SC",
+    "STSong",
+    "SimSun",
+    "Noto Serif SC",
+    serif;
+  --bk-heading-weight: 680;
 }
 
 :root[data-density="compact"] {
@@ -1568,7 +1559,7 @@ textarea:focus-visible {
 .dashboard-markdown h2 { font-size: 14px; color: var(--bk-label); margin-top: 10px; }
 
 .dashboard-log-text {
-  font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+  font-family: var(--bk-font-body);
   font-size: 11px;
   color: var(--bk-secondary-label);
   overflow: hidden;
@@ -1813,7 +1804,7 @@ textarea:focus-visible {
 
 .overview-activity-code {
   overflow: hidden;
-  font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+  font-family: var(--bk-font-body);
   font-size: 12px;
   color: var(--bk-secondary-label);
   text-overflow: ellipsis;
@@ -2328,7 +2319,7 @@ textarea:focus-visible {
   height: calc(100% - 28px);
   overflow: auto;
   padding: 8px 12px;
-  font-family: "SF Mono", "Cascadia Code", Menlo, Monaco, Consolas, monospace;
+  font-family: var(--bk-font-body);
   font-size: 12px;
 }
 
@@ -3052,7 +3043,7 @@ textarea:focus-visible {
 .last-output-preview {
   overflow: hidden;
   color: var(--bk-secondary-label);
-  font-family: "SF Mono", "Cascadia Code", Menlo, Monaco, Consolas, monospace;
+  font-family: var(--bk-font-body);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4313,7 +4304,7 @@ textarea:focus-visible {
   gap: 4px;
   font-size: 11px;
   color: var(--bk-tertiary-label);
-  font-family: monospace;
+  font-family: var(--bk-font-body);
   min-width: 50px;
   flex-shrink: 0;
 }
@@ -5117,4 +5108,28 @@ textarea:focus-visible {
 .settings-help-markdown ol,
 .settings-help-markdown ul {
   padding-left: 22px;
+}
+
+/* Final typography guard: every surface uses Songti, including code/status text. */
+:root,
+:root[data-font="rounded"],
+:root[data-font="serif"],
+:root[data-font="mono"] {
+  --bk-font-body: "Songti SC", "STSong", "SimSun", "Noto Serif SC", serif;
+  --bk-font-mono: var(--bk-font-body);
+}
+
+code,
+pre,
+kbd,
+samp,
+button,
+input,
+select,
+textarea,
+.mac-app,
+.settings-help-markdown,
+.react-markdown,
+.markdown-body {
+  font-family: var(--bk-font-body) !important;
 }
