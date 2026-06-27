@@ -81,7 +81,7 @@ const settingsSectionKeys = [
   "settings.validation",
   "settings.ai",
   "settings.security",
-  "settings.scripts",
+  "settings.helpFeedback",
   "settings.exportBackup",
   "settings.appearance",
 ] as const;
@@ -128,6 +128,7 @@ export function SettingsView({
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [doctorRunning, setDoctorRunning] = useState<"diagnose" | "repair" | null>(null);
   const [activeSection, setActiveSection] = useState<SettingsSection>("settings.general");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(
     null,
@@ -156,6 +157,29 @@ export function SettingsView({
       return;
     }
     await invoke("save_config", { config: JSON.stringify(nextConfig) });
+  }
+
+
+  async function runDoctor(mode: "diagnose" | "repair") {
+    if (!isTauriRuntime()) {
+      setMessage({ type: "error", text: t("settings.doctorPreviewUnavailable") });
+      return;
+    }
+    try {
+      setDoctorRunning(mode);
+      await invoke("run_script", {
+        scriptName: mode === "repair" ? "doctor_fix.py" : "doctor.py",
+        args: ["--root", "."],
+      });
+      setMessage({
+        type: "success",
+        text: mode === "repair" ? t("settings.doctorRepairDone") : t("settings.doctorDiagnoseDone"),
+      });
+    } catch (err) {
+      setMessage({ type: "error", text: `${t("settings.doctorFailed")}: ${String(err)}` });
+    } finally {
+      setDoctorRunning(null);
+    }
   }
 
   async function saveConfig() {
@@ -423,28 +447,34 @@ export function SettingsView({
           </MacSettingsGroup>
         )}
 
-        {activeSection === "settings.scripts" && (
-          <MacSettingsGroup title={t("settings.scripts")}>
-            <MacSettingsRow detail={t("settings.importFavoritesDesc")} label={t("settings.importFavorites")}>
-              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
+        {activeSection === "settings.helpFeedback" && (
+          <MacSettingsGroup title={t("settings.helpFeedback")}>
+            <MacSettingsRow detail={t("settings.helpHowToUseDesc")} label={t("settings.helpHowToUse")}>
+              <span className="mac-inspector-meta">1. {t("scripts.fetchSubtitles")} / {t("scripts.transcribeSubtitles")} → 2. {t("scripts.generateInsights")} → 3. {t("scripts.generateNotes")}</span>
             </MacSettingsRow>
-            <MacSettingsRow detail={t("settings.fetchSubtitlesDesc")} label={t("scripts.fetchSubtitles")}>
-              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
+            <MacSettingsRow detail={t("settings.helpWorkflowDesc")} label={t("settings.helpWorkflow")}>
+              <span className="mac-inspector-meta">{t("settings.helpWorkflowValue")}</span>
             </MacSettingsRow>
-            <MacSettingsRow detail={t("settings.generateInsightsDesc")} label={t("scripts.generateInsights")}>
-              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
+            <MacSettingsRow detail={t("settings.doctorDesc")} label={t("scripts.doctor")}>
+              <MacToolbarButton
+                disabled={doctorRunning !== null}
+                label={doctorRunning === "diagnose" ? t("scripts.running") : t("settings.runDoctor")}
+                onClick={() => runDoctor("diagnose")}
+              />
             </MacSettingsRow>
-            <MacSettingsRow detail={t("settings.generateNotesDesc")} label={t("scripts.generateNotes")}>
-              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
+            <MacSettingsRow detail={t("settings.doctorFixDesc")} label={t("scripts.doctorFix")}>
+              <MacToolbarButton
+                disabled={doctorRunning !== null}
+                label={doctorRunning === "repair" ? t("scripts.running") : t("settings.runDoctorFix")}
+                onClick={() => runDoctor("repair")}
+                primary
+              />
             </MacSettingsRow>
-            <MacSettingsRow detail={t("settings.extractProjectsDesc")} label={t("settings.extractProjects")}>
-              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
+            <MacSettingsRow detail={t("settings.helpTroubleshootingDesc")} label={t("settings.helpTroubleshooting")}>
+              <span className="mac-inspector-meta">{t("settings.helpTroubleshootingValue")}</span>
             </MacSettingsRow>
-            <MacSettingsRow detail={t("settings.buildIndexDesc")} label={t("settings.buildIndex")}>
-              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
-            </MacSettingsRow>
-            <MacSettingsRow detail={t("settings.validateKnowledgeBaseDesc")} label={t("settings.validateKnowledgeBase")}>
-              <span className="mac-status-pill tone-green">{t("status.ready")}</span>
+            <MacSettingsRow detail={t("settings.feedbackDesc")} label={t("settings.feedback")}>
+              <span className="mac-inspector-meta">{t("settings.feedbackValue")}</span>
             </MacSettingsRow>
           </MacSettingsGroup>
         )}
