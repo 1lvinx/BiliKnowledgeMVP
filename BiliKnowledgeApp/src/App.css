@@ -5056,3 +5056,73 @@ textarea:focus-visible {
   border-radius: 12px;
   background: var(--bk-code-bg);
 }
+
+/* Help center modal: align with the app's native macOS-style panels. */
+.settings-help-modal {
+  padding: 0;
+  align-items: stretch;
+  justify-items: stretch;
+  background: color-mix(in srgb, var(--bk-content-bg) 72%, transparent);
+}
+
+.settings-help-backdrop {
+  background:
+    radial-gradient(circle at 50% 18%, color-mix(in srgb, var(--bk-blue-soft) 45%, transparent) 0%, transparent 40%),
+    color-mix(in srgb, var(--bk-content-bg) 70%, transparent);
+  backdrop-filter: blur(16px) saturate(1.15);
+}
+
+.settings-help-dialog {
+  align-self: center;
+  justify-self: center;
+  width: min(760px, calc(100vw - 96px));
+  max-height: min(760px, calc(100vh - 112px));
+  border-radius: var(--bk-radius-panel);
+  background: color-mix(in srgb, var(--bk-elevated-bg) 96%, transparent);
+  box-shadow: var(--bk-shadow-panel);
+}
+
+.settings-help-header {
+  min-height: 54px;
+  padding: 12px 16px 10px 20px;
+  background: color-mix(in srgb, var(--bk-elevated-bg) 92%, transparent);
+}
+
+.settings-help-header strong {
+  font-size: 15px;
+  font-weight: 680;
+  letter-spacing: 0;
+}
+
+.settings-help-header button {
+  width: 28px;
+  height: 28px;
+  box-shadow: var(--bk-shadow-subtle);
+}
+
+.settings-help-markdown {
+  padding: 22px 30px 30px;
+  background: transparent;
+}
+
+.settings-help-markdown h1 {
+  font-size: 20px;
+  margin-bottom: 14px;
+}
+
+.settings-help-markdown h2 {
+  margin: 20px 0 8px;
+  font-size: 15px;
+  font-weight: 660;
+}
+
+.settings-help-markdown p,
+.settings-help-markdown li {
+  font-size: 13px;
+  line-height: 1.58;
+}
+
+.settings-help-markdown ol,
+.settings-help-markdown ul {
+  padding-left: 22px;
+}
