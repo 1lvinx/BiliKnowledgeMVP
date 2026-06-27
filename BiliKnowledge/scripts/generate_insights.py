@@ -7,7 +7,7 @@ import re
 import sys
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -30,7 +30,60 @@ def load_config(root: Path) -> dict:
     return load_json(root / "config" / "config.json", {})
 
 
-def call_chat_completion(base_url: str, api_key: str, model: str, prompt: str) -> str:
+def estimate_tokens(text: str) -> int:
+    """Rough local estimate used only when the model provider does not return usage."""
+    source = str(text or "")
+    if not source:
+        return 0
+    cjk_chars = len(re.findall(r"[\u4e00-\u9fff]", source))
+    non_cjk = re.sub(r"[\u4e00-\u9fff]", " ", source)
+    ascii_estimate = max(0, len(non_cjk) // 4)
+    return max(1, cjk_chars + ascii_estimate)
+
+
+def normalize_token_usage(
+    raw_usage: Optional[dict],
+    prompt_text: str,
+    completion_text: str,
+    *,
+    mode: str,
+    provider: str,
+    model: str,
+) -> dict:
+    usage = raw_usage if isinstance(raw_usage, dict) else {}
+    prompt_tokens = usage.get("prompt_tokens")
+    completion_tokens = usage.get("completion_tokens")
+    total_tokens = usage.get("total_tokens")
+    measured = all(isinstance(value, int) for value in [prompt_tokens, completion_tokens, total_tokens])
+    if not measured:
+        prompt_tokens = estimate_tokens(prompt_text)
+        completion_tokens = estimate_tokens(completion_text)
+        total_tokens = prompt_tokens + completion_tokens
+    return {
+        "mode": mode,
+        "provider": provider or "openai-compatible",
+        "model": model,
+        "estimated": not measured,
+        "prompt_tokens": int(prompt_tokens or 0),
+        "completion_tokens": int(completion_tokens or 0),
+        "total_tokens": int(total_tokens or 0),
+        "measured_at": datetime.now(timezone.utc).isoformat(),
+        "source": "api_usage" if measured else "local_estimate",
+    }
+
+
+def append_token_usage(root: Path, video_id: str, usage: dict) -> None:
+    if not usage:
+        return
+    ledger_path = root / "manifest" / "token_usage.json"
+    ledger = load_json(ledger_path, [])
+    if not isinstance(ledger, list):
+        ledger = []
+    ledger.append({"video_id": video_id, **usage})
+    save_json(ledger_path, ledger[-1000:])
+
+
+def call_chat_completion(base_url: str, api_key: str, model: str, prompt: str, provider: str = "") -> tuple[str, dict]:
     url = base_url.rstrip("/") + "/chat/completions"
     payload = {
         "model": model,
@@ -61,7 +114,16 @@ def call_chat_completion(base_url: str, api_key: str, model: str, prompt: str) -
     )
     with urllib.request.urlopen(request, timeout=90) as response:
         body = json.loads(response.read().decode("utf-8"))
-    return body["choices"][0]["message"]["content"]
+    content = body["choices"][0]["message"]["content"]
+    usage = normalize_token_usage(
+        body.get("usage"),
+        prompt,
+        content,
+        mode="insight",
+        provider=provider,
+        model=model,
+    )
+    return content, usage
 
 
 
@@ -283,6 +345,7 @@ def normalize_insight(video_id: str, raw_text: str) -> dict:
         "limitations": [str(x).strip() for x in payload.get("limitations", []) if str(x).strip()],
         "evidence_quality": str(payload.get("evidence_quality", "medium")).strip() or "medium",
         "core_assets": [asset for asset in core_assets if asset.get("name")],
+        "token_usage": {},
         "created_at": now,
         "updated_at": now,
     }
@@ -317,6 +380,7 @@ def upgrade_existing_insight(payload: dict) -> dict:
             for asset in payload.get("core_assets", [])
             if isinstance(asset, dict) and str(asset.get("name", "")).strip()
         ],
+        "token_usage": payload.get("token_usage") if isinstance(payload.get("token_usage"), dict) else {},
         "created_at": str(payload.get("created_at", "")).strip(),
         "updated_at": str(payload.get("updated_at", "")).strip(),
     }
@@ -348,6 +412,7 @@ def main():
     api_key = (ai.get("api_key") or "").strip()
     base_url = (ai.get("base_url") or "https://api.deepseek.com").strip()
     model = (ai.get("model") or "deepseek-chat").strip()
+    provider = str(ai.get("provider") or "openai-compatible").strip()
 
     if not api_key:
         print("[错误] 未配置 AI 密钥。")
@@ -384,13 +449,19 @@ def main():
             continue
         print(f"[视频洞察] 正在分析 {video_id} {video.get('title', '')}")
         try:
-            raw_text = call_chat_completion(
+            prompt = build_prompt(video, source_item, subtitle, comment_lookup.get(video_id), danmaku_lookup.get(video_id))
+            raw_text, token_usage = call_chat_completion(
                 base_url=base_url,
                 api_key=api_key,
                 model=model,
-                prompt=build_prompt(video, source_item, subtitle, comment_lookup.get(video_id), danmaku_lookup.get(video_id)),
+                prompt=prompt,
+                provider=provider,
             )
             insight = normalize_insight(video_id, raw_text)
+            insight["token_usage"] = token_usage
+            append_token_usage(root, video_id, token_usage)
+            usage_label = "估算" if token_usage.get("estimated") else "实际"
+            print(f"[Token] 洞察 {video_id}: {token_usage.get('total_tokens', 0)} tokens（{usage_label}）")
         except (urllib.error.URLError, KeyError, json.JSONDecodeError) as exc:
             print(f"[错误] 视频洞察生成失败 {video_id}：{exc}")
             if args.video_id:

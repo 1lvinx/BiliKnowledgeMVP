@@ -25,7 +25,89 @@ def load_config(root: Path) -> dict:
     return load_json(root / "config" / "config.json", {})
 
 
-def call_chat_completion(base_url: str, api_key: str, model: str, prompt: str) -> str:
+def estimate_tokens(text: str) -> int:
+    """Rough local estimate used only when the model provider does not return usage."""
+    source = str(text or "")
+    if not source:
+        return 0
+    cjk_chars = len(re.findall(r"[\u4e00-\u9fff]", source))
+    non_cjk = re.sub(r"[\u4e00-\u9fff]", " ", source)
+    ascii_estimate = max(0, len(non_cjk) // 4)
+    return max(1, cjk_chars + ascii_estimate)
+
+
+def normalize_token_usage(
+    raw_usage: Optional[dict],
+    prompt_text: str,
+    completion_text: str,
+    *,
+    mode: str,
+    provider: str,
+    model: str,
+) -> dict:
+    usage = raw_usage if isinstance(raw_usage, dict) else {}
+    prompt_tokens = usage.get("prompt_tokens")
+    completion_tokens = usage.get("completion_tokens")
+    total_tokens = usage.get("total_tokens")
+    measured = all(isinstance(value, int) for value in [prompt_tokens, completion_tokens, total_tokens])
+    if not measured:
+        prompt_tokens = estimate_tokens(prompt_text)
+        completion_tokens = estimate_tokens(completion_text)
+        total_tokens = prompt_tokens + completion_tokens
+    return {
+        "mode": mode,
+        "provider": provider or "openai-compatible",
+        "model": model,
+        "estimated": not measured,
+        "prompt_tokens": int(prompt_tokens or 0),
+        "completion_tokens": int(completion_tokens or 0),
+        "total_tokens": int(total_tokens or 0),
+        "measured_at": datetime.now(timezone.utc).isoformat(),
+        "source": "api_usage" if measured else "local_estimate",
+    }
+
+
+def make_local_token_usage(prompt_text: str, completion_text: str, *, mode: str, model: str = "local-template") -> dict:
+    return normalize_token_usage(
+        None,
+        prompt_text,
+        completion_text,
+        mode=mode,
+        provider="local",
+        model=model,
+    )
+
+
+def append_token_usage(root: Path, video_id: str, usage: dict) -> None:
+    if not usage:
+        return
+    ledger_path = root / "manifest" / "token_usage.json"
+    ledger = load_json(ledger_path, [])
+    if not isinstance(ledger, list):
+        ledger = []
+    ledger.append({"video_id": video_id, **usage})
+    save_json(ledger_path, ledger[-1000:])
+
+
+def build_note_token_prompt(video: dict, insight: Optional[dict], subtitle: Optional[dict]) -> str:
+    insight_payload = dict(insight or {})
+    insight_payload.pop("token_usage", None)
+    return json.dumps(
+        {
+            "video": {
+                "id": video.get("id", ""),
+                "title": video.get("title", ""),
+                "uploader": video.get("uploader", ""),
+                "favorite_folder": video.get("favorite_folder", ""),
+            },
+            "insight": insight_payload,
+            "subtitle_excerpt": str((subtitle or {}).get("raw_text") or "")[:4500],
+        },
+        ensure_ascii=False,
+    )
+
+
+def call_chat_completion(base_url: str, api_key: str, model: str, prompt: str, provider: str = "") -> tuple[str, dict]:
     url = base_url.rstrip("/") + "/chat/completions"
     payload = {
         "model": model,
@@ -47,7 +129,16 @@ def call_chat_completion(base_url: str, api_key: str, model: str, prompt: str) -
     )
     with urllib.request.urlopen(request, timeout=90) as response:
         body = json.loads(response.read().decode("utf-8"))
-    return body["choices"][0]["message"]["content"]
+    content = body["choices"][0]["message"]["content"]
+    usage = normalize_token_usage(
+        body.get("usage"),
+        prompt,
+        content,
+        mode="github_repo_match",
+        provider=provider,
+        model=model,
+    )
+    return content, usage
 
 
 
@@ -266,10 +357,15 @@ def precise_match_github_repos(root: Path, video: dict, insight: Optional[dict],
     api_key = str(ai.get("api_key") or "").strip()
     base_url = str(ai.get("base_url") or "https://api.deepseek.com").strip()
     model = str(ai.get("model") or "deepseek-chat").strip()
+    provider = str(ai.get("provider") or "openai-compatible").strip()
     selection = {}
     if api_key:
         try:
-            raw = call_chat_completion(base_url, api_key, model, build_repo_match_prompt(video, insight, search_terms, candidates))
+            prompt = build_repo_match_prompt(video, insight, search_terms, candidates)
+            raw, token_usage = call_chat_completion(base_url, api_key, model, prompt, provider=provider)
+            append_token_usage(root, str(video.get("id") or ""), token_usage)
+            usage_label = "估算" if token_usage.get("estimated") else "实际"
+            print(f"[Token] GitHub 匹配 {video.get('id', '')}: {token_usage.get('total_tokens', 0)} tokens（{usage_label}）")
             selection = json.loads(raw)
         except (urllib.error.URLError, KeyError, json.JSONDecodeError, TimeoutError):
             selection = {}
@@ -789,6 +885,11 @@ def main():
             insight,
             subtitle,
         )
+        note_token_usage = make_local_token_usage(
+            build_note_token_prompt(video, insight, subtitle),
+            note_text,
+            mode="note",
+        )
         note_path.write_text(note_text, encoding="utf-8")
         synced_projects = sync_open_source_candidates(root, video, insight, note_text)
         if synced_projects:
@@ -798,9 +899,15 @@ def main():
         next_video["note_ready"] = True
         next_video["note_generated_at"] = datetime.now(timezone.utc).isoformat()
         next_video["note_generation_mode"] = "single" if args.video_id else "batch"
+        token_usage_map = next_video.get("token_usage") if isinstance(next_video.get("token_usage"), dict) else {}
+        token_usage_map["note"] = note_token_usage
+        next_video["token_usage"] = token_usage_map
+        next_video["note_token_usage"] = note_token_usage
+        append_token_usage(root, str(video.get("id") or ""), note_token_usage)
         updated_videos.append(next_video)
         generated += 1
         print(f"[笔记] 已生成 {note_path.name}")
+        print(f"[Token] 笔记 {video.get('id', '')}: {note_token_usage.get('total_tokens', 0)} tokens（估算，本地模板无 API 计费）")
 
     save_json(videos_path, updated_videos)
     print(f"[已写入] {videos_path}（已更新 {len(updated_videos)} 条）")

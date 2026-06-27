@@ -1,3 +1,15 @@
+export interface TokenUsage {
+  mode: "insight" | "note" | "github_repo_match" | string;
+  provider?: string;
+  model?: string;
+  estimated?: boolean;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  measured_at?: string;
+  source?: "api_usage" | "local_estimate" | string;
+}
+
 export interface Video {
   id: string;
   title: string;
@@ -15,6 +27,13 @@ export interface Video {
   note_ready?: boolean;
   note_generated_at?: string;
   note_generation_mode?: "single" | "batch";
+  note_token_usage?: TokenUsage;
+  token_usage?: {
+    insight?: TokenUsage;
+    note?: TokenUsage;
+    github_repo_match?: TokenUsage;
+    [key: string]: TokenUsage | undefined;
+  };
   project_extracted: boolean;
   remarks: string;
 }
@@ -72,6 +91,7 @@ export interface VideoInsight {
     solves: string;
     notes: string[];
   }>;
+  token_usage?: TokenUsage;
   created_at: string;
   updated_at: string;
 }

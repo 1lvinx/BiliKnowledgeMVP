@@ -24,6 +24,7 @@ cd src-tauri && cargo test
 - Plain browser mode is preview-only and uses sample data.
 - QR login is intended to be tested in the desktop app, not in browser preview.
 - Favorites can be synced from Bilibili, and individual videos can also be manually added from BV / av / full Bilibili URL / b23.tv short link.
+- Each processed video shows Token metering in the inspector. API provider usage is used when available; otherwise the app shows a local estimate for cost awareness.
 - Local data lives under `../BiliKnowledge` by default.
 - Run Doctor from Settings or via `python3 ../BiliKnowledge/scripts/doctor.py --root ../BiliKnowledge` when subtitle fetching, ASR, or note generation fails.
 

@@ -1,5 +1,5 @@
 import { Archive, BookOpen, Check, ExternalLink, FileText, Sparkles, Subtitles } from "lucide-react";
-import type { Video, VideoInsight, VideoSubtitle } from "../types";
+import type { TokenUsage, Video, VideoInsight, VideoSubtitle } from "../types";
 import { t } from "../i18n";
 import {
   formatPubdate,
@@ -38,6 +38,25 @@ function getEvidenceQualityLabel(value?: string) {
   return "中";
 }
 
+function formatTokenCount(value?: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toLocaleString() : "-";
+}
+
+function tokenUsageLabel(usage?: TokenUsage | null) {
+  if (!usage) return "未计量";
+  const total = formatTokenCount(usage.total_tokens);
+  const suffix = usage.estimated ? "估算" : "实际";
+  return `${total} tokens · ${suffix}`;
+}
+
+function tokenUsageTone(usage?: TokenUsage | null) {
+  if (!usage) return "neutral" as const;
+  const total = usage.total_tokens || 0;
+  if (total >= 30000) return "red" as const;
+  if (total >= 12000) return "orange" as const;
+  return "green" as const;
+}
+
 export function VideoInspector({
   activeVideo,
   fetchNote,
@@ -69,6 +88,10 @@ export function VideoInspector({
   const subtitleEvidence = getSubtitleEvidence(subtitle);
   const hasInsight = Boolean(insight);
   const evidenceQuality = insight?.evidence_quality ? getEvidenceQualityLabel(insight.evidence_quality) : "-";
+  const insightTokenUsage = insight?.token_usage || activeVideo.token_usage?.insight;
+  const noteTokenUsage = activeVideo.note_token_usage || activeVideo.token_usage?.note;
+  const githubMatchUsage = activeVideo.token_usage?.github_repo_match;
+  const tokenModel = insightTokenUsage?.model || noteTokenUsage?.model || githubMatchUsage?.model || "-";
 
   return (
     <aside className="mac-inspector custom-scrollbar">
@@ -120,6 +143,31 @@ export function VideoInspector({
               <span className="mac-row-title">证据质量</span>
               <span>{evidenceQuality}</span>
             </div>
+          </div>
+        </MacPanel>
+        <MacPanel title="AI 用量 / Token 计量">
+          <div className="mac-native-list">
+            <div className="mac-native-row">
+              <span className="mac-row-title">洞察</span>
+              <MacStatusPill tone={tokenUsageTone(insightTokenUsage)}>{tokenUsageLabel(insightTokenUsage)}</MacStatusPill>
+            </div>
+            <div className="mac-native-row">
+              <span className="mac-row-title">笔记</span>
+              <MacStatusPill tone={tokenUsageTone(noteTokenUsage)}>{tokenUsageLabel(noteTokenUsage)}</MacStatusPill>
+            </div>
+            {githubMatchUsage && (
+              <div className="mac-native-row">
+                <span className="mac-row-title">开源匹配</span>
+                <MacStatusPill tone={tokenUsageTone(githubMatchUsage)}>{tokenUsageLabel(githubMatchUsage)}</MacStatusPill>
+              </div>
+            )}
+            <div className="mac-native-row">
+              <span className="mac-row-title">模型</span>
+              <span>{tokenModel}</span>
+            </div>
+            <p className="mac-inspector-meta">
+              API 返回 usage 时显示实际值；否则使用本地估算。实际费用以模型服务商账单为准。
+            </p>
           </div>
         </MacPanel>
         <details className="mac-inspector-compact-section">

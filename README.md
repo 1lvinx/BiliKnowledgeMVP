@@ -20,6 +20,7 @@ Recommended positioning:
 - Favorite sync plus manual video add from BV / av / full Bilibili URL / b23.tv short link
 - Single-video workflow: fetch subtitles or local ASR, generate insight, generate concise note
 - GitHub project candidate extraction from generated notes and insights
+- Per-video Token metering for AI insight, note generation, and AI-assisted GitHub matching
 - Doctor diagnostics for Python, ffmpeg, yt-dlp, ASR dependencies, model cache, Bilibili login state, AI config, and workspace health
 - Script execution for manifest generation, project extraction, index build, and validation
 - CI checks for frontend build, Rust tests, and Python script tests
@@ -113,6 +114,7 @@ BiliKnowledge/
 ├── config/config.json          # local app config, Bilibili cookie fields, AI config
 ├── manifest/videos.json        # imported/manual video manifest
 ├── manifest/insights.json      # generated insights
+├── manifest/token_usage.json   # per-video token usage ledger
 ├── subtitles/                  # fetched or locally transcribed subtitles
 ├── notes/raw/                  # generated Markdown notes
 ├── projects/project_candidates.json
@@ -126,7 +128,24 @@ Privacy notes:
 - AI provider API keys are stored locally in the same config file.
 - Subtitles, insights, notes, project candidates, and user ideas are local files.
 - When using an external AI provider, selected subtitle/text content may be sent to that provider for insight/note generation.
+- Token usage is recorded locally per video. If the provider returns `usage`, 哔知 stores the provider value; otherwise it stores a conservative local estimate.
 - Do not commit real cookies, API keys, personal notes, or private manifests.
+
+## Token Metering
+
+哔知会为每条视频记录 AI 用量，避免用户误以为模型调用没有成本：
+
+- `generate_insights.py`：记录洞察生成的 prompt / completion / total tokens。
+- `generate_notes.py`：记录笔记生成的本地估算 token；如果触发 AI 精准匹配 GitHub 仓库，也会记录该次模型调用。
+- 前端右侧检查面板展示“AI 用量 / Token 计量”。
+- `BiliKnowledge/manifest/token_usage.json` 保存最近的用量流水。
+
+说明：
+
+- API 返回 `usage` 时显示实际值。
+- API 不返回 `usage` 或本地模板生成时显示估算值。
+- Token 计量是成本预警和透明提示，不等同于最终账单；实际费用以用户所配置模型服务商的账单为准。
+- 建议继续按“每天精选 5–10 条视频”的方式使用，不建议批量高并发生成。
 
 ## Legal and Platform Notes
 
