@@ -7,12 +7,48 @@ import json
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Optional
 
 
 GITHUB_RE = re.compile(r"https?://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+
+GENERIC_PROJECT_TERMS = {
+    "github", "项目", "仓库", "开源", "工具", "插件", "agent", "agents", "skill", "skills",
+    "claude", "claude code", "codex", "ai", "教程", "分享", "视频", "自动化", "代码", "开发",
+}
+
+
+def load_config(root: Path) -> dict:
+    return load_json(root / "config" / "config.json", {})
+
+
+def call_chat_completion(base_url: str, api_key: str, model: str, prompt: str) -> str:
+    url = base_url.rstrip("/") + "/chat/completions"
+    payload = {
+        "model": model,
+        "temperature": 0.1,
+        "messages": [
+            {
+                "role": "system",
+                "content": "你是 GitHub 仓库匹配助手。只做证据充分的精确匹配，严格返回 JSON。",
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "response_format": {"type": "json_object"},
+    }
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=90) as response:
+        body = json.loads(response.read().decode("utf-8"))
+    return body["choices"][0]["message"]["content"]
+
 
 
 def infer_name_from_url(url: str) -> str:
@@ -56,6 +92,206 @@ def fetch_github_repo_metadata(url: str) -> dict:
     }
 
 
+
+
+def normalize_search_term(raw: str) -> str:
+    term = re.sub(r"[`*_#>\[\]（）(){}:：，。！？!?,;；]+", " ", str(raw or ""))
+    term = re.sub(r"\s+", " ", term).strip()
+    return term
+
+
+def collect_project_search_terms(video: dict, insight: Optional[dict], note_text: str) -> list[str]:
+    terms: list[str] = []
+    for asset in (insight or {}).get("core_assets", []) or []:
+        if not isinstance(asset, dict):
+            continue
+        name = normalize_search_term(asset.get("name") or "")
+        url = str(asset.get("url") or "").strip()
+        asset_type = str(asset.get("asset_type") or "").lower()
+        role = normalize_search_term(asset.get("role") or asset.get("solves") or "")
+        if url.startswith("https://github.com/"):
+            continue
+        if name and name.lower() not in GENERIC_PROJECT_TERMS:
+            terms.append(" ".join(x for x in [name, role] if x)[:96])
+        if name and any(key in asset_type for key in ["github", "repo", "repository", "仓库", "开源"]):
+            terms.append(name[:96])
+
+    # Pick quoted/backtick terms from generated note that look like concrete repo/tool names.
+    for raw in re.findall(r"`([^`]{3,80})`|《([^》]{3,80})》|([A-Za-z][A-Za-z0-9_.-]{3,40})", note_text or ""):
+        candidate = normalize_search_term(next((x for x in raw if x), ""))
+        if candidate and candidate.lower() not in GENERIC_PROJECT_TERMS:
+            terms.append(candidate)
+
+    title = normalize_search_term(video.get("title") or "")
+    # Titles often contain the actual project name near GitHub/开源 keywords; keep a compact title query as fallback.
+    if any(key.lower() in title.lower() for key in ["github", "开源", "项目", "repo", "仓库"]):
+        terms.append(title[:120])
+
+    seen = set()
+    results = []
+    for term in terms:
+        key = term.lower()
+        if key in seen or len(key) < 3:
+            continue
+        seen.add(key)
+        results.append(term)
+    return results[:8]
+
+
+def search_github_repositories(query: str, limit: int = 5) -> list[dict]:
+    q = f"{query} in:name,description,readme"
+    api_url = "https://api.github.com/search/repositories?" + urllib.parse.urlencode(
+        {"q": q, "sort": "stars", "order": "desc", "per_page": str(limit)}
+    )
+    request = urllib.request.Request(
+        api_url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "BiliKnowledgeLocal/1.0",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError):
+        return []
+    repos = []
+    for item in payload.get("items", [])[:limit]:
+        if not isinstance(item, dict):
+            continue
+        repos.append(
+            {
+                "full_name": item.get("full_name") or "",
+                "html_url": item.get("html_url") or "",
+                "description": item.get("description") or "",
+                "stars": int(item.get("stargazers_count") or 0),
+                "language": item.get("language") or "",
+                "topics": item.get("topics") or [],
+                "homepage": item.get("homepage") or "",
+                "archived": bool(item.get("archived") or False),
+                "pushed_at": item.get("pushed_at") or "",
+            }
+        )
+    return repos
+
+
+def build_repo_match_prompt(video: dict, insight: Optional[dict], search_terms: list[str], candidates: list[dict]) -> str:
+    return json.dumps(
+        {
+            "task": "判断 GitHub 搜索结果中哪一个仓库最可能是视频真正提到的项目。",
+            "video": {
+                "bvid": video.get("id", ""),
+                "title": video.get("title", ""),
+                "uploader": video.get("uploader", ""),
+            },
+            "insight": {
+                "summary": (insight or {}).get("summary", ""),
+                "key_points": (insight or {}).get("key_points", [])[:6],
+                "core_assets": (insight or {}).get("core_assets", [])[:8],
+                "evidence": (insight or {}).get("evidence", [])[:5],
+            },
+            "search_terms": search_terms,
+            "github_candidates": candidates[:12],
+            "rules": [
+                "只有当仓库名/描述/主题与视频标题、洞察中的具体项目高度一致时才选择。",
+                "不要因为 stars 高就选择；不要选择通用框架、教程集合或不相关热门仓库。",
+                "如果无法确定，selected_url 返回空字符串，confidence 不超过 0.5。",
+                "confidence 范围 0-1；0.75 以上代表可自动加入开源候选。",
+            ],
+            "output_schema": {
+                "selected_url": "string",
+                "repo_full_name": "string",
+                "confidence": 0.0,
+                "reason": "string",
+                "matched_terms": ["string"],
+            },
+        },
+        ensure_ascii=False,
+    )
+
+
+def heuristic_rank_repo(video: dict, insight: Optional[dict], search_terms: list[str], candidates: list[dict]) -> dict:
+    haystack_base = " ".join([
+        str(video.get("title") or ""),
+        str((insight or {}).get("summary") or ""),
+        " ".join((insight or {}).get("key_points", [])[:6]),
+    ]).lower()
+    best = {"selected_url": "", "repo_full_name": "", "confidence": 0.0, "reason": "未找到足够明确的仓库匹配。", "matched_terms": []}
+    for repo in candidates:
+        full_name = str(repo.get("full_name") or "")
+        repo_name = full_name.split("/")[-1].lower() if "/" in full_name else full_name.lower()
+        repo_text = " ".join([full_name, str(repo.get("description") or ""), " ".join(repo.get("topics") or [])]).lower()
+        matched = [term for term in search_terms if normalize_search_term(term).lower() and normalize_search_term(term).lower() in repo_text]
+        score = 0.0
+        if repo_name and repo_name in haystack_base:
+            score += 0.45
+        if full_name.lower() and full_name.lower() in haystack_base:
+            score += 0.35
+        score += min(0.35, 0.08 * len(matched))
+        if int(repo.get("stars") or 0) >= 100:
+            score += 0.05
+        if repo.get("archived"):
+            score -= 0.15
+        score = max(0.0, min(0.95, score))
+        if score > float(best["confidence"]):
+            best = {
+                "selected_url": repo.get("html_url") or "",
+                "repo_full_name": full_name,
+                "confidence": score,
+                "reason": "仓库名称/描述与视频标题或洞察关键词匹配。",
+                "matched_terms": matched[:5],
+            }
+    if float(best["confidence"]) < 0.75:
+        best["selected_url"] = ""
+    return best
+
+
+def precise_match_github_repos(root: Path, video: dict, insight: Optional[dict], note_text: str) -> list[dict]:
+    search_terms = collect_project_search_terms(video, insight, note_text)
+    if not search_terms:
+        return []
+    candidates_by_url: dict[str, dict] = {}
+    for query in search_terms[:5]:
+        for repo in search_github_repositories(query, limit=5):
+            url = str(repo.get("html_url") or "")
+            if url and url not in candidates_by_url:
+                candidates_by_url[url] = repo
+    candidates = list(candidates_by_url.values())
+    if not candidates:
+        return []
+
+    config = load_config(root)
+    ai = config.get("ai") or {}
+    api_key = str(ai.get("api_key") or "").strip()
+    base_url = str(ai.get("base_url") or "https://api.deepseek.com").strip()
+    model = str(ai.get("model") or "deepseek-chat").strip()
+    selection = {}
+    if api_key:
+        try:
+            raw = call_chat_completion(base_url, api_key, model, build_repo_match_prompt(video, insight, search_terms, candidates))
+            selection = json.loads(raw)
+        except (urllib.error.URLError, KeyError, json.JSONDecodeError, TimeoutError):
+            selection = {}
+    if not selection:
+        selection = heuristic_rank_repo(video, insight, search_terms, candidates)
+
+    selected_url = str(selection.get("selected_url") or "").strip()
+    confidence = float(selection.get("confidence") or 0)
+    if not selected_url or confidence < 0.75:
+        return []
+    matched_repo = next((repo for repo in candidates if repo.get("html_url") == selected_url), {})
+    metadata = fetch_github_repo_metadata(selected_url) or matched_repo
+    return [
+        {
+            "url": metadata.get("html_url") or selected_url,
+            "metadata": metadata,
+            "match_confidence": round(confidence, 2),
+            "match_reason": str(selection.get("reason") or "AI 精准搜索匹配。"),
+            "matched_terms": selection.get("matched_terms") or search_terms[:3],
+        }
+    ]
+
 def collect_github_urls(insight: Optional[dict], note_text: str) -> list[str]:
     urls = set(GITHUB_RE.findall(note_text or ""))
     for asset in (insight or {}).get("core_assets", []) or []:
@@ -69,6 +305,11 @@ def collect_github_urls(insight: Optional[dict], note_text: str) -> list[str]:
 
 def sync_open_source_candidates(root: Path, video: dict, insight: Optional[dict], note_text: str) -> int:
     urls = collect_github_urls(insight, note_text)
+    precise_matches = precise_match_github_repos(root, video, insight, note_text)
+    for match in precise_matches:
+        url = str(match.get("url") or "").strip()
+        if url and url not in urls:
+            urls.append(url)
     if not urls:
         return 0
     candidates_path = root / "projects" / "project_candidates.json"
@@ -77,8 +318,10 @@ def sync_open_source_candidates(root: Path, video: dict, insight: Optional[dict]
         candidates = []
     by_url = {str(item.get("url") or ""): item for item in candidates if isinstance(item, dict)}
     added = 0
+    precise_by_url = {str(match.get("url") or ""): match for match in precise_matches}
     for url in urls:
-        metadata = fetch_github_repo_metadata(url)
+        precise_match = precise_by_url.get(url) or {}
+        metadata = precise_match.get("metadata") or fetch_github_repo_metadata(url)
         existing = by_url.get(url) or {}
         item = {
             **existing,
@@ -95,7 +338,11 @@ def sync_open_source_candidates(root: Path, video: dict, insight: Optional[dict]
             "risk": existing.get("risk") or "",
             "priority": existing.get("priority") or video.get("priority") or "P1",
             "status": existing.get("status") or "candidate",
-            "need_verify": True,
+            "need_verify": False if precise_match.get("match_confidence", 0) >= 0.85 else True,
+            "match_source": existing.get("match_source") or ("ai_github_search" if precise_match else "explicit_url"),
+            "match_confidence": existing.get("match_confidence") or precise_match.get("match_confidence", 1.0 if not precise_match else 0),
+            "match_reason": existing.get("match_reason") or precise_match.get("match_reason", "笔记或洞察中出现明确 GitHub URL。"),
+            "matched_terms": existing.get("matched_terms") or precise_match.get("matched_terms", []),
             "homepage": existing.get("homepage") or metadata.get("homepage") or "",
             "stars": existing.get("stars") or metadata.get("stars") or 0,
             "forks": existing.get("forks") or metadata.get("forks") or 0,

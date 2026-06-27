@@ -68,6 +68,14 @@ export function Candidates({
               <MacPanel title={activeProject.name} meta={localizeLabel(activeProject.type)}>
                 <div className="mac-inspector-content">
                   <p>{activeProject.description || "从视频笔记中提取出来的开源项目候选。"}</p>
+                  {activeProject.match_source ? (
+                    <div className="mac-row-meta">
+                      <span>{activeProject.match_source === "ai_github_search" ? "AI 精准匹配" : "明确链接"}</span>
+                      {typeof activeProject.match_confidence === "number" ? (
+                        <span>置信度 {Math.round(activeProject.match_confidence * 100)}%</span>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <div className="mac-project-metrics">
                     {typeof activeProject.stars === "number" ? (
                       <span className="mac-project-metric">
@@ -121,6 +129,22 @@ export function Candidates({
                       <div className="mac-row-meta">{activeProject.source_note}</div>
                     </div>
                   </div>
+                  {activeProject.match_reason ? (
+                    <div className="mac-native-row">
+                      <div>
+                        <div className="mac-row-title">匹配依据</div>
+                        <div className="mac-row-meta">{activeProject.match_reason}</div>
+                      </div>
+                    </div>
+                  ) : null}
+                  {activeProject.matched_terms?.length ? (
+                    <div className="mac-native-row">
+                      <div>
+                        <div className="mac-row-title">匹配词</div>
+                        <div className="mac-row-meta">{activeProject.matched_terms.join(" · ")}</div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </MacPanel>
             </div>
@@ -143,6 +167,7 @@ export function Candidates({
               <p className="mac-inspector-meta">{t("projects.forks")}: {activeProject?.forks ?? 0}</p>
               <p className="mac-inspector-meta">{t("projects.language")}: {activeProject?.language || "-"}</p>
               <p className="mac-inspector-meta">{t("projects.updatedAt")}: {formatProjectDate(activeProject?.pushed_at)}</p>
+              <p className="mac-inspector-meta">匹配: {formatMatchSource(activeProject)}</p>
             </div>
           </MacPanel>
         </div>
@@ -165,4 +190,15 @@ function formatProjectDate(raw?: string) {
     month: "2-digit",
     day: "2-digit",
   });
+}
+
+function formatMatchSource(project: Project | null) {
+  if (!project?.match_source) {
+    return "-";
+  }
+  const source = project.match_source === "ai_github_search" ? "AI 精准搜索" : "明确链接";
+  if (typeof project.match_confidence !== "number") {
+    return source;
+  }
+  return `${source} · ${Math.round(project.match_confidence * 100)}%`;
 }

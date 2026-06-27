@@ -110,6 +110,10 @@ export interface Project {
   priority: string;
   status: string;
   need_verify: boolean;
+  match_source?: string;
+  match_confidence?: number;
+  match_reason?: string;
+  matched_terms?: string[];
   homepage?: string;
   stars?: number;
   forks?: number;
