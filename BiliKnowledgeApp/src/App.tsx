@@ -1261,7 +1261,19 @@ function App() {
   const reviewedCount = videos.filter((video) => video.status === "reviewed").length;
   const pendingCount = videos.filter((video) => video.status === "pending").length;
   const p0Count = videos.filter((video) => video.priority === "P0").length;
-  const noteCount = videos.filter((video) => video.note_ready && video.note_path && video.note_generation_mode === "single").length;
+  const generatedNoteVideos = useMemo(
+    () =>
+      videos
+        .filter((video) => video.note_ready && video.note_path && video.note_generation_mode === "single")
+        .sort((a, b) => {
+          const aTime = Date.parse(a.note_generated_at || "") || 0;
+          const bTime = Date.parse(b.note_generated_at || "") || 0;
+          if (aTime !== bTime) return bTime - aTime;
+          return compareVideosByRecency(a, b);
+        }),
+    [videos],
+  );
+  const noteCount = generatedNoteVideos.length;
 
   const toolbarAction = getToolbarAction({
     currentView,
@@ -1537,6 +1549,7 @@ function App() {
               projects,
               reviewedCount,
               videos,
+              generatedNoteVideos,
             })}
           {currentView === "scripts" &&
             renderScripts({
@@ -2361,6 +2374,7 @@ function renderKnowledge({
   projects,
   reviewedCount,
   videos,
+  generatedNoteVideos,
 }: {
   openVideoInNotes: (video: Video) => void;
   openVideoInFavorites: (video: Video) => void;
@@ -2373,6 +2387,7 @@ function renderKnowledge({
   projects: Project[];
   reviewedCount: number;
   videos: Video[];
+  generatedNoteVideos: Video[];
 }) {
   const folders = [
     { name: "manifest", count: videos.length, onClick: onOpenVideoFavorites },
@@ -2391,8 +2406,8 @@ function renderKnowledge({
   }
 
   function onOpenNotes() {
-    if (videos[0]) {
-      openVideoInNotes(videos[0]);
+    if (generatedNoteVideos[0]) {
+      openVideoInNotes(generatedNoteVideos[0]);
       return;
     }
     onRefreshKnowledge();
@@ -2464,10 +2479,10 @@ function renderKnowledge({
             <section className="bk-panel kb-notes-panel">
               <header className="panel-header">
                 <h2>{t("kb.recentNotes")}</h2>
-                <span>{t("kb.totalItems", { count: videos.length })}</span>
+                <span>{t("kb.totalItems", { count: generatedNoteVideos.length })}</span>
               </header>
               <div className="kb-note-list">
-                {videos.slice(0, 7).map((video) => (
+                {generatedNoteVideos.slice(0, 7).map((video) => (
                   <button
                     className="kb-note-row w-full text-left"
                     key={video.id}
@@ -2475,7 +2490,7 @@ function renderKnowledge({
                     type="button"
                   >
                     <div className="kb-note-main">
-                      <div className="kb-note-title">{video.id}.md</div>
+                      <div className="kb-note-title">{video.note_path || `${video.id}.md`}</div>
                       <div className="kb-note-subtitle">{video.title}</div>
                     </div>
                     <div className="kb-note-status">
@@ -2483,6 +2498,14 @@ function renderKnowledge({
                     </div>
                   </button>
                 ))}
+                {generatedNoteVideos.length === 0 ? (
+                  <div className="kb-note-row">
+                    <div className="kb-note-main">
+                      <div className="kb-note-title">暂无生成笔记</div>
+                      <div className="kb-note-subtitle">从收藏夹选择视频，完成“生成笔记”后会显示在这里。</div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </section>
 
