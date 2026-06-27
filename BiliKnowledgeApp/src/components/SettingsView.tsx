@@ -11,7 +11,7 @@ import {
 import { cn } from "../lib/utils";
 import { t } from "../i18n";
 import { BilibiliLogin } from "./BilibiliLogin";
-import type { AppearancePreference, DensityPreference, FontPreference } from "../app/app-model";
+import type { AppearancePreference, DensityPreference } from "../app/app-model";
 
 interface Config {
   bilibili: {
@@ -31,7 +31,7 @@ interface Config {
     language: string;
     appearance: AppearancePreference;
     timezone: string;
-    fontFamily: FontPreference;
+    fontFamily: string;
     density: DensityPreference;
   };
 }
@@ -170,12 +170,6 @@ function helpDocMarkdown(key: HelpDocKey): string {
   return docs[key];
 }
 
-const fontOptions: Array<{ value: FontPreference; label: string; detail: string }> = [
-  { value: "system", label: "System UI", detail: "SF Pro / Inter / PingFang SC" },
-  { value: "rounded", label: "Rounded", detail: "SF Pro Rounded / Nunito / PingFang SC" },
-  { value: "serif", label: "Serif", detail: "New York / Noto Serif SC" },
-  { value: "mono", label: "Mono", detail: "SF Mono / JetBrains Mono / Menlo" },
-];
 
 const settingsSectionKeys = [
   "settings.general",
@@ -218,13 +212,11 @@ function normalizeConfig(value: unknown): Config {
 export function SettingsView({
   onLanguageChange,
   onAppearanceChange,
-  onFontChange,
   onDensityChange,
   onTimezoneChange,
 }: {
   onLanguageChange?: (lang: string) => void;
   onAppearanceChange?: (appearance: AppearancePreference) => void;
-  onFontChange?: (fontFamily: FontPreference) => void;
   onDensityChange?: (density: DensityPreference) => void;
   onTimezoneChange?: (timezone: string) => void;
 }) {
@@ -621,13 +613,6 @@ export function SettingsView({
                 ))}
               </select>
             </MacSettingsRow>
-            <MacSettingsRow detail={t("settings.localeDesc")} label={t("settings.locale")}>
-              <span className="mac-inspector-meta">
-                {languageOptions.find((language) => language.value === config.preferences.language)?.detail}
-                {" · "}
-                {config.preferences.language}
-              </span>
-            </MacSettingsRow>
             <MacSettingsRow detail={t("settings.timezoneDesc")} label={t("settings.timezone")}>
               <select
                 className="mac-select"
@@ -658,23 +643,6 @@ export function SettingsView({
                 <option value="light">{t("settings.modernLight")}</option>
                 <option value="dark">{t("settings.dark")}</option>
                 <option value="system">{t("settings.system")}</option>
-              </select>
-            </MacSettingsRow>
-            <MacSettingsRow detail={t("settings.fontDesc")} label={t("settings.font")}>
-              <select
-                className="mac-select"
-                onChange={(event) => {
-                  const fontFamily = event.target.value as FontPreference;
-                  updatePreferences({ fontFamily });
-                  onFontChange?.(fontFamily);
-                }}
-                value={config.preferences.fontFamily}
-              >
-                {fontOptions.map((font) => (
-                  <option key={font.value} value={font.value}>
-                    {font.label} · {font.detail}
-                  </option>
-                ))}
               </select>
             </MacSettingsRow>
             <MacSettingsRow detail={t("settings.densityDesc")} label={t("settings.density")}>

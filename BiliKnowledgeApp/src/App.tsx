@@ -292,11 +292,6 @@ function App() {
     void persistPreferencePatch({ appearance: nextAppearance }).catch((err) => appendLog(`外观偏好保存失败：${String(err)}`));
   }
 
-  function handleFontChange(nextFont: FontPreference) {
-    setFontPreference(nextFont);
-    void persistPreferencePatch({ fontFamily: nextFont }).catch((err) => appendLog(`字体偏好保存失败：${String(err)}`));
-  }
-
   function handleDensityChange(nextDensity: DensityPreference) {
     setDensityPreference(nextDensity);
     void persistPreferencePatch({ density: nextDensity }).catch((err) => appendLog(`密度偏好保存失败：${String(err)}`));
@@ -1503,7 +1498,6 @@ function App() {
               <LazySettingsView
                 onAppearanceChange={handleAppearanceChange}
                 onDensityChange={handleDensityChange}
-                onFontChange={handleFontChange}
                 onLanguageChange={handleLanguageChange}
                 onTimezoneChange={handleTimezoneChange}
               />
