@@ -5133,3 +5133,169 @@ textarea,
 .markdown-body {
   font-family: var(--bk-font-body) !important;
 }
+
+/* Thoughts: manual idea injection + compact de-duplicated AI signals. */
+.mac-textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--bk-input-border);
+  border-radius: var(--bk-radius-control);
+  background: var(--bk-input-bg);
+  color: var(--bk-label);
+  padding: 10px 11px;
+  font-size: 13px;
+  line-height: 1.55;
+  outline: 0;
+  resize: vertical;
+}
+
+.mac-textarea:focus {
+  border-color: var(--bk-blue);
+  box-shadow: 0 0 0 3px var(--bk-input-focus-ring);
+}
+
+.thoughts-page {
+  gap: 14px;
+}
+
+.thoughts-hero {
+  padding: 18px 22px;
+}
+
+.thoughts-editor-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.thoughts-editor-form {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+
+.thoughts-editor-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.thoughts-user-list {
+  display: grid;
+  gap: 10px;
+}
+
+.thought-user-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--bk-separator);
+  border-radius: var(--bk-radius-panel);
+  background: var(--bk-card-bg);
+  box-shadow: var(--bk-shadow-subtle);
+}
+
+.thought-user-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.thought-user-card h3 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.thought-user-card header span,
+.thought-user-card p {
+  margin: 0;
+  color: var(--bk-secondary-label);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.thought-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.thought-delete-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--bk-separator);
+  border-radius: 999px;
+  background: var(--bk-elevated-bg);
+  color: var(--bk-tertiary-label);
+}
+
+.thought-delete-button:hover {
+  color: var(--bk-red);
+  border-color: color-mix(in srgb, var(--bk-red) 35%, var(--bk-separator));
+}
+
+.thoughts-feed-grid {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.thought-signal-card {
+  min-height: 0;
+}
+
+.thought-signal-card .dashboard-board-feed {
+  max-height: 220px;
+}
+
+.thought-title-input,
+.thought-tags-input,
+.thought-content-input {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--bk-label);
+  outline: 0;
+}
+
+.thought-title-input {
+  padding: 2px 0;
+  font-size: 15px;
+  font-weight: 680;
+  line-height: 1.35;
+}
+
+.thought-content-input {
+  min-height: 72px;
+  padding: 8px 9px;
+  color: var(--bk-secondary-label);
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.thought-tags-input {
+  padding: 7px 9px;
+  color: var(--bk-secondary-label);
+  font-size: 12px;
+}
+
+.thought-title-input:focus,
+.thought-tags-input:focus,
+.thought-content-input:focus {
+  border-color: var(--bk-input-border);
+  background: var(--bk-input-bg);
+  box-shadow: 0 0 0 3px var(--bk-input-focus-ring);
+}
+
+.thought-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}

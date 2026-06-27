@@ -607,6 +607,65 @@ fn update_video_status(id: String, status: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn get_user_ideas() -> Result<String, String> {
+    let path = knowledge_path("thoughts/user_ideas.json")?;
+    if !path.exists() {
+        return Ok("[]".into());
+    }
+    let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let parsed: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Invalid user ideas JSON: {e}"))?;
+    if !parsed.is_array() {
+        return Err("Invalid user ideas JSON: root must be an array".into());
+    }
+    Ok(content)
+}
+
+#[tauri::command]
+fn save_user_ideas(ideas: String) -> Result<(), String> {
+    let parsed: serde_json::Value = serde_json::from_str(&ideas)
+        .map_err(|e| format!("Invalid user ideas JSON: {e}"))?;
+    let Some(items) = parsed.as_array() else {
+        return Err("Invalid user ideas JSON: root must be an array".into());
+    };
+    let mut sanitized = Vec::new();
+    for item in items.iter().take(500) {
+        let Some(obj) = item.as_object() else { continue; };
+        let title = obj.get("title").and_then(|v| v.as_str()).unwrap_or("").trim();
+        let content = obj.get("content").and_then(|v| v.as_str()).unwrap_or("").trim();
+        if title.is_empty() && content.is_empty() { continue; }
+        let tags = obj
+            .get("tags")
+            .and_then(|v| v.as_array())
+            .map(|values| {
+                values
+                    .iter()
+                    .filter_map(|v| v.as_str())
+                    .map(|v| v.trim())
+                    .filter(|v| !v.is_empty())
+                    .take(12)
+                    .map(|v| serde_json::Value::String(v.to_string()))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        sanitized.push(serde_json::json!({
+            "id": obj.get("id").and_then(|v| v.as_str()).unwrap_or(""),
+            "title": title.chars().take(120).collect::<String>(),
+            "content": content.chars().take(4000).collect::<String>(),
+            "tags": tags,
+            "created_at": obj.get("created_at").and_then(|v| v.as_str()).unwrap_or(""),
+            "updated_at": obj.get("updated_at").and_then(|v| v.as_str()).unwrap_or(""),
+        }));
+    }
+    let path = knowledge_path("thoughts/user_ideas.json")?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let content = serde_json::to_string_pretty(&sanitized).map_err(|e| e.to_string())?;
+    fs::write(path, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn get_projects() -> Result<String, String> {
     let path = knowledge_path("projects/project_candidates.json")?;
     if !path.exists() {
@@ -944,6 +1003,8 @@ pub fn run() {
             validate_bilibili_cookie,
             get_note,
             get_projects,
+            get_user_ideas,
+            save_user_ideas,
             get_insights,
             get_subtitles,
             get_config,

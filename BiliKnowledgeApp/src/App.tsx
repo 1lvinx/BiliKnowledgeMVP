@@ -17,6 +17,7 @@ import {
   LayoutDashboard,
   Library,
   Moon,
+  Plus,
   PlaySquare,
   RefreshCw,
   Search,
@@ -26,6 +27,7 @@ import {
   Star,
   Sun,
   Tag,
+  Trash2,
   Terminal,
 } from "lucide-react";
 import { FavoriteFolder, ProcessingStatus, Project, Video, VideoInsight, VideoSubtitle } from "./types";
@@ -90,6 +92,21 @@ const LazyReactMarkdown = lazy(() => import("react-markdown"));
 
 function isTauriRuntime() {
   return isTauri() || (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);
+}
+
+interface UserIdea {
+  id: string;
+  title: string;
+  content: string;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+const PREVIEW_USER_IDEAS_STORAGE_KEY = "biliknowledge.preview.userIdeas";
+
+function createIdeaId() {
+  return `idea-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 
@@ -247,6 +264,7 @@ function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [insights, setInsights] = useState<VideoInsight[]>([]);
   const [subtitles, setSubtitles] = useState<VideoSubtitle[]>([]);
+  const [userIdeas, setUserIdeas] = useState<UserIdea[]>([]);
   const [subtitleExtracting, setSubtitleExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
@@ -324,6 +342,60 @@ function App() {
     const parsed = JSON.parse(raw);
     const preferences = { ...(parsed.preferences ?? {}), ...patch };
     await invoke("save_config", { config: JSON.stringify({ ...parsed, preferences }) });
+  }
+
+  async function loadUserIdeas() {
+    if (!tauriAvailable) {
+      const cached = window.localStorage.getItem(PREVIEW_USER_IDEAS_STORAGE_KEY);
+      setUserIdeas(cached ? JSON.parse(cached) : []);
+      return;
+    }
+    const raw: string = await invoke("get_user_ideas");
+    setUserIdeas(JSON.parse(raw));
+  }
+
+  async function persistUserIdeas(nextIdeas: UserIdea[]) {
+    setUserIdeas(nextIdeas);
+    if (!tauriAvailable) {
+      window.localStorage.setItem(PREVIEW_USER_IDEAS_STORAGE_KEY, JSON.stringify(nextIdeas));
+      return;
+    }
+    await invoke("save_user_ideas", { ideas: JSON.stringify(nextIdeas) });
+  }
+
+  async function addUserIdea(input: { title: string; content: string; tags: string[] }) {
+    const now = new Date().toISOString();
+    const nextIdea: UserIdea = {
+      id: createIdeaId(),
+      title: input.title.trim(),
+      content: input.content.trim(),
+      tags: input.tags.map((tag) => tag.trim()).filter(Boolean),
+      created_at: now,
+      updated_at: now,
+    };
+    if (!nextIdea.title && !nextIdea.content) return;
+    await persistUserIdeas([nextIdea, ...userIdeas]);
+    appendLog(`已保存想法：${nextIdea.title || nextIdea.content.slice(0, 18)}`);
+  }
+
+  async function updateUserIdea(id: string, input: { title: string; content: string; tags: string[] }) {
+    const now = new Date().toISOString();
+    await persistUserIdeas(userIdeas.map((idea) => (
+      idea.id === id
+        ? {
+            ...idea,
+            title: input.title.trim(),
+            content: input.content.trim(),
+            tags: input.tags.map((tag) => tag.trim()).filter(Boolean),
+            updated_at: now,
+          }
+        : idea
+    )));
+    appendLog(`已更新想法：${input.title.trim() || input.content.trim().slice(0, 18)}`);
+  }
+
+  async function deleteUserIdea(id: string) {
+    await persistUserIdeas(userIdeas.filter((idea) => idea.id !== id));
   }
 
   async function setAppearanceAndPersist(nextAppearance: AppearancePreference) {
@@ -1005,6 +1077,7 @@ function App() {
     fetchInsights();
     fetchSubtitles();
     fetchProcessingStatus();
+    void loadUserIdeas().catch((err) => appendLog(`想法加载失败：${String(err)}`));
     if (!tauriAvailable) {
       setPipelineStatus(buildPreviewPipelineStatus());
       setInsights(previewInsights);
@@ -1489,7 +1562,11 @@ function App() {
           {currentView === "tags" && (
             renderThoughts({
               insights,
+              onAddIdea: addUserIdea,
+              onDeleteIdea: deleteUserIdea,
+              onUpdateIdea: updateUserIdea,
               openVideoInNotes,
+              userIdeas,
               videos,
             })
           )}
@@ -2522,37 +2599,129 @@ function renderKnowledge({
   );
 }
 
+function normalizeThoughtTitle(title: string) {
+  return title
+    .toLowerCase()
+    .replace(/[\s\p{P}\p{S}]+/gu, "")
+    .slice(0, 80);
+}
+
+function parseIdeaTags(raw: FormDataEntryValue | null) {
+  return String(raw || "")
+    .split(/[，,#\s]+/)
+    .map((tag) => tag.trim().replace(/^#/, ""))
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
 function renderThoughts({
   insights,
+  onAddIdea,
+  onDeleteIdea,
+  onUpdateIdea,
   openVideoInNotes,
+  userIdeas,
   videos,
 }: {
   insights: VideoInsight[];
+  onAddIdea: (input: { title: string; content: string; tags: string[] }) => Promise<void>;
+  onDeleteIdea: (id: string) => Promise<void>;
+  onUpdateIdea: (id: string, input: { title: string; content: string; tags: string[] }) => Promise<void>;
   openVideoInNotes: (video: Video) => void;
+  userIdeas: UserIdea[];
   videos: Video[];
 }) {
   const insightMap = new Map(insights.map((item) => [item.video_id, item]));
+  const seenTitles = new Set<string>();
   const cards = [...videos]
     .sort(compareVideosByRecency)
-    .slice(0, 24)
+    .filter((video) => {
+      const key = normalizeThoughtTitle(video.title || video.id);
+      if (!key) return true;
+      if (seenTitles.has(key)) return false;
+      seenTitles.add(key);
+      return true;
+    })
+    .slice(0, 18)
     .map((video) => ({
       video,
       insight: insightMap.get(video.id) ?? null,
     }));
 
+  async function handleIdeaSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    await onAddIdea({
+      title: String(data.get("title") || ""),
+      content: String(data.get("content") || ""),
+      tags: parseIdeaTags(data.get("tags")),
+    });
+    form.reset();
+  }
+
+  async function handleIdeaUpdate(event: React.FormEvent<HTMLFormElement>, id: string) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    await onUpdateIdea(id, {
+      title: String(data.get("title") || ""),
+      content: String(data.get("content") || ""),
+      tags: parseIdeaTags(data.get("tags")),
+    });
+  }
+
   return (
     <div className="mac-page-scroll custom-scrollbar">
-      <div className="dashboard-page">
-        <section className="dashboard-hero">
+      <div className="dashboard-page thoughts-page">
+        <section className="dashboard-hero thoughts-hero">
           <div className="dashboard-hero-main">
             <div className="dashboard-hero-badge">{t("kb.thoughts")}</div>
-            <h1 className="dashboard-hero-title">按最新内容整理的思考卡片</h1>
-            <p className="dashboard-hero-text">这里展示最近收藏内容的核心判断、适用场景与下一步跟进入口。</p>
+            <h1 className="dashboard-hero-title">人工想法 + AI 线索</h1>
+            <p className="dashboard-hero-text">把你的真实判断、下一步动作和标签注入知识库；下面只保留去重后的最近内容线索。</p>
           </div>
         </section>
-        <section className="dashboard-body-grid">
+
+        <section className="thoughts-editor-panel bk-panel">
+          <header className="panel-header">
+            <h2>新增想法</h2>
+            <span>写给未来的自己</span>
+          </header>
+          <form className="thoughts-editor-form" onSubmit={handleIdeaSubmit}>
+            <input className="mac-input" name="title" placeholder="一句话标题，例如：这个项目适合做本地 RAG 工具链" />
+            <textarea className="mac-textarea" name="content" placeholder="真实想法、判断依据、下一步动作。尽量写具体：为什么值得跟进？怎么用？风险是什么？" rows={4} />
+            <div className="thoughts-editor-bottom">
+              <input className="mac-input" name="tags" placeholder="tags：RAG，开源项目，待验证" />
+              <button className="mac-toolbar-button is-primary" type="submit"><Plus size={14} /><span>保存想法</span></button>
+            </div>
+          </form>
+        </section>
+
+        {userIdeas.length > 0 ? (
+          <section className="thoughts-user-list">
+            {userIdeas.map((idea) => (
+              <form className="thought-user-card" key={idea.id} onSubmit={(event) => void handleIdeaUpdate(event, idea.id)}>
+                <header>
+                  <div>
+                    <input className="thought-title-input" name="title" defaultValue={idea.title} placeholder="未命名想法" />
+                    <span>{formatVideoTime(idea.updated_at || idea.created_at)}</span>
+                  </div>
+                  <div className="thought-card-actions">
+                    <button className="mac-toolbar-button" type="submit"><span>保存</span></button>
+                    <button className="thought-delete-button" onClick={() => void onDeleteIdea(idea.id)} title="删除想法" type="button">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </header>
+                <textarea className="thought-content-input" name="content" defaultValue={idea.content} placeholder="写下真实想法、判断和下一步动作" rows={3} />
+                <input className="thought-tags-input" name="tags" defaultValue={idea.tags.join("，")} placeholder="tags：RAG，开源项目，待验证" />
+              </form>
+            ))}
+          </section>
+        ) : null}
+
+        <section className="dashboard-body-grid thoughts-feed-grid">
           {cards.map(({ video, insight }) => (
-            <article className="dashboard-board" key={video.id}>
+            <article className="dashboard-board thought-signal-card" key={video.id}>
               <header className="dashboard-board-head">
                 <div>
                   <h3>{video.title}</h3>
@@ -2575,7 +2744,7 @@ function renderThoughts({
                     </div>
                   </div>
                 </div>
-                {(insight?.problem_statements?.slice(0, 3) || []).map((item, index) => (
+                {(insight?.problem_statements?.slice(0, 1) || []).map((item, index) => (
                   <div className="dashboard-feed-row" key={`${video.id}-problem-${index}`}>
                     <div className="dashboard-feed-main">
                       <div className="dashboard-feed-title">解决的问题</div>
@@ -2585,7 +2754,7 @@ function renderThoughts({
                     </div>
                   </div>
                 ))}
-                {(insight?.use_cases?.slice(0, 3) || []).map((item, index) => (
+                {(insight?.use_cases?.slice(0, 1) || []).map((item, index) => (
                   <div className="dashboard-feed-row" key={`${video.id}-usecase-${index}`}>
                     <div className="dashboard-feed-main">
                       <div className="dashboard-feed-title">适用场景</div>

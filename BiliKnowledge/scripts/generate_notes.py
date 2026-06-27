@@ -625,136 +625,112 @@ def format_open_source_assets(insight: Optional[dict]) -> str:
         assets.append(f"- {label}")
     return "\n".join(assets) if assets else "- 未提取到明确开源仓库或项目地址。"
 
+def take_items(items: list[str], limit: int) -> list[str]:
+    return [str(item).strip() for item in items if str(item).strip()][:limit]
+
+
+def format_numbered(items: list[str], fallback: str = "信息不足，需人工复核原视频。", limit: int = 4) -> str:
+    cleaned = take_items(items, limit)
+    if not cleaned:
+        cleaned = [fallback]
+    return "\n".join(f"{index}. {item}" for index, item in enumerate(cleaned, 1))
+
+
 def build_note(video: dict, insight: Optional[dict], subtitle: Optional[dict]) -> str:
     summary = (insight or {}).get("summary") or "待补充。"
-    key_points = (insight or {}).get("key_points") or ["待补充"]
+    key_points = take_items((insight or {}).get("key_points") or [], 4)
     tags = (insight or {}).get("insight_tags") or video.get("tags", [])
-    use_cases = (insight or {}).get("use_cases") or ["信息不足，需人工复核原视频。"]
-    reusable_value = (insight or {}).get("reusable_value") or []
-    workflow_steps = (insight or {}).get("workflow_steps") or []
-    evidence = (insight or {}).get("evidence") or []
-    limitations = (insight or {}).get("limitations") or []
+    use_cases = take_items((insight or {}).get("use_cases") or [], 3)
+    reusable_value = take_items((insight or {}).get("reusable_value") or [], 3)
+    workflow_steps = take_items((insight or {}).get("workflow_steps") or [], 5)
+    evidence = take_items((insight or {}).get("evidence") or [], 3)
+    limitations = take_items((insight or {}).get("limitations") or [], 3)
     evidence_quality = str((insight or {}).get("evidence_quality") or "medium").strip() or "medium"
-    problem_statements = (insight or {}).get("problem_statements") or ["待补充"]
-    category_paths = (insight or {}).get("category_paths") or [video.get("category", "未分类") or "未分类"]
+    problem_statements = take_items((insight or {}).get("problem_statements") or [], 2)
+    category_paths = take_items((insight or {}).get("category_paths") or [video.get("category", "未分类") or "未分类"], 3)
     core_assets = (insight or {}).get("core_assets") or []
     subtitle_text = (subtitle or {}).get("raw_text") or "暂无字幕。"
     subtitle_ok = subtitle_matches_video(video, subtitle)
-    subtitle_warning = ""
     if subtitle_ok:
-        subtitle_excerpt = "\n".join(subtitle_text.splitlines()[:20]).strip()
-        if not subtitle_excerpt:
-            subtitle_excerpt = "暂无字幕。"
+        subtitle_excerpt = "\n".join(subtitle_text.splitlines()[:8]).strip() or "暂无字幕。"
     else:
-        subtitle_excerpt = "字幕内容疑似与当前视频不匹配，已跳过自动引用，建议人工复核后再使用。"
-        if subtitle and str(subtitle.get("raw_text", "")).strip():
-            subtitle_warning = "> 注意：当前抓取到的字幕与视频标题/上下文疑似不一致，已自动降级处理。\n"
+        subtitle_excerpt = "字幕内容疑似与当前视频不匹配，建议人工复核。"
 
-    key_points_md = "\n".join(f"- {point}" for point in key_points)
-    use_cases_md = format_bullets(use_cases)
-    reusable_value_md = format_bullets(reusable_value)
-    workflow_steps_md = format_bullets(workflow_steps)
-    evidence_md = format_bullets(evidence)
-    limitations_md = format_bullets(limitations)
+    one_line_value = reusable_value[0] if reusable_value else summary
+    key_points_md = format_bullets(key_points, fallback="信息不足，需人工复核原视频。")
+    use_cases_md = format_bullets(use_cases, fallback="信息不足，需人工复核原视频。")
+    workflow_steps_md = format_numbered(workflow_steps, limit=5)
+    evidence_md = format_bullets(evidence, fallback="证据不足，需人工复核原视频。")
+    limitations_md = format_bullets(limitations, fallback="限制信息不足，需人工复核。")
     evidence_quality_label = {"high": "高", "medium": "中", "low": "低"}.get(evidence_quality.lower(), evidence_quality)
-    problem_md = "\n".join(f"- {professionalize_problem_statement(item)}" for item in problem_statements)
-    category_md = "\n".join(f"- `{item}`" for item in category_paths)
+    problem_md = "\n".join(f"- {professionalize_problem_statement(item)}" for item in problem_statements) or "- 待补充。"
+    category_md = " / ".join(f"`{item}`" for item in category_paths) if category_paths else "`未分类`"
+    open_source_assets_md = format_open_source_assets(insight)
+
     named_assets = []
     for asset in core_assets:
         name = str(asset.get("name", "")).strip()
         if name:
             asset_type = str(asset.get("asset_type", "")).strip()
+            role = str(asset.get("role") or asset.get("solves") or "").strip()
+            label = f"`{name}`"
             if asset_type:
-                named_assets.append(f"- `{name}` ({asset_type})")
-            else:
-                named_assets.append(f"- `{name}`")
+                label += f"（{asset_type}）"
+            if role:
+                label += f"：{role}"
+            named_assets.append(f"- {label}")
     if not named_assets:
         fallback_terms = infer_named_terms(video, insight)
         named_assets = [f"- `{item}`" for item in fallback_terms]
-    core_terms_md = "\n".join(named_assets) if named_assets else "- 待补充"
-    open_source_assets_md = format_open_source_assets(insight)
+    core_terms_md = "\n".join(named_assets[:8]) if named_assets else "- 待补充"
 
-    return f"""## 内容概述
+    return f"""## 一句话价值
 
-> {summary}
+{one_line_value}
 
----
+## 一手资源
 
-## 核心观点
+{open_source_assets_md}
+
+## 关键判断
 
 {key_points_md}
 
----
-
-## 可复用价值
-
-{reusable_value_md}
-
----
-
-## 操作流程 / 方法
+## 怎么用
 
 {workflow_steps_md}
-
----
 
 ## 适用场景
 
 {use_cases_md}
 
----
-
 ## 解决的问题
 
 {problem_md}
 
----
+## 注意事项
 
-## 判断依据
+{limitations_md}
+
+## 来源证据
 
 证据质量：**{evidence_quality_label}**
 
 {evidence_md}
 
----
-
-## 限制与风险
-
-{limitations_md}
-
----
-
-## 开源仓库 / 项目
-
-{open_source_assets_md}
-
----
+```text
+{subtitle_excerpt}
+```
 
 ## 关键名词
 
 {core_terms_md}
 
----
-
-## 归类路径
+## 归类 / 标签
 
 {category_md}
 
----
-
-## 检索标签
-
 {format_tags(tags)}
-
----
-
-## 字幕参考
-
-{subtitle_warning}
-
-```text
-{subtitle_excerpt}
-```
 """
 
 
