@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
+import bizhiIcon from "../assets/bizhi-icon.png";
 import { cn } from "../lib/utils";
 import { t } from "../i18n";
 
@@ -45,7 +46,7 @@ export function MacSidebar({
         </button>
       </div>
       <div className="mac-sidebar-brand">
-        <div className="mac-sidebar-brand-mark">哔</div>
+        <img className="mac-sidebar-brand-mark" src={bizhiIcon} alt="哔知" />
         <div className="mac-sidebar-brand-copy">
           <strong>哔知</strong>
           <span>{t("sidebar.localIntelligenceStudio")}</span>

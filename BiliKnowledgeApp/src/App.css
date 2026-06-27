@@ -332,16 +332,12 @@ textarea:focus-visible {
 }
 
 .mac-sidebar-brand-mark {
-  display: grid;
-  place-items: center;
+  display: block;
   width: 44px;
   height: 44px;
   border-radius: 14px;
-  background: linear-gradient(145deg, rgba(122, 162, 255, 0.95), rgba(177, 140, 255, 0.9));
-  color: #fff;
-  font-size: 14px;
-  font-weight: 780;
-  box-shadow: 0 8px 24px rgba(79, 70, 229, 0.25);
+  object-fit: cover;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.2);
 }
 
 .mac-toolbar-status {
