@@ -158,6 +158,26 @@ fn resolve_python_executable(project_root: &Path) -> Result<PathBuf, String> {
     )
 }
 
+fn augmented_script_path_env() -> String {
+    let current = std::env::var("PATH").unwrap_or_default();
+    let mut parts: Vec<String> = vec![
+        "/opt/homebrew/bin".into(),
+        "/opt/homebrew/sbin".into(),
+        "/usr/local/bin".into(),
+        "/usr/local/sbin".into(),
+        "/usr/bin".into(),
+        "/bin".into(),
+        "/usr/sbin".into(),
+        "/sbin".into(),
+    ];
+    for item in current.split(':') {
+        if !item.trim().is_empty() && !parts.iter().any(|existing| existing == item) {
+            parts.push(item.to_string());
+        }
+    }
+    parts.join(":")
+}
+
 fn resolve_base_path(base: &Path) -> Result<PathBuf, String> {
     // Like canonicalize but tolerates missing dirs
     if base.exists() {
@@ -683,6 +703,8 @@ async fn run_script<R: Runtime>(
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
     command.current_dir(&knowledge_root);
+    command.env("PATH", augmented_script_path_env());
+    command.env("PYTHONIOENCODING", "utf-8");
 
     let mut child = command.spawn().map_err(|e| e.to_string())?;
     let stdout = child

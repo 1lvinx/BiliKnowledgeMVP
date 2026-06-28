@@ -41,6 +41,26 @@ def status_line(ok: bool, label: str, detail: str = "") -> None:
     print(f"[{marker}] {label}{suffix}")
 
 
+def augmented_env() -> dict[str, str]:
+    env = os.environ.copy()
+    common_paths = [
+        "/opt/homebrew/bin",
+        "/opt/homebrew/sbin",
+        "/usr/local/bin",
+        "/usr/local/sbin",
+        "/usr/bin",
+        "/bin",
+        "/usr/sbin",
+        "/sbin",
+    ]
+    current = env.get("PATH", "")
+    parts = common_paths + [item for item in current.split(os.pathsep) if item]
+    deduped = list(dict.fromkeys(parts))
+    env["PATH"] = os.pathsep.join(deduped)
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+    return env
+
+
 def load_json(path: Path, default: Any) -> Any:
     if not path.exists():
         return default
@@ -61,7 +81,7 @@ def venv_python(project_root: Path) -> Path:
 
 def run(cmd: list[str], cwd: Path | None = None) -> int:
     print("$ " + " ".join(cmd))
-    return subprocess.call(cmd, cwd=str(cwd) if cwd else None)
+    return subprocess.call(cmd, cwd=str(cwd) if cwd else None, env=augmented_env())
 
 
 def ensure_venv(project_root: Path, fix: bool) -> tuple[bool, Path]:
@@ -80,9 +100,26 @@ def ensure_venv(project_root: Path, fix: bool) -> tuple[bool, Path]:
 
 
 def check_command(name: str) -> bool:
-    path = shutil.which(name)
+    path = shutil.which(name, path=augmented_env().get("PATH"))
     status_line(bool(path), f"系统命令 {name}", path or "未安装或不在 PATH")
     return bool(path)
+
+
+def fix_command(name: str) -> bool:
+    if check_command(name):
+        return True
+    if name != "ffmpeg":
+        return False
+    brew = shutil.which("brew", path=augmented_env().get("PATH"))
+    if not brew:
+        status_line(False, "ffmpeg 自动修复", "未找到 Homebrew。请先安装 Homebrew，或手动执行：brew install ffmpeg")
+        return False
+    print("\n[修复] 正在通过 Homebrew 安装 ffmpeg...")
+    rc = run([brew, "install", "ffmpeg"])
+    ok = rc == 0 and check_command("ffmpeg")
+    if not ok:
+        status_line(False, "ffmpeg 自动修复", "安装失败，请手动执行：brew install ffmpeg")
+    return ok
 
 
 def check_modules(python: Path) -> bool:
@@ -98,7 +135,7 @@ for m in mods:
         result[m] = {'ok': False, 'error': f'{type(exc).__name__}: {exc}'}
 print(json.dumps(result, ensure_ascii=False))
 """
-    proc = subprocess.run([str(python), "-c", code], capture_output=True, text=True)
+    proc = subprocess.run([str(python), "-c", code], capture_output=True, text=True, env=augmented_env())
     if proc.returncode != 0:
         status_line(False, "Python 依赖导入", proc.stderr.strip()[-500:])
         return False
@@ -127,7 +164,7 @@ print(json.dumps(result, ensure_ascii=False))
 
 
 def check_ytdlp_runtime(python: Path) -> bool:
-    proc = subprocess.run([str(python), "-m", "yt_dlp", "--version"], capture_output=True, text=True)
+    proc = subprocess.run([str(python), "-m", "yt_dlp", "--version"], capture_output=True, text=True, env=augmented_env())
     ok = proc.returncode == 0
     detail = proc.stdout.strip() or proc.stderr.strip()[-300:] or "yt-dlp 不可运行"
     status_line(ok, "yt-dlp 运行态", detail)
@@ -237,7 +274,8 @@ def main() -> int:
 
     ok = True
     ok = check_knowledge_root(root) and ok
-    ok = check_command("ffmpeg") and ok
+    ffmpeg_ok = fix_command("ffmpeg") if args.fix else check_command("ffmpeg")
+    ok = ffmpeg_ok and ok
     venv_ok, python = ensure_venv(project_root, args.fix)
     ok = venv_ok and ok
     if venv_ok:

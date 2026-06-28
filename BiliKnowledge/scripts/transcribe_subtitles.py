@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -26,6 +27,23 @@ STOPWORDS = {
     "什么", "如何", "一个", "我们", "你们", "他们", "这个", "那个", "就是", "然后", "因为",
     "可以", "视频", "教程", "分享", "实战", "方法", "使用", "入门", "完整", "最新", "真的",
 }
+
+
+def augmented_env() -> dict[str, str]:
+    env = os.environ.copy()
+    common_paths = [
+        "/opt/homebrew/bin",
+        "/opt/homebrew/sbin",
+        "/usr/local/bin",
+        "/usr/local/sbin",
+        "/usr/bin",
+        "/bin",
+        "/usr/sbin",
+        "/sbin",
+    ]
+    current = env.get("PATH", "")
+    env["PATH"] = os.pathsep.join(list(dict.fromkeys(common_paths + [item for item in current.split(os.pathsep) if item])))
+    return env
 
 
 def load_json(path: Path, default: Any) -> Any:
@@ -68,7 +86,7 @@ def write_cookies_file(cookie_header: str, path: Path) -> bool:
 
 
 def require_command(name: str) -> None:
-    if shutil.which(name) is None:
+    if shutil.which(name, path=augmented_env().get("PATH")) is None:
         raise RuntimeError(f"缺少系统依赖：{name}")
 
 
@@ -90,7 +108,7 @@ def download_audio(bvid: str, work_dir: Path, cookie_header: str = "") -> Path:
     cookie_path = work_dir / "cookies.txt"
     if cookie_header and write_cookies_file(cookie_header, cookie_path):
         cmd += ["--cookies", str(cookie_path), "--add-header", "Referer:https://www.bilibili.com"]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, env=augmented_env())
     if result.returncode != 0:
         raise RuntimeError(f"yt-dlp 下载音频失败：{result.stderr[-500:]}")
     for path in sorted(work_dir.glob(f"{bvid}.*")):
@@ -101,7 +119,7 @@ def download_audio(bvid: str, work_dir: Path, cookie_header: str = "") -> Path:
 
 def convert_to_wav(audio_path: Path, wav_path: Path) -> None:
     cmd = ["ffmpeg", "-y", "-i", str(audio_path), "-vn", "-ac", "1", "-ar", "16000", str(wav_path)]
-    result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, env=augmented_env())
     if result.returncode != 0 or not wav_path.exists():
         raise RuntimeError(f"ffmpeg 转码失败：{result.stderr[-500:]}")
 
