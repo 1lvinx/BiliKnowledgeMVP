@@ -52,6 +52,223 @@ const DEFAULT_CONFIG: &str = r#"{
   }
 }"#;
 
+
+const BILIBILI_RSA_PUBLIC_KEY: &str = "-----BEGIN PUBLIC KEY-----
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDLgd2OAkcGVtoE3ThUREbio0Eg
+Uc/prcajMKXvkCKFCWhJYJcLkcM2DKKcSeFpD/j6Boy538YXnR6VhcuUJOhH2x71
+nzPjfdTcqMz7djHKETI/PgKfSE78CIaFNyPJdIAUiPSYEM3elGMsJy0GWFZdWkKp
+PdQG/yLKQzBIIwIDAQAB
+-----END PUBLIC KEY-----";
+
+#[derive(Debug, Clone)]
+struct BilibiliCredentials {
+    sessdata: String,
+    bili_jct: String,
+    dedeuserid: String,
+    buvid3: String,
+    refresh_token: String,
+}
+
+fn extract_set_cookie_value(cookie_str: &str, name: &str) -> Option<String> {
+    let prefix = format!("{}=", name);
+    if !cookie_str.starts_with(&prefix) {
+        return None;
+    }
+    Some(cookie_str[prefix.len()..].split(';').next().unwrap_or("").to_string())
+}
+
+fn normalize_cookie_value(value: &str) -> std::borrow::Cow<'_, str> {
+    if value.contains('%') || !value.chars().any(|ch| matches!(ch, ',' | ';' | ' ' | '\t' | '\r' | '\n')) {
+        std::borrow::Cow::Borrowed(value)
+    } else {
+        std::borrow::Cow::Owned(urlencoding::encode(value).into_owned())
+    }
+}
+
+fn cookie_header_from_credentials(credentials: &BilibiliCredentials) -> String {
+    let mut parts = Vec::new();
+    if !credentials.sessdata.is_empty() {
+        parts.push(format!("SESSDATA={}", credentials.sessdata));
+    }
+    if !credentials.bili_jct.is_empty() {
+        parts.push(format!("bili_jct={}", credentials.bili_jct));
+    }
+    if !credentials.dedeuserid.is_empty() {
+        parts.push(format!("DedeUserID={}", credentials.dedeuserid));
+    }
+    if !credentials.buvid3.is_empty() {
+        parts.push(format!("buvid3={}", credentials.buvid3));
+    }
+    parts.join("; ")
+}
+
+fn load_bilibili_credentials() -> Result<Option<BilibiliCredentials>, String> {
+    let config_path = knowledge_path("config/config.json")?;
+    let config_text = fs::read_to_string(&config_path).unwrap_or_else(|_| DEFAULT_CONFIG.to_string());
+    let config_json: serde_json::Value = serde_json::from_str(&config_text)
+        .map_err(|e| format!("配置文件格式无效：{e}"))?;
+    let bilibili = &config_json["bilibili"];
+    let sessdata = bilibili["sessdata"].as_str().unwrap_or("").trim().to_string();
+    let raw_cookie = bilibili["cookie"].as_str().unwrap_or("").trim().to_string();
+    if sessdata.is_empty() && raw_cookie.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(BilibiliCredentials {
+        sessdata,
+        bili_jct: bilibili["bili_jct"].as_str().unwrap_or("").trim().to_string(),
+        dedeuserid: bilibili["dedeuserid"].as_str().unwrap_or("").trim().to_string(),
+        buvid3: bilibili["buvid3"].as_str().unwrap_or("").trim().to_string(),
+        refresh_token: bilibili["refresh_token"].as_str().unwrap_or("").trim().to_string(),
+    }))
+}
+
+fn persist_bilibili_credentials(credentials: &BilibiliCredentials, status: &str) -> Result<(), String> {
+    let path = knowledge_path("config/config.json")?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let existing = fs::read_to_string(&path).unwrap_or_else(|_| DEFAULT_CONFIG.to_string());
+    let parsed = serde_json::from_str::<serde_json::Value>(&existing).unwrap_or_else(|_| default_config_value().unwrap_or_else(|_| serde_json::json!({})));
+    let mut config = normalize_config_value(parsed)?;
+    if !config.get("bilibili").map(|v| v.is_object()).unwrap_or(false) {
+        config["bilibili"] = serde_json::json!({});
+    }
+    config["bilibili"]["cookie"] = serde_json::Value::String(cookie_header_from_credentials(credentials));
+    config["bilibili"]["sessdata"] = serde_json::Value::String(credentials.sessdata.clone());
+    config["bilibili"]["bili_jct"] = serde_json::Value::String(credentials.bili_jct.clone());
+    config["bilibili"]["dedeuserid"] = serde_json::Value::String(credentials.dedeuserid.clone());
+    config["bilibili"]["buvid3"] = serde_json::Value::String(credentials.buvid3.clone());
+    config["bilibili"]["refresh_token"] = serde_json::Value::String(credentials.refresh_token.clone());
+    config["bilibili"]["cookie_ts"] = serde_json::Value::String(now_epoch_string());
+    config["bilibili"]["status"] = serde_json::Value::String(status.to_string());
+    let content = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    fs::write(path, content).map_err(|e| e.to_string())
+}
+
+fn now_epoch_string() -> String {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|v| v.as_secs().to_string())
+        .unwrap_or_else(|_| "0".into())
+}
+
+fn generate_bilibili_correspond_path(timestamp: i64) -> Result<String, String> {
+    use rsa::{pkcs8::DecodePublicKey, Oaep, RsaPublicKey};
+    use sha2::Sha256;
+    let public_key = RsaPublicKey::from_public_key_pem(BILIBILI_RSA_PUBLIC_KEY)
+        .map_err(|e| format!("解析 B站 RSA 公钥失败：{e}"))?;
+    let plaintext = format!("refresh_{}", timestamp);
+    let mut rng = rand::thread_rng();
+    let encrypted = public_key
+        .encrypt(&mut rng, Oaep::new::<Sha256>(), plaintext.as_bytes())
+        .map_err(|e| format!("生成 Cookie 刷新凭证失败：{e}"))?;
+    Ok(hex::encode(encrypted))
+}
+
+fn fetch_bilibili_refresh_csrf(client: &reqwest::blocking::Client, sessdata: &str, correspond_path: &str) -> Result<String, String> {
+    let url = format!("https://www.bilibili.com/correspond/1/{}", correspond_path);
+    let sessdata = normalize_cookie_value(sessdata);
+    let html = client
+        .get(&url)
+        .header("Cookie", format!("SESSDATA={}", sessdata))
+        .send()
+        .map_err(|e| format!("请求 refresh_csrf 页面失败：{e}"))?
+        .text()
+        .map_err(|e| format!("读取 refresh_csrf 页面失败：{e}"))?;
+    let re = regex::Regex::new(r#"<div id="1-name">([^<]+)</div>"#).map_err(|e| e.to_string())?;
+    let caps = re.captures(&html).ok_or_else(|| "无法从 B站页面提取 refresh_csrf".to_string())?;
+    Ok(caps[1].to_string())
+}
+
+fn refresh_bilibili_cookie(credentials: &BilibiliCredentials) -> Result<BilibiliCredentials, String> {
+    if credentials.sessdata.is_empty() || credentials.bili_jct.is_empty() || credentials.refresh_token.is_empty() {
+        return Err("缺少 SESSDATA / bili_jct / refresh_token，无法自动刷新，请重新扫码登录。".into());
+    }
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36")
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| format!("创建网络客户端失败：{e}"))?;
+
+    let info: serde_json::Value = client
+        .get("https://passport.bilibili.com/x/passport-login/web/cookie/info")
+        .header("Cookie", format!("SESSDATA={}; bili_jct={}", normalize_cookie_value(&credentials.sessdata), credentials.bili_jct))
+        .query(&[("csrf", credentials.bili_jct.as_str())])
+        .send()
+        .map_err(|e| format!("检查 Cookie 刷新状态失败：{e}"))?
+        .json()
+        .map_err(|e| format!("解析 Cookie 刷新状态失败：{e}"))?;
+    if info["code"].as_i64().unwrap_or(-1) != 0 {
+        return Err(format!("B站 Cookie 状态接口返回异常：{}", info["message"].as_str().unwrap_or("unknown")));
+    }
+    let refresh = info["data"]["refresh"].as_bool().unwrap_or(false);
+    if !refresh {
+        return Ok(credentials.clone());
+    }
+    let timestamp = info["data"]["timestamp"].as_i64().ok_or_else(|| "B站未返回 Cookie refresh timestamp".to_string())?;
+    let correspond_path = generate_bilibili_correspond_path(timestamp)?;
+    let refresh_csrf = fetch_bilibili_refresh_csrf(&client, &credentials.sessdata, &correspond_path)?;
+
+    let resp = client
+        .post("https://passport.bilibili.com/x/passport-login/web/cookie/refresh")
+        .header("Cookie", format!("SESSDATA={}; bili_jct={}", normalize_cookie_value(&credentials.sessdata), credentials.bili_jct))
+        .form(&[
+            ("csrf", credentials.bili_jct.as_str()),
+            ("refresh_csrf", refresh_csrf.as_str()),
+            ("source", "main_web"),
+            ("refresh_token", credentials.refresh_token.as_str()),
+        ])
+        .send()
+        .map_err(|e| format!("刷新 B站 Cookie 请求失败：{e}"))?;
+    let set_cookies: Vec<String> = resp
+        .headers()
+        .get_all("set-cookie")
+        .iter()
+        .filter_map(|v| v.to_str().ok().map(String::from))
+        .collect();
+    let body: serde_json::Value = resp.json().map_err(|e| format!("解析 Cookie 刷新响应失败：{e}"))?;
+    if body["code"].as_i64().unwrap_or(-1) != 0 {
+        return Err(format!("刷新 B站 Cookie 失败：{}", body["message"].as_str().unwrap_or("unknown")));
+    }
+
+    let mut next = credentials.clone();
+    for cookie in &set_cookies {
+        if let Some(v) = extract_set_cookie_value(cookie, "SESSDATA") { next.sessdata = v; }
+        if let Some(v) = extract_set_cookie_value(cookie, "bili_jct") { next.bili_jct = v; }
+        if let Some(v) = extract_set_cookie_value(cookie, "DedeUserID") { next.dedeuserid = v; }
+        if let Some(v) = extract_set_cookie_value(cookie, "buvid3") { next.buvid3 = v; }
+    }
+    if let Some(v) = body["data"]["refresh_token"].as_str().filter(|v| !v.is_empty()) {
+        next.refresh_token = v.to_string();
+    }
+
+    let _ = client
+        .post("https://passport.bilibili.com/x/passport-login/web/confirm/refresh")
+        .header("Cookie", format!("SESSDATA={}; bili_jct={}", normalize_cookie_value(&next.sessdata), next.bili_jct))
+        .form(&[("csrf", next.bili_jct.as_str()), ("refresh_token", credentials.refresh_token.as_str())])
+        .send();
+    Ok(next)
+}
+
+fn auto_refresh_bilibili_cookie_if_possible() -> Result<Option<BilibiliCredentials>, String> {
+    let Some(credentials) = load_bilibili_credentials()? else { return Ok(None); };
+    if credentials.refresh_token.is_empty() || credentials.bili_jct.is_empty() {
+        return Ok(Some(credentials));
+    }
+    match refresh_bilibili_cookie(&credentials) {
+        Ok(next) => {
+            if next.sessdata != credentials.sessdata || next.refresh_token != credentials.refresh_token {
+                persist_bilibili_credentials(&next, "auto_refreshed")?;
+            }
+            Ok(Some(next))
+        }
+        Err(err) => {
+            eprintln!("[bilibili-auth] auto refresh failed: {err}");
+            Ok(Some(credentials))
+        }
+    }
+}
+
 fn knowledge_base_root() -> PathBuf {
     if let Ok(configured) = std::env::var("BILIKNOWLEDGE_ROOT") {
         let candidate = PathBuf::from(configured);
@@ -716,6 +933,7 @@ struct BilibiliCookieValidation {
 
 #[tauri::command]
 async fn validate_bilibili_cookie() -> Result<String, String> {
+    let refreshed_credentials = auto_refresh_bilibili_cookie_if_possible()?;
     let config_path = knowledge_path("config/config.json")?;
     let config_text = fs::read_to_string(&config_path).unwrap_or_else(|_| DEFAULT_CONFIG.to_string());
     let config_json: serde_json::Value =
@@ -732,7 +950,10 @@ async fn validate_bilibili_cookie() -> Result<String, String> {
         .trim()
         .to_string();
 
-    let cookie_header = if !raw_cookie.is_empty() {
+    let cookie_header = if let Some(credentials) = refreshed_credentials.as_ref() {
+        let header = cookie_header_from_credentials(credentials);
+        if !header.is_empty() { header } else if !raw_cookie.is_empty() { raw_cookie } else if !sessdata.is_empty() { format!("SESSDATA={sessdata}") } else { String::new() }
+    } else if !raw_cookie.is_empty() {
         raw_cookie
     } else if !sessdata.is_empty() {
         format!("SESSDATA={sessdata}")
@@ -1336,52 +1557,86 @@ fn poll_bilibili_qr(qrcode_key: String) -> Result<String, String> {
         .send()
         .map_err(|e| format!("Failed to poll QR status: {e}"))?;
 
+    let set_cookies: Vec<String> = resp
+        .headers()
+        .get_all("set-cookie")
+        .iter()
+        .filter_map(|v| v.to_str().ok().map(String::from))
+        .collect();
     let body: serde_json::Value = resp.json().map_err(|e| format!("Failed to parse response: {e}"))?;
 
     let code = body["data"]["code"].as_i64().unwrap_or(-1);
 
     if code == 0 {
-        // Login success - extract cookies from URL
         let goto_url = body["data"]["url"].as_str().unwrap_or("");
+        let mut credentials = BilibiliCredentials {
+            sessdata: String::new(),
+            bili_jct: String::new(),
+            dedeuserid: String::new(),
+            buvid3: String::new(),
+            refresh_token: body["data"]["refresh_token"].as_str().unwrap_or("").to_string(),
+        };
 
-        // Parse URL query parameters to get cookies
-        let mut sessdata = String::new();
-        let mut bili_jct = String::new();
-        let mut dedeuserid = String::new();
-        let mut buvid3 = String::new();
+        for cookie in &set_cookies {
+            if let Some(v) = extract_set_cookie_value(cookie, "SESSDATA") { credentials.sessdata = v; }
+            if let Some(v) = extract_set_cookie_value(cookie, "bili_jct") { credentials.bili_jct = v; }
+            if let Some(v) = extract_set_cookie_value(cookie, "DedeUserID") { credentials.dedeuserid = v; }
+            if let Some(v) = extract_set_cookie_value(cookie, "buvid3") { credentials.buvid3 = v; }
+        }
 
-        if let Some(query_start) = goto_url.find('?') {
-            let query = &goto_url[query_start + 1..];
-            for param in query.split('&') {
-                if let Some((key, value)) = param.split_once('=') {
-                    match key {
-                        "SESSDATA" => sessdata = value.to_string(),
-                        "bili_jct" => bili_jct = value.to_string(),
-                        "DedeUserID" => dedeuserid = value.to_string(),
-                        "buvid3" => buvid3 = value.to_string(),
-                        _ => {}
+        if credentials.sessdata.is_empty() || credentials.bili_jct.is_empty() {
+            if let Some(query_start) = goto_url.find('?') {
+                let query = &goto_url[query_start + 1..];
+                for param in query.split('&') {
+                    if let Some((key, value)) = param.split_once('=') {
+                        match key {
+                            "SESSDATA" if credentials.sessdata.is_empty() => credentials.sessdata = value.to_string(),
+                            "bili_jct" if credentials.bili_jct.is_empty() => credentials.bili_jct = value.to_string(),
+                            "DedeUserID" if credentials.dedeuserid.is_empty() => credentials.dedeuserid = value.to_string(),
+                            "buvid3" if credentials.buvid3.is_empty() => credentials.buvid3 = value.to_string(),
+                            _ => {}
+                        }
                     }
                 }
             }
         }
 
+        if !credentials.sessdata.is_empty() {
+            persist_bilibili_credentials(&credentials, "qr_login")?;
+        }
+
         let result = serde_json::json!({
             "code": 0,
-            "sessdata": sessdata,
-            "bili_jct": bili_jct,
-            "dedeuserid": dedeuserid,
-            "buvid3": buvid3,
+            "sessdata": credentials.sessdata,
+            "bili_jct": credentials.bili_jct,
+            "dedeuserid": credentials.dedeuserid,
+            "buvid3": credentials.buvid3,
+            "refresh_token": credentials.refresh_token,
+            "auto_refresh": !credentials.refresh_token.is_empty(),
         });
 
         Ok(result.to_string())
     } else {
-        // Return the status code for polling
         let result = serde_json::json!({
             "code": code,
             "message": body["data"]["message"].as_str().unwrap_or(""),
         });
         Ok(result.to_string())
     }
+}
+
+#[tauri::command]
+fn refresh_bilibili_login() -> Result<String, String> {
+    let credentials = load_bilibili_credentials()?.ok_or_else(|| "未配置 B站登录态，请先扫码登录。".to_string())?;
+    let refreshed = refresh_bilibili_cookie(&credentials)?;
+    persist_bilibili_credentials(&refreshed, "auto_refreshed")?;
+    Ok(serde_json::json!({
+        "ok": true,
+        "sessdata": !refreshed.sessdata.is_empty(),
+        "bili_jct": !refreshed.bili_jct.is_empty(),
+        "refresh_token": !refreshed.refresh_token.is_empty(),
+        "message": "B站 Cookie 已刷新"
+    }).to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -1414,7 +1669,8 @@ pub fn run() {
             get_processing_status,
             open_bilibili_login_window,
             generate_bilibili_qr,
-            poll_bilibili_qr
+            poll_bilibili_qr,
+            refresh_bilibili_login
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

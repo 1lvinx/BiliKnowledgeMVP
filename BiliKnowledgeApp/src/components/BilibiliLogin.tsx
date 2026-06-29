@@ -10,6 +10,8 @@ interface BilibiliLoginProps {
     bili_jct: string;
     dedeuserid: string;
     buvid3: string;
+    refresh_token: string;
+    auto_refresh: boolean;
   }) => void;
 }
 
@@ -97,6 +99,8 @@ function BilibiliLogin({ onLoginSuccess }: BilibiliLoginProps) {
             bili_jct: data.bili_jct || "",
             dedeuserid: data.dedeuserid || "",
             buvid3: data.buvid3 || "",
+            refresh_token: data.refresh_token || "",
+            auto_refresh: Boolean(data.auto_refresh),
           });
           return;
         } else if (data.code === 86101) {

@@ -20,6 +20,9 @@ interface Config {
     bili_jct: string;
     buvid3: string;
     dedeuserid: string;
+    refresh_token: string;
+    cookie_ts: string;
+    status: string;
   };
   ai: {
     provider: string;
@@ -38,7 +41,7 @@ interface Config {
 }
 
 const defaultConfig: Config = {
-  bilibili: { cookie: "", sessdata: "", bili_jct: "", buvid3: "", dedeuserid: "" },
+  bilibili: { cookie: "", sessdata: "", bili_jct: "", buvid3: "", dedeuserid: "", refresh_token: "", cookie_ts: "", status: "not_configured" },
   ai: {
     provider: "deepseek",
     preset: "deepseek-chat",
@@ -511,6 +514,8 @@ export function SettingsView({
                       bili_jct: cookies.bili_jct,
                       dedeuserid: cookies.dedeuserid,
                       buvid3: cookies.buvid3,
+                      refresh_token: cookies.refresh_token,
+                      status: cookies.auto_refresh ? "qr_login" : "qr_login_no_refresh",
                     },
                   };
                   setConfig(nextConfig);
