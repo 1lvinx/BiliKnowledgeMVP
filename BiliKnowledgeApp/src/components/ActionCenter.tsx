@@ -34,11 +34,42 @@ interface HealthMetric {
   icon: React.ReactNode;
 }
 
+function getVideoQueueTime(video: Video) {
+  const candidates = [video.collected_at, video.note_generated_at, video.pubdate];
+  for (const value of candidates) {
+    if (!value) continue;
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return numeric > 10_000_000_000 ? numeric : numeric * 1000;
+    }
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return 0;
+}
+
+function isLearningQueueVideo(video: Video) {
+  return !video.note_ready && !video.note_path && video.status !== "invalid" && video.status !== "archived";
+}
+
+function sortLearningQueueVideos(videos: Video[]) {
+  const priorityOrder = { P0: 0, P1: 1, P2: 2 };
+  return videos
+    .filter(isLearningQueueVideo)
+    .sort((a, b) => {
+      const timeDelta = getVideoQueueTime(b) - getVideoQueueTime(a);
+      if (timeDelta !== 0) return timeDelta;
+      return (priorityOrder[a.priority as keyof typeof priorityOrder] ?? 3) - (priorityOrder[b.priority as keyof typeof priorityOrder] ?? 3);
+    });
+}
+
 function computeMetrics(videos: Video[], projects: Project[]): HealthMetric[] {
   const total = videos.length;
-  const reviewed = videos.filter((v) => v.status === "reviewed").length;
-  const pending = videos.filter((v) => v.status === "pending").length;
-  const withNotes = videos.filter((v) => v.note_path).length;
+  const reviewed = videos.filter((v) => v.status === "reviewed" || v.note_ready).length;
+  const pending = videos.filter(isLearningQueueVideo).length;
+  const withNotes = videos.filter((v) => v.note_ready || v.note_path).length;
 
   return [
     {
@@ -80,20 +111,12 @@ function ActionCenter({
 }: ActionCenterProps) {
   const metrics = useMemo(() => computeMetrics(videos, projects), [videos, projects]);
 
-  const nextVideo = useMemo(() => {
-    return (
-      videos
-        .filter((v) => v.status === "pending")
-        .sort((a, b) => {
-          const order = { P0: 0, P1: 1, P2: 2 };
-          return (order[a.priority as keyof typeof order] ?? 3) - (order[b.priority as keyof typeof order] ?? 3);
-        })[0] ?? null
-    );
-  }, [videos]);
+  const queuedVideos = useMemo(() => sortLearningQueueVideos(videos), [videos]);
+  const nextVideo = queuedVideos[0] ?? null;
 
   const pendingVideos = useMemo(
-    () => videos.filter((v) => v.status === "pending").slice(0, 5),
-    [videos]
+    () => queuedVideos.slice(0, 5),
+    [queuedVideos]
   );
 
   const highValueProjects = useMemo(
@@ -102,8 +125,8 @@ function ActionCenter({
   );
 
   const totalVideos = videos.length;
-  const reviewedCount = videos.filter((v) => v.status === "reviewed").length;
-  const pendingCount = videos.filter((v) => v.status === "pending").length;
+  const reviewedCount = videos.filter((v) => v.status === "reviewed" || v.note_ready).length;
+  const pendingCount = queuedVideos.length;
   const p0Count = videos.filter((v) => v.priority === "P0").length;
 
   return (
