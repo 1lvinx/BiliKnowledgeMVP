@@ -2414,8 +2414,8 @@ function renderKnowledge({
     { name: "manifest", count: videos.length, onClick: onOpenVideoFavorites },
     { name: "notes/raw", count: noteCount, onClick: onOpenNotes },
     { name: "projects", count: projects.length, onClick: onOpenCandidates },
-    { name: "reports", count: 2, onClick: onOpenScripts },
-    { name: "thoughts", count: 3, onClick: onOpenTags },
+    { name: "status-flow", count: 1, onClick: onOpenScripts },
+    { name: "thoughts", count: generatedNoteVideos.length, onClick: onOpenTags },
   ];
 
   function onOpenVideoFavorites() {
@@ -2670,7 +2670,12 @@ function renderThoughts({
   const insightMap = new Map(insights.map((item) => [item.video_id, item]));
   const seenTitles = new Set<string>();
   const cards = [...videos]
-    .sort(compareVideosByRecency)
+    .filter((video) => Boolean(video.note_ready && video.note_path))
+    .sort((a, b) => {
+      const aTime = new Date(a.note_generated_at || a.collected_at || a.pubdate || 0).getTime();
+      const bTime = new Date(b.note_generated_at || b.collected_at || b.pubdate || 0).getTime();
+      return bTime - aTime;
+    })
     .filter((video) => {
       const key = normalizeThoughtTitle(video.title || video.id);
       if (!key) return true;
@@ -2712,8 +2717,8 @@ function renderThoughts({
         <section className="dashboard-hero thoughts-hero">
           <div className="dashboard-hero-main">
             <div className="dashboard-hero-badge">{t("kb.thoughts")}</div>
-            <h1 className="dashboard-hero-title">人工想法 + AI 线索</h1>
-            <p className="dashboard-hero-text">把你的真实判断、下一步动作和标签注入知识库；下面只保留去重后的最近内容线索。</p>
+            <h1 className="dashboard-hero-title">基于最近笔记的想法</h1>
+            <p className="dashboard-hero-text">只围绕已经生成的笔记继续写判断、标签和下一步动作，避免把未沉淀的视频也当成知识线索。</p>
           </div>
         </section>
 
@@ -2756,7 +2761,16 @@ function renderThoughts({
         ) : null}
 
         <section className="dashboard-body-grid thoughts-feed-grid">
-          {cards.map(({ video, insight }) => (
+          {cards.length === 0 ? (
+            <article className="dashboard-board thought-signal-card">
+              <header className="dashboard-board-head">
+                <div>
+                  <h3>暂无最近笔记</h3>
+                  <span>先在「收藏夹」完成生成笔记，这里才会出现可继续思考的内容。</span>
+                </div>
+              </header>
+            </article>
+          ) : cards.map(({ video, insight }) => (
             <article className="dashboard-board thought-signal-card" key={video.id}>
               <header className="dashboard-board-head">
                 <div>
@@ -2776,7 +2790,7 @@ function renderThoughts({
                   <div className="dashboard-feed-main">
                     <div className="dashboard-feed-title">核心摘要</div>
                     <div className="dashboard-feed-meta">
-                      <span>{insight?.summary || "暂未生成 AI 洞察，点击打开笔记继续处理。"}</span>
+                      <span>{insight?.summary || "这条笔记还没有关联洞察，可打开笔记补充你的判断。"}</span>
                     </div>
                   </div>
                 </div>

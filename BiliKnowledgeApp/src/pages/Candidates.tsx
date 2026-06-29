@@ -54,7 +54,7 @@ export function Candidates({
                       <span>{project.source_note}</span>
                     </div>
                   </div>
-                  <MacStatusPill tone="blue">{localizeLabel(project.status || "candidate")}</MacStatusPill>
+                  <MacStatusPill tone={project.need_verify ? "orange" : "green"}>{formatProjectReviewLabel(project)}</MacStatusPill>
                 </button>
               ))
             )}
@@ -159,6 +159,7 @@ export function Candidates({
           <MacStatusPill tone={activeProject?.need_verify ? "orange" : "green"}>
             {activeProject?.need_verify ? t("projects.toReview") : t("projects.useful")}
           </MacStatusPill>
+          <p className="mac-inspector-meta">{t("projects.reviewHint")}</p>
           <MacPanel title={t("projects.metadata")}>
             <div className="mac-inspector-content">
               <p className="mac-inspector-meta">{t("projects.repo")}: {activeProject?.name ?? "-"}</p>
@@ -174,6 +175,16 @@ export function Candidates({
       </aside>
     </MacSplitView>
   );
+}
+
+function formatProjectReviewLabel(project: Project) {
+  if (project.need_verify || project.status === "candidate") {
+    return t("projects.toReview");
+  }
+  if (project.status === "useful" || project.status === "reviewed") {
+    return t("projects.useful");
+  }
+  return localizeLabel(project.status || "candidate");
 }
 
 function formatProjectDate(raw?: string) {

@@ -56,6 +56,7 @@ export function localizeLabel(raw: string): string {
     "notes/raw": t("kb.notesRaw"),
     projects: t("kb.projects"),
     reports: t("kb.reports"),
+    "status-flow": t("kb.statusFlow"),
     thoughts: t("kb.thoughts"),
   };
   return map[raw] ?? raw;
