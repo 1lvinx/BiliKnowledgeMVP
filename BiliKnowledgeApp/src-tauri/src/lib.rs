@@ -1,8 +1,10 @@
 use std::fs;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Component, Path, PathBuf};
+use std::net::{TcpListener, TcpStream};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use tauri::{Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
@@ -438,9 +440,8 @@ fn resolve_video_input(input: &str) -> Result<(String, serde_json::Value), Strin
     Err("未识别到有效 B站视频编号；支持 BV、av、完整链接和 b23.tv 短链。".into())
 }
 
-#[tauri::command]
-fn add_manual_video(input: String, title: Option<String>) -> Result<String, String> {
-    let (bvid, metadata) = resolve_video_input(&input)?;
+fn add_video_to_manifest(input: &str, title: Option<&str>, source: &str) -> Result<String, String> {
+    let (bvid, metadata) = resolve_video_input(input)?;
     let path = knowledge_path("manifest/videos.json")?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -456,11 +457,7 @@ fn add_manual_video(input: String, title: Option<String>) -> Result<String, Stri
         return Ok(format!("视频已存在：{bvid}"));
     }
 
-    let title_value = title
-        .as_deref()
-        .unwrap_or("")
-        .trim()
-        .to_string();
+    let title_value = title.unwrap_or("").trim().to_string();
     let api_title = metadata.get("title").and_then(|v| v.as_str()).unwrap_or("").trim();
     let owner_name = metadata
         .get("owner")
@@ -484,16 +481,16 @@ fn add_manual_video(input: String, title: Option<String>) -> Result<String, Stri
         "url": format!("https://www.bilibili.com/video/{bvid}"),
         "uploader": owner_name,
         "collected_at": now,
-        "favorite_folder": "手动添加",
+        "favorite_folder": source,
         "category": "",
-        "tags": ["manual"],
+        "tags": [source],
         "duration": if duration > 0 { format_seconds(duration) } else { String::new() },
         "pubdate": pubdate,
         "priority": "P1",
         "status": "pending",
         "note_path": "",
         "project_extracted": false,
-        "remarks": "手动添加：支持 BV / av / b23.tv / 完整链接",
+        "remarks": format!("{}：支持 BV / av / b23.tv / 完整链接", source),
         "note_ready": false
     });
 
@@ -501,6 +498,147 @@ fn add_manual_video(input: String, title: Option<String>) -> Result<String, Stri
     let updated = serde_json::to_string_pretty(&videos).map_err(|e| e.to_string())?;
     fs::write(path, updated).map_err(|e| e.to_string())?;
     Ok(format!("已添加视频：{bvid}"))
+}
+
+#[tauri::command]
+fn add_manual_video(input: String, title: Option<String>) -> Result<String, String> {
+    add_video_to_manifest(&input, title.as_deref(), "手动添加")
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct BrowserBridgeImportPayload {
+    url: String,
+    title: Option<String>,
+    bvid: Option<String>,
+    uploader: Option<String>,
+    cookies: Option<BrowserBridgeCookies>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct BrowserBridgeCookies {
+    sessdata: Option<String>,
+    bili_jct: Option<String>,
+    dedeuserid: Option<String>,
+    buvid3: Option<String>,
+    cookie_header: Option<String>,
+}
+
+fn merge_browser_bridge_cookies(cookies: Option<BrowserBridgeCookies>) -> Result<(), String> {
+    let Some(cookies) = cookies else { return Ok(()); };
+    let has_cookie = cookies.sessdata.as_deref().unwrap_or("").trim().len() > 0
+        || cookies.cookie_header.as_deref().unwrap_or("").trim().len() > 0;
+    if !has_cookie {
+        return Ok(());
+    }
+
+    let path = knowledge_path("config/config.json")?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let existing = fs::read_to_string(&path).unwrap_or_else(|_| DEFAULT_CONFIG.to_string());
+    let parsed = serde_json::from_str::<serde_json::Value>(&existing).unwrap_or_else(|_| default_config_value().unwrap_or_else(|_| serde_json::json!({})));
+    let mut config = normalize_config_value(parsed)?;
+    if !config.get("bilibili").map(|v| v.is_object()).unwrap_or(false) {
+        config["bilibili"] = serde_json::json!({});
+    }
+
+    if let Some(value) = cookies.cookie_header.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+        config["bilibili"]["cookie"] = serde_json::Value::String(value.to_string());
+    }
+    if let Some(value) = cookies.sessdata.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+        config["bilibili"]["sessdata"] = serde_json::Value::String(value.to_string());
+    }
+    if let Some(value) = cookies.bili_jct.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+        config["bilibili"]["bili_jct"] = serde_json::Value::String(value.to_string());
+    }
+    if let Some(value) = cookies.dedeuserid.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+        config["bilibili"]["dedeuserid"] = serde_json::Value::String(value.to_string());
+    }
+    if let Some(value) = cookies.buvid3.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+        config["bilibili"]["buvid3"] = serde_json::Value::String(value.to_string());
+    }
+    config["bilibili"]["status"] = serde_json::Value::String("browser_bridge".into());
+
+    let content = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    fs::write(path, content).map_err(|e| e.to_string())
+}
+
+fn start_browser_bridge_server() {
+    thread::spawn(|| {
+        let listener = match TcpListener::bind("127.0.0.1:31420") {
+            Ok(listener) => listener,
+            Err(err) => {
+                eprintln!("[browser-bridge] failed to bind 127.0.0.1:31420: {err}");
+                return;
+            }
+        };
+        eprintln!("[browser-bridge] listening on http://127.0.0.1:31420");
+        for stream in listener.incoming() {
+            match stream {
+                Ok(stream) => handle_browser_bridge_stream(stream),
+                Err(err) => eprintln!("[browser-bridge] connection error: {err}"),
+            }
+        }
+    });
+}
+
+fn handle_browser_bridge_stream(mut stream: TcpStream) {
+    let mut buffer = vec![0_u8; 1024 * 256];
+    let read = match stream.read(&mut buffer) {
+        Ok(read) => read,
+        Err(err) => {
+            eprintln!("[browser-bridge] read error: {err}");
+            return;
+        }
+    };
+    let request = String::from_utf8_lossy(&buffer[..read]).to_string();
+    let response = process_browser_bridge_request(&request);
+    let _ = stream.write_all(response.as_bytes());
+}
+
+fn browser_bridge_response(status: &str, body: serde_json::Value) -> String {
+    let body = body.to_string();
+    format!(
+        "HTTP/1.1 {status}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, X-Bizhi-Companion\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        body.as_bytes().len(),
+        body
+    )
+}
+
+fn process_browser_bridge_request(request: &str) -> String {
+    let mut lines = request.lines();
+    let request_line = lines.next().unwrap_or("");
+    if request_line.starts_with("OPTIONS ") {
+        return browser_bridge_response("204 No Content", serde_json::json!({}));
+    }
+    if request_line.starts_with("GET /api/browser/health ") {
+        return browser_bridge_response("200 OK", serde_json::json!({ "ok": true, "app": "哔知", "bridge": "browser" }));
+    }
+    if !request_line.starts_with("POST /api/browser/import ") {
+        return browser_bridge_response("404 Not Found", serde_json::json!({ "ok": false, "error": "not_found" }));
+    }
+    if !request.to_ascii_lowercase().contains("x-bizhi-companion:") {
+        return browser_bridge_response("403 Forbidden", serde_json::json!({ "ok": false, "error": "missing_companion_header" }));
+    }
+
+    let Some((_, body)) = request.split_once("\r\n\r\n") else {
+        return browser_bridge_response("400 Bad Request", serde_json::json!({ "ok": false, "error": "missing_body" }));
+    };
+    let payload: BrowserBridgeImportPayload = match serde_json::from_str(body.trim_end_matches(char::from(0))) {
+        Ok(payload) => payload,
+        Err(err) => {
+            return browser_bridge_response("400 Bad Request", serde_json::json!({ "ok": false, "error": format!("invalid_json: {err}") }));
+        }
+    };
+    let input = payload.bvid.as_deref().filter(|v| !v.trim().is_empty()).unwrap_or(payload.url.as_str()).to_string();
+    if let Err(err) = merge_browser_bridge_cookies(payload.cookies) {
+        return browser_bridge_response("500 Internal Server Error", serde_json::json!({ "ok": false, "error": err }));
+    }
+    let title = payload.title.as_deref();
+    match add_video_to_manifest(&input, title, "哔知助手") {
+        Ok(message) => browser_bridge_response("200 OK", serde_json::json!({ "ok": true, "message": message, "uploader": payload.uploader })),
+        Err(err) => browser_bridge_response("400 Bad Request", serde_json::json!({ "ok": false, "error": err })),
+    }
 }
 
 #[tauri::command]
@@ -1250,6 +1388,10 @@ fn poll_bilibili_qr(qrcode_key: String) -> Result<String, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .setup(|_| {
+            start_browser_bridge_server();
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             add_manual_video,

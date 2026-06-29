@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>哔知助手</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="brand">
+        <div class="logo">哔</div>
+        <div>
+          <h1>哔知助手</h1>
+          <p>Bili Knowledge Companion</p>
+        </div>
+      </header>
+      <section class="card">
+        <div class="row"><span>当前页面</span><strong id="pageType">检测中</strong></div>
+        <div class="title" id="title">正在读取当前 B 站页面…</div>
+        <div class="meta" id="meta"></div>
+      </section>
+      <section class="card compact">
+        <div class="row"><span>登录 Cookie</span><strong id="loginState">检测中</strong></div>
+        <div class="row"><span>Desktop</span><strong id="desktopState">检测中</strong></div>
+      </section>
+      <button id="send" disabled>发送到哔知 Desktop</button>
+      <p id="status" class="status">只发送当前页和必要 Cookie，不处理 AI。</p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

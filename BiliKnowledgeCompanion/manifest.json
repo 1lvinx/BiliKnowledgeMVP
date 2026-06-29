@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "哔知助手",
+  "description": "Bili Knowledge Companion：把当前 B 站视频与登录态发送到哔知 Desktop。",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "发送到哔知",
+    "default_popup": "popup.html"
+  },
+  "permissions": ["activeTab", "tabs", "cookies", "storage"],
+  "host_permissions": [
+    "https://*.bilibili.com/*",
+    "https://b23.tv/*",
+    "http://127.0.0.1:31420/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.bilibili.com/video/*", "https://www.bilibili.com/list/*", "https://space.bilibili.com/*/favlist*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
