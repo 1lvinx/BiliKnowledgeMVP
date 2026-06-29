@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Boxes, ExternalLink, GitFork, Globe, Star } from "lucide-react";
 import type { Project } from "../types";
 import { t } from "../i18n";
@@ -7,8 +8,11 @@ import { MacEmptyState, MacPanel, MacSplitView, MacStatusPill, MacTagPill } from
 
 type ViewMode = "list" | "detail";
 
+type ProjectReviewStatus = "candidate" | "valuable" | "archived";
+
 interface CandidatesProps {
   activeProject: Project | null;
+  onUpdateProjectStatus: (projectUrl: string, status: ProjectReviewStatus) => Promise<void>;
   projects: Project[];
   setSelectedProject: (project: Project) => void;
   viewMode: ViewMode;
@@ -16,11 +20,23 @@ interface CandidatesProps {
 
 export function Candidates({
   activeProject,
+  onUpdateProjectStatus,
   projects,
   setSelectedProject,
   viewMode,
 }: CandidatesProps) {
+  const [updatingStatus, setUpdatingStatus] = useState<ProjectReviewStatus | null>(null);
   const sortedProjects = [...projects].sort((a, b) => (b.stars ?? 0) - (a.stars ?? 0));
+
+  async function handleReviewStatus(status: ProjectReviewStatus) {
+    if (!activeProject || updatingStatus) return;
+    setUpdatingStatus(status);
+    try {
+      await onUpdateProjectStatus(activeProject.url, status);
+    } finally {
+      setUpdatingStatus(null);
+    }
+  }
 
   return (
     <MacSplitView columns={viewMode === "list" ? "380px minmax(0, 1fr) 300px" : "minmax(0, 1fr) 300px"}>
@@ -156,10 +172,36 @@ export function Candidates({
       <aside className="mac-inspector custom-scrollbar">
         <div className="mac-inspector-content">
           <h2 className="mac-inspector-title">{t("projects.reviewState")}</h2>
-          <MacStatusPill tone={activeProject?.need_verify ? "orange" : "green"}>
-            {activeProject?.need_verify ? t("projects.toReview") : t("projects.useful")}
+          <MacStatusPill tone={activeProject?.status === "archived" ? "neutral" : activeProject?.need_verify ? "orange" : "green"}>
+            {activeProject ? formatProjectReviewLabel(activeProject) : "-"}
           </MacStatusPill>
           <p className="mac-inspector-meta">{t("projects.reviewHint")}</p>
+          <div className="settings-feedback-actions">
+            <button
+              className="mac-toolbar-button"
+              disabled={!activeProject || Boolean(updatingStatus)}
+              onClick={() => handleReviewStatus("candidate")}
+              type="button"
+            >
+              {updatingStatus === "candidate" ? t("status.processing") : t("projects.keepCandidate")}
+            </button>
+            <button
+              className="mac-toolbar-button primary"
+              disabled={!activeProject || Boolean(updatingStatus)}
+              onClick={() => handleReviewStatus("valuable")}
+              type="button"
+            >
+              {updatingStatus === "valuable" ? t("status.processing") : t("projects.markValuable")}
+            </button>
+            <button
+              className="mac-toolbar-button"
+              disabled={!activeProject || Boolean(updatingStatus)}
+              onClick={() => handleReviewStatus("archived")}
+              type="button"
+            >
+              {updatingStatus === "archived" ? t("status.processing") : t("projects.archiveCandidate")}
+            </button>
+          </div>
           <MacPanel title={t("projects.metadata")}>
             <div className="mac-inspector-content">
               <p className="mac-inspector-meta">{t("projects.repo")}: {activeProject?.name ?? "-"}</p>
@@ -181,8 +223,11 @@ function formatProjectReviewLabel(project: Project) {
   if (project.need_verify || project.status === "candidate") {
     return t("projects.toReview");
   }
-  if (project.status === "useful" || project.status === "reviewed") {
-    return t("projects.useful");
+  if (project.status === "valuable" || project.status === "useful" || project.status === "reviewed") {
+    return t("projects.valuable");
+  }
+  if (project.status === "archived") {
+    return t("projects.archived");
   }
   return localizeLabel(project.status || "candidate");
 }

@@ -517,13 +517,42 @@ function App() {
   async function fetchProjects() {
     if (!tauriAvailable) {
       setProjects(previewProjects);
-      return;
+      return previewProjects;
     }
     try {
       const data: string = await invoke("get_projects");
-      setProjects(JSON.parse(data));
+      const parsed = JSON.parse(data) as Project[];
+      setProjects(parsed);
+      return parsed;
     } catch {
       setProjects([]);
+      return [];
+    }
+  }
+
+  async function updateProjectReviewStatus(projectUrl: string, status: "candidate" | "valuable" | "archived") {
+    if (!tauriAvailable) {
+      setProjects((current) =>
+        current.map((project) =>
+          project.url === projectUrl ? { ...project, status, need_verify: status === "candidate" } : project,
+        ),
+      );
+      setSelectedProject((current) =>
+        current?.url === projectUrl ? { ...current, status, need_verify: status === "candidate" } : current,
+      );
+      return;
+    }
+    try {
+      await invoke("update_project_status", { url: projectUrl, status });
+      const updatedProjects = await fetchProjects();
+      const updatedProject = updatedProjects.find((project) => project.url === projectUrl);
+      if (updatedProject) {
+        setSelectedProject(updatedProject);
+      }
+      showToast(t("projects.statusUpdated"), "success");
+    } catch (err) {
+      showToast(`${t("projects.statusUpdateFailed")}: ${String(err)}`, "error");
+      throw err;
     }
   }
 
@@ -1442,7 +1471,7 @@ function App() {
         <Suspense
           fallback={
             <div className="mac-page-scroll custom-scrollbar">
-              <MacEmptyState detail={t("status.processing")} title={t("status.processing")} />
+              <MacEmptyState detail={t("status.loadingDetail")} title={t("status.processing")} />
             </div>
           }
         >
@@ -1552,6 +1581,7 @@ function App() {
           {currentView === "projects" && (
             <LazyCandidates
               activeProject={activeProject}
+              onUpdateProjectStatus={updateProjectReviewStatus}
               projects={filteredProjects}
               setSelectedProject={setSelectedProject}
               viewMode={viewMode}

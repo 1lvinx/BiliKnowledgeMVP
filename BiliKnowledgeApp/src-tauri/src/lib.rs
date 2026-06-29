@@ -883,6 +883,51 @@ fn get_projects() -> Result<String, String> {
     fs::read_to_string(path).map_err(|e| e.to_string())
 }
 
+
+#[tauri::command]
+fn update_project_status(url: String, status: String) -> Result<String, String> {
+    let normalized_status = status.trim();
+    if !matches!(normalized_status, "candidate" | "valuable" | "archived") {
+        return Err(format!("Unsupported project status: {normalized_status}"));
+    }
+
+    let path = knowledge_path("projects/project_candidates.json")?;
+    if !path.exists() {
+        return Err("Project candidates file does not exist".into());
+    }
+
+    let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut projects: serde_json::Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    let Some(items) = projects.as_array_mut() else {
+        return Err("Project candidates JSON must be an array".into());
+    };
+
+    let reviewed_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs().to_string())
+        .unwrap_or_else(|_| "0".into());
+    let mut found = false;
+
+    for item in items.iter_mut() {
+        if item.get("url").and_then(|value| value.as_str()) == Some(url.as_str()) {
+            item["status"] = serde_json::Value::String(normalized_status.to_string());
+            item["need_verify"] = serde_json::Value::Bool(normalized_status == "candidate");
+            item["review_action"] = serde_json::Value::String(normalized_status.to_string());
+            item["reviewed_at"] = serde_json::Value::String(reviewed_at.clone());
+            found = true;
+            break;
+        }
+    }
+
+    if !found {
+        return Err(format!("Project not found: {url}"));
+    }
+
+    let updated = serde_json::to_string_pretty(&projects).map_err(|e| e.to_string())?;
+    fs::write(path, updated).map_err(|e| e.to_string())?;
+    Ok(format!("Project status updated: {normalized_status}"))
+}
+
 #[tauri::command]
 fn get_insights() -> Result<String, String> {
     let path = knowledge_path("manifest/insights.json")?;
@@ -1213,6 +1258,7 @@ pub fn run() {
             validate_bilibili_cookie,
             get_note,
             get_projects,
+            update_project_status,
             get_user_ideas,
             save_user_ideas,
             get_insights,

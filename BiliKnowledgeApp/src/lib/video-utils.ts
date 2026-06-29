@@ -35,9 +35,10 @@ export function statusLabel(status: string) {
 
 export function localizeLabel(raw: string): string {
   const map: Record<string, string> = {
-    candidate: t("status.pending"),
-    review: t("status.needsReview"),
-    useful: t("status.ready"),
+    candidate: t("projects.toReview"),
+    review: t("projects.toReview"),
+    useful: t("projects.valuable"),
+    valuable: t("projects.valuable"),
     pending: t("status.pending"),
     reviewed: t("status.reviewed"),
     archived: t("status.archived"),
