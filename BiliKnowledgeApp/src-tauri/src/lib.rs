@@ -1290,8 +1290,18 @@ async fn run_script<R: Runtime>(
             let trimmed = line.trim();
             let is_python_warning = trimmed.contains("NotOpenSSLWarning")
                 || trimmed.contains("warnings.warn(")
-                || trimmed.starts_with("/Users/") && trimmed.contains("site-packages/urllib3");
-            let formatted = if is_python_warning {
+                || trimmed.contains("WARNING:")
+                || trimmed.contains("Check update of funasr")
+                || (trimmed.starts_with("/Users/") && trimmed.contains("site-packages/urllib3"));
+            let is_progress_noise = trimmed.contains("%|")
+                || trimmed.contains("it/s")
+                || trimmed.contains("rtf_avg")
+                || trimmed.contains("load_data")
+                || trimmed.contains("extract_feat")
+                || trimmed.contains("forward");
+            let formatted = if is_progress_noise {
+                format!("[TRACE] {}", line)
+            } else if is_python_warning {
                 format!("[WARN] {}", line)
             } else {
                 format!("[ERROR] {}", line)

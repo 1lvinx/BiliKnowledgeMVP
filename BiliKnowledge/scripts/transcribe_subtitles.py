@@ -140,7 +140,7 @@ def transcribe_wav(wav_path: Path) -> list[dict[str, Any]]:
         raise RuntimeError(f"缺少 ASR 依赖：请安装 funasr modelscope torch torchaudio pydub yt-dlp，并确保 numpy<2；当前 Python：{sys.executable}") from exc
 
     print("[ASR] 加载 SenseVoiceSmall 模型；首次运行会下载到 ~/.cache/modelscope", flush=True)
-    model = AutoModel(model="iic/SenseVoiceSmall")
+    model = AutoModel(model="iic/SenseVoiceSmall", disable_update=True)
     result = model.generate(input=str(wav_path), use_itn=True)
     segments: list[dict[str, Any]] = []
     cursor = 0.0
@@ -174,10 +174,10 @@ def extract_keywords(text: str) -> list[str]:
     return list(dict.fromkeys(results))
 
 
-def validate_subtitle_against_video(video: dict[str, Any], raw_text: str) -> tuple[bool, str, list[str]]:
+def validate_subtitle_against_video(video: dict[str, Any], raw_text: str) -> tuple[str, str, list[str]]:
     text = raw_text.strip().lower()
     if len(text) < 40:
-        return False, "ASR 文本过短，无法支撑笔记生成", []
+        return "invalid", "ASR 文本过短，无法支撑笔记生成", []
     title_keywords = extract_keywords(str(video.get("title") or ""))
     metadata_keywords = extract_keywords(" ".join([
         str(video.get("uploader") or ""),
@@ -188,10 +188,12 @@ def validate_subtitle_against_video(video: dict[str, Any], raw_text: str) -> tup
     title_hits = [kw for kw in title_keywords if kw in text]
     meta_hits = [kw for kw in metadata_keywords if kw in text]
     if title_hits:
-        return True, "标题关键词命中 ASR 文本", title_hits[:8]
+        return "valid", "标题关键词命中 ASR 文本", title_hits[:8]
     if len(meta_hits) >= 2 and len(title_keywords) <= 1:
-        return True, "元数据关键词命中 ASR 文本", meta_hits[:8]
-    return False, "ASR 文本疑似与视频不匹配", (title_keywords + metadata_keywords)[:8]
+        return "valid", "元数据关键词命中 ASR 文本", meta_hits[:8]
+    # 标题/元数据没有命中，不代表 ASR 一定错。很多视频开头不会复述标题。
+    # RC 阶段不应因此打断单条视频链路；保留字幕，但标记为 low_confidence。
+    return "low_confidence", "ASR 文本未命中标题关键词，建议人工抽查", (title_keywords + metadata_keywords)[:8]
 
 
 def main() -> int:
@@ -224,10 +226,12 @@ def main() -> int:
         return 1
 
     raw_text = "\n".join(segment["text"] for segment in segments)
-    is_valid, reason, matched_keywords = validate_subtitle_against_video(video, raw_text)
-    if not is_valid:
+    validation_status, reason, matched_keywords = validate_subtitle_against_video(video, raw_text)
+    if validation_status == "invalid":
         print(f"[错误] ASR 校验失败：{reason}")
         return 1
+    if validation_status == "low_confidence":
+        print(f"[ASR] 低置信保存：{reason}")
 
     entry = {
         "video_id": args.video_id,
@@ -237,7 +241,7 @@ def main() -> int:
         "raw_text": raw_text,
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "validation": {
-            "status": "valid",
+            "status": validation_status,
             "reason": reason,
             "matched_keywords": matched_keywords,
         },
