@@ -216,11 +216,16 @@ def subtitle_matches_video(video: dict, subtitle: Optional[dict]) -> bool:
     if not subtitle or not isinstance(subtitle, dict):
         return False
     validation = subtitle.get("validation") if isinstance(subtitle.get("validation"), dict) else {}
-    if validation.get("status") == "mismatch":
+    validation_status = str(validation.get("status") or "").strip().lower()
+    if validation_status in {"mismatch", "invalid"}:
         return False
     raw_text = compact_subtitle_text(subtitle, max_chars=1600).lower()
     if len(raw_text) < 40:
         return False
+    # ASR 字幕可能无法命中标题关键词，但仍然是当前视频的可用证据。
+    # 转写层已经把这类情况标记为 low_confidence；洞察层允许继续生成，并在结果里保留证据质量。
+    if validation_status in {"valid", "low_confidence"}:
+        return True
     title_keywords = extract_keywords(str(video.get("title") or ""))
     metadata_keywords = extract_keywords(" ".join([
         str(video.get("uploader") or ""),
@@ -444,7 +449,7 @@ def main():
         source_item = source_lookup.get(video_id, {})
         subtitle = subtitle_lookup.get(video_id)
         if not subtitle_matches_video(video, subtitle):
-            print(f"[错误] 字幕缺失或疑似错配，已阻止生成洞察：{video_id} {video.get('title', '')}")
+            print(f"[错误] 字幕缺失、文本过短或明确错配，已阻止生成洞察：{video_id} {video.get('title', '')}")
             if args.video_id:
                 sys.exit(1)
             continue
