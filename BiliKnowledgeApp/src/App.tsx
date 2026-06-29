@@ -715,6 +715,29 @@ function App() {
     setNoteContent(null);
   }
 
+  async function saveCurrentNote(video: Video, content: string) {
+    if (!tauriAvailable || !video.note_path) return;
+    try {
+      const message: string = await invoke("save_note", { notePath: video.note_path, content });
+      setNoteContent(content);
+      showToast(message, "success");
+      appendLog(message);
+    } catch (err) {
+      showToast(`保存笔记失败：${String(err)}`, "error");
+    }
+  }
+
+  async function exportCurrentNote(video: Video) {
+    if (!tauriAvailable || !video.note_path) return;
+    try {
+      const path: string = await invoke("export_note", { notePath: video.note_path });
+      showToast(`已导出 Markdown：${path}`, "success");
+      appendLog(`已导出 Markdown：${path}`);
+    } catch (err) {
+      showToast(`导出笔记失败：${String(err)}`, "error");
+    }
+  }
+
   async function addManualVideo(input: string, title?: string) {
     if (!tauriAvailable) {
       showToast("预览模式不能写入视频清单。", "error");
@@ -1575,6 +1598,8 @@ function App() {
               fetchNote={fetchNote}
               noteContent={noteContent}
               onGenerateNote={generateNoteForVideo}
+              onSaveNote={saveCurrentNote}
+              onExportNote={exportCurrentNote}
               videos={videos}
             />
           )}

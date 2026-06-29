@@ -14,6 +14,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import warnings
+
+try:
+    from urllib3.exceptions import NotOpenSSLWarning
+    warnings.filterwarnings("ignore", category=NotOpenSSLWarning)
+except Exception:
+    pass
+
 import re
 import shutil
 import subprocess

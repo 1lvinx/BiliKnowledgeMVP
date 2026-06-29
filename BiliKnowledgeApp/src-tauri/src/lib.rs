@@ -1,12 +1,12 @@
+use serde::Serialize;
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
-use std::path::{Component, Path, PathBuf};
 use std::net::{TcpListener, TcpStream};
+use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
-use serde::Serialize;
 use tauri::{Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
 use which::which;
 
@@ -52,7 +52,6 @@ const DEFAULT_CONFIG: &str = r#"{
   }
 }"#;
 
-
 const BILIBILI_RSA_PUBLIC_KEY: &str = "-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDLgd2OAkcGVtoE3ThUREbio0Eg
 Uc/prcajMKXvkCKFCWhJYJcLkcM2DKKcSeFpD/j6Boy538YXnR6VhcuUJOhH2x71
@@ -74,11 +73,21 @@ fn extract_set_cookie_value(cookie_str: &str, name: &str) -> Option<String> {
     if !cookie_str.starts_with(&prefix) {
         return None;
     }
-    Some(cookie_str[prefix.len()..].split(';').next().unwrap_or("").to_string())
+    Some(
+        cookie_str[prefix.len()..]
+            .split(';')
+            .next()
+            .unwrap_or("")
+            .to_string(),
+    )
 }
 
 fn normalize_cookie_value(value: &str) -> std::borrow::Cow<'_, str> {
-    if value.contains('%') || !value.chars().any(|ch| matches!(ch, ',' | ';' | ' ' | '\t' | '\r' | '\n')) {
+    if value.contains('%')
+        || !value
+            .chars()
+            .any(|ch| matches!(ch, ',' | ';' | ' ' | '\t' | '\r' | '\n'))
+    {
         std::borrow::Cow::Borrowed(value)
     } else {
         std::borrow::Cow::Owned(urlencoding::encode(value).into_owned())
@@ -104,41 +113,68 @@ fn cookie_header_from_credentials(credentials: &BilibiliCredentials) -> String {
 
 fn load_bilibili_credentials() -> Result<Option<BilibiliCredentials>, String> {
     let config_path = knowledge_path("config/config.json")?;
-    let config_text = fs::read_to_string(&config_path).unwrap_or_else(|_| DEFAULT_CONFIG.to_string());
-    let config_json: serde_json::Value = serde_json::from_str(&config_text)
-        .map_err(|e| format!("配置文件格式无效：{e}"))?;
+    let config_text =
+        fs::read_to_string(&config_path).unwrap_or_else(|_| DEFAULT_CONFIG.to_string());
+    let config_json: serde_json::Value =
+        serde_json::from_str(&config_text).map_err(|e| format!("配置文件格式无效：{e}"))?;
     let bilibili = &config_json["bilibili"];
-    let sessdata = bilibili["sessdata"].as_str().unwrap_or("").trim().to_string();
+    let sessdata = bilibili["sessdata"]
+        .as_str()
+        .unwrap_or("")
+        .trim()
+        .to_string();
     let raw_cookie = bilibili["cookie"].as_str().unwrap_or("").trim().to_string();
     if sessdata.is_empty() && raw_cookie.is_empty() {
         return Ok(None);
     }
     Ok(Some(BilibiliCredentials {
         sessdata,
-        bili_jct: bilibili["bili_jct"].as_str().unwrap_or("").trim().to_string(),
-        dedeuserid: bilibili["dedeuserid"].as_str().unwrap_or("").trim().to_string(),
+        bili_jct: bilibili["bili_jct"]
+            .as_str()
+            .unwrap_or("")
+            .trim()
+            .to_string(),
+        dedeuserid: bilibili["dedeuserid"]
+            .as_str()
+            .unwrap_or("")
+            .trim()
+            .to_string(),
         buvid3: bilibili["buvid3"].as_str().unwrap_or("").trim().to_string(),
-        refresh_token: bilibili["refresh_token"].as_str().unwrap_or("").trim().to_string(),
+        refresh_token: bilibili["refresh_token"]
+            .as_str()
+            .unwrap_or("")
+            .trim()
+            .to_string(),
     }))
 }
 
-fn persist_bilibili_credentials(credentials: &BilibiliCredentials, status: &str) -> Result<(), String> {
+fn persist_bilibili_credentials(
+    credentials: &BilibiliCredentials,
+    status: &str,
+) -> Result<(), String> {
     let path = knowledge_path("config/config.json")?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let existing = fs::read_to_string(&path).unwrap_or_else(|_| DEFAULT_CONFIG.to_string());
-    let parsed = serde_json::from_str::<serde_json::Value>(&existing).unwrap_or_else(|_| default_config_value().unwrap_or_else(|_| serde_json::json!({})));
+    let parsed = serde_json::from_str::<serde_json::Value>(&existing)
+        .unwrap_or_else(|_| default_config_value().unwrap_or_else(|_| serde_json::json!({})));
     let mut config = normalize_config_value(parsed)?;
-    if !config.get("bilibili").map(|v| v.is_object()).unwrap_or(false) {
+    if !config
+        .get("bilibili")
+        .map(|v| v.is_object())
+        .unwrap_or(false)
+    {
         config["bilibili"] = serde_json::json!({});
     }
-    config["bilibili"]["cookie"] = serde_json::Value::String(cookie_header_from_credentials(credentials));
+    config["bilibili"]["cookie"] =
+        serde_json::Value::String(cookie_header_from_credentials(credentials));
     config["bilibili"]["sessdata"] = serde_json::Value::String(credentials.sessdata.clone());
     config["bilibili"]["bili_jct"] = serde_json::Value::String(credentials.bili_jct.clone());
     config["bilibili"]["dedeuserid"] = serde_json::Value::String(credentials.dedeuserid.clone());
     config["bilibili"]["buvid3"] = serde_json::Value::String(credentials.buvid3.clone());
-    config["bilibili"]["refresh_token"] = serde_json::Value::String(credentials.refresh_token.clone());
+    config["bilibili"]["refresh_token"] =
+        serde_json::Value::String(credentials.refresh_token.clone());
     config["bilibili"]["cookie_ts"] = serde_json::Value::String(now_epoch_string());
     config["bilibili"]["status"] = serde_json::Value::String(status.to_string());
     let content = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
@@ -165,7 +201,11 @@ fn generate_bilibili_correspond_path(timestamp: i64) -> Result<String, String> {
     Ok(hex::encode(encrypted))
 }
 
-fn fetch_bilibili_refresh_csrf(client: &reqwest::blocking::Client, sessdata: &str, correspond_path: &str) -> Result<String, String> {
+fn fetch_bilibili_refresh_csrf(
+    client: &reqwest::blocking::Client,
+    sessdata: &str,
+    correspond_path: &str,
+) -> Result<String, String> {
     let url = format!("https://www.bilibili.com/correspond/1/{}", correspond_path);
     let sessdata = normalize_cookie_value(sessdata);
     let html = client
@@ -176,13 +216,22 @@ fn fetch_bilibili_refresh_csrf(client: &reqwest::blocking::Client, sessdata: &st
         .text()
         .map_err(|e| format!("读取 refresh_csrf 页面失败：{e}"))?;
     let re = regex::Regex::new(r#"<div id="1-name">([^<]+)</div>"#).map_err(|e| e.to_string())?;
-    let caps = re.captures(&html).ok_or_else(|| "无法从 B站页面提取 refresh_csrf".to_string())?;
+    let caps = re
+        .captures(&html)
+        .ok_or_else(|| "无法从 B站页面提取 refresh_csrf".to_string())?;
     Ok(caps[1].to_string())
 }
 
-fn refresh_bilibili_cookie(credentials: &BilibiliCredentials) -> Result<BilibiliCredentials, String> {
-    if credentials.sessdata.is_empty() || credentials.bili_jct.is_empty() || credentials.refresh_token.is_empty() {
-        return Err("缺少 SESSDATA / bili_jct / refresh_token，无法自动刷新，请重新扫码登录。".into());
+fn refresh_bilibili_cookie(
+    credentials: &BilibiliCredentials,
+) -> Result<BilibiliCredentials, String> {
+    if credentials.sessdata.is_empty()
+        || credentials.bili_jct.is_empty()
+        || credentials.refresh_token.is_empty()
+    {
+        return Err(
+            "缺少 SESSDATA / bili_jct / refresh_token，无法自动刷新，请重新扫码登录。".into(),
+        );
     }
     let client = reqwest::blocking::Client::builder()
         .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36")
@@ -192,26 +241,46 @@ fn refresh_bilibili_cookie(credentials: &BilibiliCredentials) -> Result<Bilibili
 
     let info: serde_json::Value = client
         .get("https://passport.bilibili.com/x/passport-login/web/cookie/info")
-        .header("Cookie", format!("SESSDATA={}; bili_jct={}", normalize_cookie_value(&credentials.sessdata), credentials.bili_jct))
+        .header(
+            "Cookie",
+            format!(
+                "SESSDATA={}; bili_jct={}",
+                normalize_cookie_value(&credentials.sessdata),
+                credentials.bili_jct
+            ),
+        )
         .query(&[("csrf", credentials.bili_jct.as_str())])
         .send()
         .map_err(|e| format!("检查 Cookie 刷新状态失败：{e}"))?
         .json()
         .map_err(|e| format!("解析 Cookie 刷新状态失败：{e}"))?;
     if info["code"].as_i64().unwrap_or(-1) != 0 {
-        return Err(format!("B站 Cookie 状态接口返回异常：{}", info["message"].as_str().unwrap_or("unknown")));
+        return Err(format!(
+            "B站 Cookie 状态接口返回异常：{}",
+            info["message"].as_str().unwrap_or("unknown")
+        ));
     }
     let refresh = info["data"]["refresh"].as_bool().unwrap_or(false);
     if !refresh {
         return Ok(credentials.clone());
     }
-    let timestamp = info["data"]["timestamp"].as_i64().ok_or_else(|| "B站未返回 Cookie refresh timestamp".to_string())?;
+    let timestamp = info["data"]["timestamp"]
+        .as_i64()
+        .ok_or_else(|| "B站未返回 Cookie refresh timestamp".to_string())?;
     let correspond_path = generate_bilibili_correspond_path(timestamp)?;
-    let refresh_csrf = fetch_bilibili_refresh_csrf(&client, &credentials.sessdata, &correspond_path)?;
+    let refresh_csrf =
+        fetch_bilibili_refresh_csrf(&client, &credentials.sessdata, &correspond_path)?;
 
     let resp = client
         .post("https://passport.bilibili.com/x/passport-login/web/cookie/refresh")
-        .header("Cookie", format!("SESSDATA={}; bili_jct={}", normalize_cookie_value(&credentials.sessdata), credentials.bili_jct))
+        .header(
+            "Cookie",
+            format!(
+                "SESSDATA={}; bili_jct={}",
+                normalize_cookie_value(&credentials.sessdata),
+                credentials.bili_jct
+            ),
+        )
         .form(&[
             ("csrf", credentials.bili_jct.as_str()),
             ("refresh_csrf", refresh_csrf.as_str()),
@@ -226,38 +295,68 @@ fn refresh_bilibili_cookie(credentials: &BilibiliCredentials) -> Result<Bilibili
         .iter()
         .filter_map(|v| v.to_str().ok().map(String::from))
         .collect();
-    let body: serde_json::Value = resp.json().map_err(|e| format!("解析 Cookie 刷新响应失败：{e}"))?;
+    let body: serde_json::Value = resp
+        .json()
+        .map_err(|e| format!("解析 Cookie 刷新响应失败：{e}"))?;
     if body["code"].as_i64().unwrap_or(-1) != 0 {
-        return Err(format!("刷新 B站 Cookie 失败：{}", body["message"].as_str().unwrap_or("unknown")));
+        return Err(format!(
+            "刷新 B站 Cookie 失败：{}",
+            body["message"].as_str().unwrap_or("unknown")
+        ));
     }
 
     let mut next = credentials.clone();
     for cookie in &set_cookies {
-        if let Some(v) = extract_set_cookie_value(cookie, "SESSDATA") { next.sessdata = v; }
-        if let Some(v) = extract_set_cookie_value(cookie, "bili_jct") { next.bili_jct = v; }
-        if let Some(v) = extract_set_cookie_value(cookie, "DedeUserID") { next.dedeuserid = v; }
-        if let Some(v) = extract_set_cookie_value(cookie, "buvid3") { next.buvid3 = v; }
+        if let Some(v) = extract_set_cookie_value(cookie, "SESSDATA") {
+            next.sessdata = v;
+        }
+        if let Some(v) = extract_set_cookie_value(cookie, "bili_jct") {
+            next.bili_jct = v;
+        }
+        if let Some(v) = extract_set_cookie_value(cookie, "DedeUserID") {
+            next.dedeuserid = v;
+        }
+        if let Some(v) = extract_set_cookie_value(cookie, "buvid3") {
+            next.buvid3 = v;
+        }
     }
-    if let Some(v) = body["data"]["refresh_token"].as_str().filter(|v| !v.is_empty()) {
+    if let Some(v) = body["data"]["refresh_token"]
+        .as_str()
+        .filter(|v| !v.is_empty())
+    {
         next.refresh_token = v.to_string();
     }
 
     let _ = client
         .post("https://passport.bilibili.com/x/passport-login/web/confirm/refresh")
-        .header("Cookie", format!("SESSDATA={}; bili_jct={}", normalize_cookie_value(&next.sessdata), next.bili_jct))
-        .form(&[("csrf", next.bili_jct.as_str()), ("refresh_token", credentials.refresh_token.as_str())])
+        .header(
+            "Cookie",
+            format!(
+                "SESSDATA={}; bili_jct={}",
+                normalize_cookie_value(&next.sessdata),
+                next.bili_jct
+            ),
+        )
+        .form(&[
+            ("csrf", next.bili_jct.as_str()),
+            ("refresh_token", credentials.refresh_token.as_str()),
+        ])
         .send();
     Ok(next)
 }
 
 fn auto_refresh_bilibili_cookie_if_possible() -> Result<Option<BilibiliCredentials>, String> {
-    let Some(credentials) = load_bilibili_credentials()? else { return Ok(None); };
+    let Some(credentials) = load_bilibili_credentials()? else {
+        return Ok(None);
+    };
     if credentials.refresh_token.is_empty() || credentials.bili_jct.is_empty() {
         return Ok(Some(credentials));
     }
     match refresh_bilibili_cookie(&credentials) {
         Ok(next) => {
-            if next.sessdata != credentials.sessdata || next.refresh_token != credentials.refresh_token {
+            if next.sessdata != credentials.sessdata
+                || next.refresh_token != credentials.refresh_token
+            {
                 persist_bilibili_credentials(&next, "auto_refreshed")?;
             }
             Ok(Some(next))
@@ -446,11 +545,7 @@ fn ensure_path_under_base(base: &Path, target: &Path) -> Result<PathBuf, String>
                 .canonicalize()
                 .unwrap_or_else(|_| parent.to_path_buf())
         } else {
-            resolve_base_path(base)?.join(
-                parent
-                    .strip_prefix(base)
-                    .unwrap_or(parent),
-            )
+            resolve_base_path(base)?.join(parent.strip_prefix(base).unwrap_or(parent))
         };
         parent_resolved.join(file_name)
     };
@@ -566,7 +661,11 @@ fn find_aid(text: &str) -> Option<String> {
 
 fn find_b23_url(text: &str) -> Option<String> {
     text.split_whitespace()
-        .map(|token| token.trim_matches(|ch: char| ch == '"' || ch == '\'' || ch == '，' || ch == ',' || ch == '。'))
+        .map(|token| {
+            token.trim_matches(|ch: char| {
+                ch == '"' || ch == '\'' || ch == '，' || ch == ',' || ch == '。'
+            })
+        })
         .find(|token| token.contains("b23.tv/") || token.contains("bili2233.cn/"))
         .map(|token| {
             if token.starts_with("http://") || token.starts_with("https://") {
@@ -665,23 +764,34 @@ fn add_video_to_manifest(input: &str, title: Option<&str>, source: &str) -> Resu
     }
 
     let content = fs::read_to_string(&path).unwrap_or_else(|_| "[]".into());
-    let mut videos: serde_json::Value = serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!([]));
+    let mut videos: serde_json::Value =
+        serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!([]));
     let items = videos
         .as_array_mut()
         .ok_or_else(|| "manifest/videos.json 不是有效数组。".to_string())?;
 
-    if items.iter().any(|video| video.get("id").and_then(|v| v.as_str()) == Some(bvid.as_str())) {
+    if items
+        .iter()
+        .any(|video| video.get("id").and_then(|v| v.as_str()) == Some(bvid.as_str()))
+    {
         return Ok(format!("视频已存在：{bvid}"));
     }
 
     let title_value = title.unwrap_or("").trim().to_string();
-    let api_title = metadata.get("title").and_then(|v| v.as_str()).unwrap_or("").trim();
+    let api_title = metadata
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
     let owner_name = metadata
         .get("owner")
         .and_then(|v| v.get("name"))
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let duration = metadata.get("duration").and_then(|v| v.as_u64()).unwrap_or(0);
+    let duration = metadata
+        .get("duration")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
     let pubdate = metadata
         .get("pubdate")
         .and_then(|v| v.as_i64())
@@ -741,7 +851,9 @@ struct BrowserBridgeCookies {
 }
 
 fn merge_browser_bridge_cookies(cookies: Option<BrowserBridgeCookies>) -> Result<(), String> {
-    let Some(cookies) = cookies else { return Ok(()); };
+    let Some(cookies) = cookies else {
+        return Ok(());
+    };
     let has_cookie = cookies.sessdata.as_deref().unwrap_or("").trim().len() > 0
         || cookies.cookie_header.as_deref().unwrap_or("").trim().len() > 0;
     if !has_cookie {
@@ -753,25 +865,55 @@ fn merge_browser_bridge_cookies(cookies: Option<BrowserBridgeCookies>) -> Result
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let existing = fs::read_to_string(&path).unwrap_or_else(|_| DEFAULT_CONFIG.to_string());
-    let parsed = serde_json::from_str::<serde_json::Value>(&existing).unwrap_or_else(|_| default_config_value().unwrap_or_else(|_| serde_json::json!({})));
+    let parsed = serde_json::from_str::<serde_json::Value>(&existing)
+        .unwrap_or_else(|_| default_config_value().unwrap_or_else(|_| serde_json::json!({})));
     let mut config = normalize_config_value(parsed)?;
-    if !config.get("bilibili").map(|v| v.is_object()).unwrap_or(false) {
+    if !config
+        .get("bilibili")
+        .map(|v| v.is_object())
+        .unwrap_or(false)
+    {
         config["bilibili"] = serde_json::json!({});
     }
 
-    if let Some(value) = cookies.cookie_header.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+    if let Some(value) = cookies
+        .cookie_header
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+    {
         config["bilibili"]["cookie"] = serde_json::Value::String(value.to_string());
     }
-    if let Some(value) = cookies.sessdata.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+    if let Some(value) = cookies
+        .sessdata
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+    {
         config["bilibili"]["sessdata"] = serde_json::Value::String(value.to_string());
     }
-    if let Some(value) = cookies.bili_jct.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+    if let Some(value) = cookies
+        .bili_jct
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+    {
         config["bilibili"]["bili_jct"] = serde_json::Value::String(value.to_string());
     }
-    if let Some(value) = cookies.dedeuserid.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+    if let Some(value) = cookies
+        .dedeuserid
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+    {
         config["bilibili"]["dedeuserid"] = serde_json::Value::String(value.to_string());
     }
-    if let Some(value) = cookies.buvid3.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+    if let Some(value) = cookies
+        .buvid3
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+    {
         config["bilibili"]["buvid3"] = serde_json::Value::String(value.to_string());
     }
     config["bilibili"]["status"] = serde_json::Value::String("browser_bridge".into());
@@ -829,32 +971,62 @@ fn process_browser_bridge_request(request: &str) -> String {
         return browser_bridge_response("204 No Content", serde_json::json!({}));
     }
     if request_line.starts_with("GET /api/browser/health ") {
-        return browser_bridge_response("200 OK", serde_json::json!({ "ok": true, "app": "哔知", "bridge": "browser" }));
+        return browser_bridge_response(
+            "200 OK",
+            serde_json::json!({ "ok": true, "app": "哔知", "bridge": "browser" }),
+        );
     }
     if !request_line.starts_with("POST /api/browser/import ") {
-        return browser_bridge_response("404 Not Found", serde_json::json!({ "ok": false, "error": "not_found" }));
+        return browser_bridge_response(
+            "404 Not Found",
+            serde_json::json!({ "ok": false, "error": "not_found" }),
+        );
     }
     if !request.to_ascii_lowercase().contains("x-bizhi-companion:") {
-        return browser_bridge_response("403 Forbidden", serde_json::json!({ "ok": false, "error": "missing_companion_header" }));
+        return browser_bridge_response(
+            "403 Forbidden",
+            serde_json::json!({ "ok": false, "error": "missing_companion_header" }),
+        );
     }
 
     let Some((_, body)) = request.split_once("\r\n\r\n") else {
-        return browser_bridge_response("400 Bad Request", serde_json::json!({ "ok": false, "error": "missing_body" }));
+        return browser_bridge_response(
+            "400 Bad Request",
+            serde_json::json!({ "ok": false, "error": "missing_body" }),
+        );
     };
-    let payload: BrowserBridgeImportPayload = match serde_json::from_str(body.trim_end_matches(char::from(0))) {
-        Ok(payload) => payload,
-        Err(err) => {
-            return browser_bridge_response("400 Bad Request", serde_json::json!({ "ok": false, "error": format!("invalid_json: {err}") }));
-        }
-    };
-    let input = payload.bvid.as_deref().filter(|v| !v.trim().is_empty()).unwrap_or(payload.url.as_str()).to_string();
+    let payload: BrowserBridgeImportPayload =
+        match serde_json::from_str(body.trim_end_matches(char::from(0))) {
+            Ok(payload) => payload,
+            Err(err) => {
+                return browser_bridge_response(
+                    "400 Bad Request",
+                    serde_json::json!({ "ok": false, "error": format!("invalid_json: {err}") }),
+                );
+            }
+        };
+    let input = payload
+        .bvid
+        .as_deref()
+        .filter(|v| !v.trim().is_empty())
+        .unwrap_or(payload.url.as_str())
+        .to_string();
     if let Err(err) = merge_browser_bridge_cookies(payload.cookies) {
-        return browser_bridge_response("500 Internal Server Error", serde_json::json!({ "ok": false, "error": err }));
+        return browser_bridge_response(
+            "500 Internal Server Error",
+            serde_json::json!({ "ok": false, "error": err }),
+        );
     }
     let title = payload.title.as_deref();
     match add_video_to_manifest(&input, title, "哔知助手") {
-        Ok(message) => browser_bridge_response("200 OK", serde_json::json!({ "ok": true, "message": message, "uploader": payload.uploader })),
-        Err(err) => browser_bridge_response("400 Bad Request", serde_json::json!({ "ok": false, "error": err })),
+        Ok(message) => browser_bridge_response(
+            "200 OK",
+            serde_json::json!({ "ok": true, "message": message, "uploader": payload.uploader }),
+        ),
+        Err(err) => browser_bridge_response(
+            "400 Bad Request",
+            serde_json::json!({ "ok": false, "error": err }),
+        ),
     }
 }
 
@@ -865,7 +1037,8 @@ fn get_videos() -> Result<String, String> {
         return Err(format!("Manifest not found at {:?}", path));
     }
     let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    let mut videos: serde_json::Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    let mut videos: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| e.to_string())?;
 
     if let Some(items) = videos.as_array_mut() {
         items.retain(|video| !is_invalid_video_entry(video));
@@ -935,7 +1108,8 @@ struct BilibiliCookieValidation {
 async fn validate_bilibili_cookie() -> Result<String, String> {
     let refreshed_credentials = auto_refresh_bilibili_cookie_if_possible()?;
     let config_path = knowledge_path("config/config.json")?;
-    let config_text = fs::read_to_string(&config_path).unwrap_or_else(|_| DEFAULT_CONFIG.to_string());
+    let config_text =
+        fs::read_to_string(&config_path).unwrap_or_else(|_| DEFAULT_CONFIG.to_string());
     let config_json: serde_json::Value =
         serde_json::from_str(&config_text).map_err(|e| format!("配置文件格式无效：{e}"))?;
 
@@ -952,7 +1126,15 @@ async fn validate_bilibili_cookie() -> Result<String, String> {
 
     let cookie_header = if let Some(credentials) = refreshed_credentials.as_ref() {
         let header = cookie_header_from_credentials(credentials);
-        if !header.is_empty() { header } else if !raw_cookie.is_empty() { raw_cookie } else if !sessdata.is_empty() { format!("SESSDATA={sessdata}") } else { String::new() }
+        if !header.is_empty() {
+            header
+        } else if !raw_cookie.is_empty() {
+            raw_cookie
+        } else if !sessdata.is_empty() {
+            format!("SESSDATA={sessdata}")
+        } else {
+            String::new()
+        }
     } else if !raw_cookie.is_empty() {
         raw_cookie
     } else if !sessdata.is_empty() {
@@ -993,18 +1175,29 @@ async fn validate_bilibili_cookie() -> Result<String, String> {
         .await
         .map_err(|e| format!("解析 Bilibili 返回失败：{e}"))?;
 
-    let data = payload.get("data").cloned().unwrap_or(serde_json::Value::Null);
-    let is_login = data.get("isLogin").and_then(|v| v.as_bool()).unwrap_or(false);
+    let data = payload
+        .get("data")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let is_login = data
+        .get("isLogin")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     let result = if is_login {
         BilibiliCookieValidation {
             valid: true,
             message: format!(
                 "Cookie 校验通过，当前账号：{}",
-                data.get("uname").and_then(|v| v.as_str()).unwrap_or("未知账号")
+                data.get("uname")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("未知账号")
             ),
             mid: data.get("mid").and_then(|v| v.as_u64()),
-            uname: data.get("uname").and_then(|v| v.as_str()).map(|v| v.to_string()),
+            uname: data
+                .get("uname")
+                .and_then(|v| v.as_str())
+                .map(|v| v.to_string()),
         }
     } else {
         BilibiliCookieValidation {
@@ -1094,7 +1287,15 @@ async fn run_script<R: Runtime>(
     let stderr_handle = std::thread::spawn(move || {
         let reader = BufReader::new(stderr);
         for line in reader.lines().map_while(|line| line.ok()) {
-            let formatted = format!("[ERROR] {}", line);
+            let trimmed = line.trim();
+            let is_python_warning = trimmed.contains("NotOpenSSLWarning")
+                || trimmed.contains("warnings.warn(")
+                || trimmed.starts_with("/Users/") && trimmed.contains("site-packages/urllib3");
+            let formatted = if is_python_warning {
+                format!("[WARN] {}", line)
+            } else {
+                format!("[ERROR] {}", line)
+            };
             if let Ok(mut output) = output_clone.lock() {
                 output.push(formatted.clone());
             }
@@ -1114,8 +1315,10 @@ async fn run_script<R: Runtime>(
             .ok()
             .map(|output| {
                 let start = output.len().saturating_sub(8);
-                output[start..].join("
-")
+                output[start..].join(
+                    "
+",
+                )
             })
             .unwrap_or_default();
         if tail.trim().is_empty() {
@@ -1134,11 +1337,41 @@ async fn run_script<R: Runtime>(
 #[tauri::command]
 fn get_note(note_path: String) -> Result<String, String> {
     // note_path is relative to the notes/raw directory, e.g., "BV1xK4y1E7pR.md"
+    ensure_safe_relative_path(&note_path)?;
     let path = knowledge_path(&format!("notes/raw/{note_path}"))?;
     if !path.exists() {
         return Err(format!("Note not found at {:?}", path));
     }
     fs::read_to_string(path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save_note(note_path: String, content: String) -> Result<String, String> {
+    ensure_safe_relative_path(&note_path)?;
+    let path = knowledge_path(&format!("notes/raw/{note_path}"))?;
+    if !path.exists() {
+        return Err(format!("Note not found at {:?}", path));
+    }
+    fs::write(&path, content).map_err(|e| e.to_string())?;
+    Ok(format!("笔记已保存：{}", note_path))
+}
+
+#[tauri::command]
+fn export_note(note_path: String) -> Result<String, String> {
+    ensure_safe_relative_path(&note_path)?;
+    let source = knowledge_path(&format!("notes/raw/{note_path}"))?;
+    if !source.exists() {
+        return Err(format!("Note not found at {:?}", source));
+    }
+    let exports_dir = knowledge_path("exports/notes")?;
+    fs::create_dir_all(&exports_dir).map_err(|e| e.to_string())?;
+    let file_name = Path::new(&note_path)
+        .file_name()
+        .and_then(|v| v.to_str())
+        .ok_or_else(|| "Invalid note file name".to_string())?;
+    let target = exports_dir.join(file_name);
+    fs::copy(&source, &target).map_err(|e| e.to_string())?;
+    Ok(target.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -1181,8 +1414,8 @@ fn get_user_ideas() -> Result<String, String> {
         return Ok("[]".into());
     }
     let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    let parsed: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Invalid user ideas JSON: {e}"))?;
+    let parsed: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("Invalid user ideas JSON: {e}"))?;
     if !parsed.is_array() {
         return Err("Invalid user ideas JSON: root must be an array".into());
     }
@@ -1191,17 +1424,29 @@ fn get_user_ideas() -> Result<String, String> {
 
 #[tauri::command]
 fn save_user_ideas(ideas: String) -> Result<(), String> {
-    let parsed: serde_json::Value = serde_json::from_str(&ideas)
-        .map_err(|e| format!("Invalid user ideas JSON: {e}"))?;
+    let parsed: serde_json::Value =
+        serde_json::from_str(&ideas).map_err(|e| format!("Invalid user ideas JSON: {e}"))?;
     let Some(items) = parsed.as_array() else {
         return Err("Invalid user ideas JSON: root must be an array".into());
     };
     let mut sanitized = Vec::new();
     for item in items.iter().take(500) {
-        let Some(obj) = item.as_object() else { continue; };
-        let title = obj.get("title").and_then(|v| v.as_str()).unwrap_or("").trim();
-        let content = obj.get("content").and_then(|v| v.as_str()).unwrap_or("").trim();
-        if title.is_empty() && content.is_empty() { continue; }
+        let Some(obj) = item.as_object() else {
+            continue;
+        };
+        let title = obj
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
+        let content = obj
+            .get("content")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
+        if title.is_empty() && content.is_empty() {
+            continue;
+        }
         let tags = obj
             .get("tags")
             .and_then(|v| v.as_array())
@@ -1242,7 +1487,6 @@ fn get_projects() -> Result<String, String> {
     fs::read_to_string(path).map_err(|e| e.to_string())
 }
 
-
 #[tauri::command]
 fn update_project_status(url: String, status: String) -> Result<String, String> {
     let normalized_status = status.trim();
@@ -1256,7 +1500,8 @@ fn update_project_status(url: String, status: String) -> Result<String, String> 
     }
 
     let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let mut projects: serde_json::Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    let mut projects: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| e.to_string())?;
     let Some(items) = projects.as_array_mut() else {
         return Err("Project candidates JSON must be an array".into());
     };
@@ -1325,12 +1570,17 @@ fn normalize_config_value(mut config: serde_json::Value) -> Result<serde_json::V
         config["preferences"] = serde_json::Value::Object(serde_json::Map::new());
     }
 
-    let Some(preferences) = config.get_mut("preferences").and_then(|value| value.as_object_mut()) else {
+    let Some(preferences) = config
+        .get_mut("preferences")
+        .and_then(|value| value.as_object_mut())
+    else {
         return Err("Invalid config: preferences must be an object".into());
     };
 
     for (key, value) in default_preferences {
-        preferences.entry(key.clone()).or_insert_with(|| value.clone());
+        preferences
+            .entry(key.clone())
+            .or_insert_with(|| value.clone());
     }
 
     validate_config_value(&config)?;
@@ -1359,12 +1609,16 @@ fn validate_preference_choice(
         return Ok(());
     };
     let Some(value) = value.as_str() else {
-        return Err(format!("Invalid config: preferences.{key} must be a string"));
+        return Err(format!(
+            "Invalid config: preferences.{key} must be a string"
+        ));
     };
     if allowed.contains(&value) {
         Ok(())
     } else {
-        Err(format!("Invalid config: unsupported preferences.{key}: {value}"))
+        Err(format!(
+            "Invalid config: unsupported preferences.{key}: {value}"
+        ))
     }
 }
 
@@ -1378,7 +1632,11 @@ fn validate_config_value(config: &serde_json::Value) -> Result<(), String> {
 
     validate_preference_choice(preferences, "language", &["zh-CN", "en-US"])?;
     validate_preference_choice(preferences, "appearance", &["system", "light", "dark"])?;
-    validate_preference_choice(preferences, "fontFamily", &["system", "rounded", "serif", "mono"])?;
+    validate_preference_choice(
+        preferences,
+        "fontFamily",
+        &["system", "rounded", "serif", "mono"],
+    )?;
     validate_preference_choice(preferences, "density", &["comfortable", "compact"])?;
     validate_preference_choice(
         preferences,
@@ -1450,8 +1708,7 @@ fn ensure_workspace() -> Result<String, String> {
         "logs",
     ];
     for d in &dirs {
-        fs::create_dir_all(root.join(d))
-            .map_err(|e| format!("Failed to create {}: {e}", d))?;
+        fs::create_dir_all(root.join(d)).map_err(|e| format!("Failed to create {}: {e}", d))?;
     }
     let manifest_path = root.join("manifest/videos.json");
     if !manifest_path.exists() {
@@ -1473,7 +1730,9 @@ fn ensure_workspace() -> Result<String, String> {
 fn get_processing_status() -> Result<String, String> {
     let path = knowledge_path("manifest/processing_status.json")?;
     if !path.exists() {
-        return Err("processing_status.json not found. Run validate_knowledge_base.py first.".into());
+        return Err(
+            "processing_status.json not found. Run validate_knowledge_base.py first.".into(),
+        );
     }
     let content = fs::read_to_string(&path).map_err(|e| format!("Failed to read status: {e}"))?;
     // Validate it's valid JSON
@@ -1524,7 +1783,9 @@ fn generate_bilibili_qr() -> Result<String, String> {
         .send()
         .map_err(|e| format!("Failed to request QR code: {e}"))?;
 
-    let body: serde_json::Value = resp.json().map_err(|e| format!("Failed to parse response: {e}"))?;
+    let body: serde_json::Value = resp
+        .json()
+        .map_err(|e| format!("Failed to parse response: {e}"))?;
 
     if body["code"] != 0 {
         return Err(format!("API error: {}", body["message"]));
@@ -1563,7 +1824,9 @@ fn poll_bilibili_qr(qrcode_key: String) -> Result<String, String> {
         .iter()
         .filter_map(|v| v.to_str().ok().map(String::from))
         .collect();
-    let body: serde_json::Value = resp.json().map_err(|e| format!("Failed to parse response: {e}"))?;
+    let body: serde_json::Value = resp
+        .json()
+        .map_err(|e| format!("Failed to parse response: {e}"))?;
 
     let code = body["data"]["code"].as_i64().unwrap_or(-1);
 
@@ -1574,14 +1837,25 @@ fn poll_bilibili_qr(qrcode_key: String) -> Result<String, String> {
             bili_jct: String::new(),
             dedeuserid: String::new(),
             buvid3: String::new(),
-            refresh_token: body["data"]["refresh_token"].as_str().unwrap_or("").to_string(),
+            refresh_token: body["data"]["refresh_token"]
+                .as_str()
+                .unwrap_or("")
+                .to_string(),
         };
 
         for cookie in &set_cookies {
-            if let Some(v) = extract_set_cookie_value(cookie, "SESSDATA") { credentials.sessdata = v; }
-            if let Some(v) = extract_set_cookie_value(cookie, "bili_jct") { credentials.bili_jct = v; }
-            if let Some(v) = extract_set_cookie_value(cookie, "DedeUserID") { credentials.dedeuserid = v; }
-            if let Some(v) = extract_set_cookie_value(cookie, "buvid3") { credentials.buvid3 = v; }
+            if let Some(v) = extract_set_cookie_value(cookie, "SESSDATA") {
+                credentials.sessdata = v;
+            }
+            if let Some(v) = extract_set_cookie_value(cookie, "bili_jct") {
+                credentials.bili_jct = v;
+            }
+            if let Some(v) = extract_set_cookie_value(cookie, "DedeUserID") {
+                credentials.dedeuserid = v;
+            }
+            if let Some(v) = extract_set_cookie_value(cookie, "buvid3") {
+                credentials.buvid3 = v;
+            }
         }
 
         if credentials.sessdata.is_empty() || credentials.bili_jct.is_empty() {
@@ -1590,10 +1864,18 @@ fn poll_bilibili_qr(qrcode_key: String) -> Result<String, String> {
                 for param in query.split('&') {
                     if let Some((key, value)) = param.split_once('=') {
                         match key {
-                            "SESSDATA" if credentials.sessdata.is_empty() => credentials.sessdata = value.to_string(),
-                            "bili_jct" if credentials.bili_jct.is_empty() => credentials.bili_jct = value.to_string(),
-                            "DedeUserID" if credentials.dedeuserid.is_empty() => credentials.dedeuserid = value.to_string(),
-                            "buvid3" if credentials.buvid3.is_empty() => credentials.buvid3 = value.to_string(),
+                            "SESSDATA" if credentials.sessdata.is_empty() => {
+                                credentials.sessdata = value.to_string()
+                            }
+                            "bili_jct" if credentials.bili_jct.is_empty() => {
+                                credentials.bili_jct = value.to_string()
+                            }
+                            "DedeUserID" if credentials.dedeuserid.is_empty() => {
+                                credentials.dedeuserid = value.to_string()
+                            }
+                            "buvid3" if credentials.buvid3.is_empty() => {
+                                credentials.buvid3 = value.to_string()
+                            }
                             _ => {}
                         }
                     }
@@ -1627,7 +1909,8 @@ fn poll_bilibili_qr(qrcode_key: String) -> Result<String, String> {
 
 #[tauri::command]
 fn refresh_bilibili_login() -> Result<String, String> {
-    let credentials = load_bilibili_credentials()?.ok_or_else(|| "未配置 B站登录态，请先扫码登录。".to_string())?;
+    let credentials = load_bilibili_credentials()?
+        .ok_or_else(|| "未配置 B站登录态，请先扫码登录。".to_string())?;
     let refreshed = refresh_bilibili_cookie(&credentials)?;
     persist_bilibili_credentials(&refreshed, "auto_refreshed")?;
     Ok(serde_json::json!({
@@ -1636,7 +1919,8 @@ fn refresh_bilibili_login() -> Result<String, String> {
         "bili_jct": !refreshed.bili_jct.is_empty(),
         "refresh_token": !refreshed.refresh_token.is_empty(),
         "message": "B站 Cookie 已刷新"
-    }).to_string())
+    })
+    .to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -1654,6 +1938,8 @@ pub fn run() {
             get_favorite_folders,
             validate_bilibili_cookie,
             get_note,
+            save_note,
+            export_note,
             get_projects,
             update_project_status,
             get_user_ideas,
@@ -1731,7 +2017,8 @@ mod tests {
     #[test]
     fn rejects_sibling_path_outside_base() {
         let base = temp_base("sibling");
-        let sibling = std::env::temp_dir().join(format!("bk-other-{}-{}", std::process::id(), "sib"));
+        let sibling =
+            std::env::temp_dir().join(format!("bk-other-{}-{}", std::process::id(), "sib"));
         fs::create_dir_all(&sibling).unwrap();
         let result = ensure_path_under_base(&base, &sibling);
         fs::remove_dir_all(&base).ok();
@@ -1798,10 +2085,7 @@ mod tests {
 
     #[test]
     fn extracts_bvid_from_plain_and_url_input() {
-        assert_eq!(
-            find_bvid("BV1LY7K6dEnd").as_deref(),
-            Some("BV1LY7K6dEnd")
-        );
+        assert_eq!(find_bvid("BV1LY7K6dEnd").as_deref(), Some("BV1LY7K6dEnd"));
         assert_eq!(
             find_bvid("https://www.bilibili.com/video/BV1DVj46KEmQ?p=1").as_deref(),
             Some("BV1DVj46KEmQ")

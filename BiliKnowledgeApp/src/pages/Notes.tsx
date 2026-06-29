@@ -1,4 +1,5 @@
-import { FileText } from "lucide-react";
+import { Copy, Download, Edit3, FileText, Save, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Video } from "../types";
 import { t } from "../i18n";
@@ -50,6 +51,8 @@ interface NotesProps {
   fetchNote: (video: Video) => void;
   noteContent: string | null;
   onGenerateNote?: (videoId: string) => void;
+  onSaveNote?: (video: Video, content: string) => Promise<void>;
+  onExportNote?: (video: Video) => Promise<void>;
   videos: Video[];
 }
 
@@ -58,11 +61,32 @@ export function Notes({
   fetchNote,
   noteContent,
   onGenerateNote,
+  onSaveNote,
+  onExportNote,
   videos,
 }: NotesProps) {
   const noteVideos = videos.filter((video) => Boolean(video.note_ready && video.note_path && video.note_generation_mode === "single"));
   const hasSubstantiveNote = !isPlaceholderNoteContent(noteContent);
   const readingContent = compactNoteForReading(noteContent);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftContent, setDraftContent] = useState(noteContent ?? "");
+
+  useEffect(() => {
+    setDraftContent(noteContent ?? "");
+    setIsEditing(false);
+  }, [activeVideo?.id, noteContent]);
+
+  async function copyCurrentNote() {
+    const text = isEditing ? draftContent : (readingContent ?? noteContent ?? "");
+    if (!text.trim()) return;
+    await navigator.clipboard?.writeText(text);
+  }
+
+  async function saveCurrentNote() {
+    if (!activeVideo || !onSaveNote) return;
+    await onSaveNote(activeVideo, draftContent);
+    setIsEditing(false);
+  }
 
   return (
     <MacSplitView columns="300px minmax(0, 1fr)">
@@ -100,15 +124,40 @@ export function Notes({
         <div className="mac-note-reader custom-scrollbar">
           {activeVideo ? (
             <article>
-              <div className="mac-row-meta mb-6">
-                <span>{activeVideo.uploader || "-"}</span>
-                <span>{activeVideo.id}</span>
-                <span>{activeVideo.collected_at || activeVideo.category || "-"}</span>
+              <div className="note-reader-toolbar">
+                <div className="mac-row-meta">
+                  <span>{activeVideo.uploader || "-"}</span>
+                  <span>{activeVideo.id}</span>
+                  <span>{activeVideo.collected_at || activeVideo.category || "-"}</span>
+                </div>
+                {hasSubstantiveNote && (
+                  <div className="note-reader-actions">
+                    <MacToolbarButton icon={<Copy size={14} />} label="复制" onClick={() => void copyCurrentNote()} />
+                    {isEditing ? (
+                      <>
+                        <MacToolbarButton icon={<Save size={14} />} label="保存" onClick={() => void saveCurrentNote()} primary />
+                        <MacToolbarButton icon={<X size={14} />} label="取消" onClick={() => { setDraftContent(noteContent ?? ""); setIsEditing(false); }} />
+                      </>
+                    ) : (
+                      <MacToolbarButton icon={<Edit3 size={14} />} label="编辑" onClick={() => setIsEditing(true)} />
+                    )}
+                    <MacToolbarButton icon={<Download size={14} />} label="导出 MD" onClick={() => activeVideo && void onExportNote?.(activeVideo)} />
+                  </div>
+                )}
               </div>
               {hasSubstantiveNote ? (
-                <div className="mac-markdown">
-                  <ReactMarkdown>{readingContent ?? t("notes.chooseNoteHint")}</ReactMarkdown>
-                </div>
+                isEditing ? (
+                  <textarea
+                    className="note-editor-textarea custom-scrollbar"
+                    value={draftContent}
+                    onChange={(event) => setDraftContent(event.target.value)}
+                    spellCheck={false}
+                  />
+                ) : (
+                  <div className="mac-markdown">
+                    <ReactMarkdown>{readingContent ?? t("notes.chooseNoteHint")}</ReactMarkdown>
+                  </div>
+                )
               ) : (
                 <div className="mac-note-generation-state">
                   <MacEmptyState
