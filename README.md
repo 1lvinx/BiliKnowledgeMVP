@@ -1,245 +1,236 @@
 # 哔知 / BiZhi
 
-> 把真正值得留下的 B 站视频，整理成可复用的知识资产。
+<p align="center">
+  <strong>把 B 站视频收藏，沉淀成可检索、可复用、可长期维护的本地 AI 知识库。</strong>
+</p>
 
-哔知是一个本地优先的 B 站视频 AI 知识库工具。它帮助你从精选视频中获取字幕、生成洞察、沉淀 Markdown 笔记，并识别视频里提到的 GitHub 开源项目。
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
+  <a href="docs/RELEASE.md"><img alt="Release" src="https://img.shields.io/badge/Release-Beta%20RC-orange.svg"></a>
+  <img alt="Desktop" src="https://img.shields.io/badge/Desktop-Tauri-24C8DB.svg">
+  <img alt="Local First" src="https://img.shields.io/badge/Local--first-Knowledge%20Base-7C3AED.svg">
+</p>
 
-哔知不是“全自动总结所有视频”的爬虫工具。它更像一个半自动视频知识工作台：用户负责选择值得沉淀的视频，AI 负责字幕整理、洞察提取、笔记结构化和项目线索识别，最终由用户判断、标注、取舍和复用。
+---
 
-## Why
+## 哔知解决什么问题？
 
-很多人会在 B 站收藏大量 AI、编程、产品、设计、开源项目相关视频，但真正需要复用时，很难从收藏夹里再次找到关键知识。收藏夹保存的是视频入口，不是知识本身。
+我们经常在 B 站收藏 AI、编程、开源项目、产品设计类视频，但真正需要复用时，收藏夹通常只剩下一长串标题。视频入口被保存了，知识却没有沉淀下来。
 
-哔知希望解决的问题是：
+哔知要解决的是：
 
-- 收藏的视频难以再次检索；
-- 视频中的工具、仓库、方法论容易看过就忘；
-- AI 总结如果缺少字幕和证据，容易变成空泛废话；
-- 手动整理字幕、笔记、标签和项目线索太耗时；
-- 用户需要一个长期可维护、可导出、可验证的本地知识库。
+- 收藏夹越来越长，但很难再次检索和复用；
+- 视频里提到的工具、仓库、命令、方法论容易看过就忘；
+- 只把标题丢给 AI 总结，结果往往空泛、像废话；
+- 手动整理字幕、摘要、标签、Markdown 笔记太耗时；
+- 用户需要一个本地优先、可导出、可审计的长期知识库。
 
-## Features
+哔知不是“自动总结全部收藏夹”的爬虫工具，而是一个**半自动视频知识工作台**：用户选择值得沉淀的视频，AI 负责字幕整理、洞察提取、笔记结构化和开源项目线索识别，最终由用户判断、标注、取舍和复用。
 
-- **B 站视频导入**：支持收藏夹同步和手动添加 BV / av / B 站链接 / b23.tv 短链。
-- **字幕优先**：优先抓取 B 站原生/AI 字幕；缺失时可使用本地 ASR 转写。
-- **视频洞察**：基于字幕生成摘要、关键观点、适用场景、风险和判断依据。
-- **精炼笔记**：生成本地 Markdown 笔记，面向复用而不是堆长文。
-- **开源候选**：从笔记和字幕中识别 GitHub 仓库，沉淀为高价值项目候选。
-- **想法注入**：允许用户记录真实判断、下一步动作和标签。
-- **Token 计量**：记录每条视频洞察/笔记生成的模型用量，帮助用户理解潜在成本。
-- **Doctor 诊断**：检查 Python、ffmpeg、yt-dlp、ASR 依赖、模型缓存、B 站登录态和 AI 配置。
-- **Chrome Companion**：浏览器助手用于获取当前视频、Cookie 和页面元数据，并发送到桌面端。
-- **本地优先**：知识库以本地文件形式保存，便于备份、审计和迁移。
+---
 
-## Screenshots
+## 核心流程
 
-Screenshots will be added before the public release.
-
-## How It Works
-
-```text
-B 站视频
-  ↓
-抓取字幕 / 本地转写
-  ↓
-生成视频洞察
-  ↓
-生成 Markdown 笔记
-  ↓
-识别 GitHub 项目候选
-  ↓
-沉淀到本地知识库 / 想法 / 开源候选
+```mermaid
+flowchart LR
+  A["选择 B 站视频"] --> B["抓取字幕 / 本地转写"]
+  B --> C["生成视频洞察"]
+  C --> D["生成 Markdown 笔记"]
+  D --> E["识别 GitHub 开源项目"]
+  D --> F["本地知识库"]
+  E --> G["开源候选"]
+  F --> H["搜索 / 想法 / 导出"]
 ```
 
-## Recommended Usage
+推荐用法很克制：每天精选 5–10 条真正值得留下的视频，优先处理 15 秒到 30 分钟内容，一次处理一条，确认字幕质量后再生成洞察和笔记。
 
-哔知适合少量精选、高价值、低并发的日常知识整理。
+---
 
-推荐：
+## 已实现功能
 
-- 每天精选 5–10 条真正值得沉淀的视频；
-- 优先处理 15 秒到 30 分钟的视频；
-- 一次处理一条视频，确认字幕质量后再生成洞察和笔记；
-- 使用 Doctor 检查本地环境；
-- 使用 Token 计量理解模型调用成本。
+| 模块 | 功能 |
+|---|---|
+| 收藏夹 | 同步 B 站收藏夹，支持手动添加 BV / av / b23.tv / 视频链接 |
+| 字幕 | 优先抓取 B 站原生/AI 字幕，缺失时可本地 ASR 转写 |
+| 洞察 | 基于字幕生成摘要、核心观点、适用场景、风险和判断依据 |
+| 笔记 | 生成本地 Markdown 笔记，支持复制、编辑和导出 |
+| 开源候选 | 从字幕/笔记中识别 GitHub 仓库，沉淀为高价值候选项目 |
+| 想法 | 用户可写入真实判断、后续动作和 tags，而不是只看 AI 输出 |
+| Token 计量 | 按视频记录洞察/笔记/项目匹配的模型用量，避免费用失控 |
+| Doctor | 检查 Python、ffmpeg、yt-dlp、ASR、模型缓存、AI 配置和知识库结构 |
+| Chrome Companion | MV3 浏览器助手，用于获取当前视频、登录态、Cookie 和页面元数据 |
+| 本地知识库 | Markdown + JSON 文件结构，便于备份、审计、迁移和二次开发 |
 
-不推荐：
+---
 
-- 一次性批量处理整个收藏夹；
-- 高并发抓取字幕或视频信息；
-- 将哔知作为爬虫工具使用；
-- 未经许可公开分发字幕、笔记或视频内容；
-- 用 AI 生成内容替代原作者的视频内容。
+## 脱敏真实使用状态
 
-## Install
+以下数据来自作者本机 Beta RC 日常验证，已去除 Cookie、API Key、原始字幕、私人笔记和收藏夹明细，仅保留规模与结果，用于说明项目不是纯 Demo：
 
-Beta RC currently focuses on macOS local testing. Public multi-platform release packages will be generated through GitHub Actions after the release workflow is stabilized.
+| 项目 | 当前状态 |
+|---|---:|
+| 本地视频清单规模 | 6,000+ 条 |
+| 已稳定验证的视频时长 | 15 秒 – 30 分钟 |
+| 推荐每日生成笔记 | 5–10 条 |
+| 本地生成笔记样本 | 8+ 条 |
+| 已识别开源候选样本 | 3+ 个 |
+| GitHub Actions CI | 通过 |
+| GitHub Actions 全平台打包 | macOS x64 / macOS arm64 / Windows x64 / Linux x64 通过 |
 
-For local development, see [Development](#development).
+这些数字不是性能承诺。哔知的目标不是批量吞掉全部收藏夹，而是帮助用户把真正值得留下的视频整理成知识资产。
 
-## Quick Start
+---
+
+## 仓库目录结构
+
+```text
+.
+├── BiliKnowledge/                 # 本地知识库与 Python 处理脚本
+│   ├── config/                    # 本地配置；真实配置被 Git 忽略
+│   ├── manifest/                  # 视频清单、洞察、字幕索引、Token 用量等运行数据
+│   ├── notes/                     # Markdown 笔记模板与本地生成笔记
+│   ├── projects/                  # 从笔记中提取的开源项目候选
+│   ├── reports/                   # 本地验证报告
+│   ├── scripts/                   # 字幕、ASR、洞察、笔记、Doctor、校验脚本
+│   └── thoughts/                  # 用户想法和产品/业务沉淀
+│
+├── BiliKnowledgeApp/              # Tauri 桌面端
+│   ├── src/                       # React 前端页面和组件
+│   └── src-tauri/                 # Rust/Tauri 后端命令、配置和打包资源
+│
+├── BiliKnowledgeCompanion/        # Chrome MV3 浏览器助手原型
+│   ├── manifest.json
+│   ├── background.js
+│   ├── content.js
+│   └── popup.*
+│
+├── docs/                          # 发布、开源、研究和使用文档
+├── reports/                       # RC 验证与封板记录
+├── tools/                         # 脱敏和敏感信息扫描工具
+├── .github/workflows/             # CI 与 Release 自动打包 workflow
+├── README.md
+├── LICENSE
+├── PRIVACY.md
+├── SECURITY.md
+└── DISCLAIMER.md
+```
+
+> 注意：真实收藏夹、Cookie、API Key、字幕、Token 账单、生成笔记、模型缓存和本地配置默认不提交到 Git。
+
+---
+
+## 安装包与当前发布状态
+
+当前发布方式：GitHub Actions 根据 tag 自动生成 Draft Release。维护者需要人工检查草稿后再公开发布。
+
+已验证打包目标：
+
+- macOS x64：`.dmg` / `.app.tar.gz`
+- macOS arm64：`.dmg` / `.app.tar.gz`
+- Windows x64：NSIS `.exe`
+- Linux x64：`.AppImage` / `.deb` / `.rpm`
+
+> 当前 Beta RC 安装包未配置正式代码签名/公证，适合内测和源码用户。公开分发前应补齐 macOS Developer ID、Notarization 和 Windows Code Signing。
+
+---
+
+## 快速开始：本地开发
 
 ```bash
-git clone https://github.com/<your-account>/<your-repo>.git
-cd bili-knowledge-mvp
+git clone https://github.com/1lvinx/BiliKnowledgeMVP.git
+cd BiliKnowledgeMVP
 cd BiliKnowledgeApp
 npm install
 npm run tauri dev
 ```
 
-The desktop app uses real local data through Tauri. Browser preview mode is only for UI preview and may show sample data.
+桌面端通过 Tauri 读取本地真实数据。纯浏览器预览只适合看 UI，不代表完整处理链路。
 
-## Local Requirements
+---
 
-Required:
+## 本地依赖
+
+基础开发依赖：
 
 - Node.js 22+
-- Rust toolchain
+- Rust stable toolchain
 - Python 3.9+
 
-Recommended for full workflow:
+完整处理链路建议安装：
 
 - ffmpeg
 - yt-dlp
-- Python virtual environment
-- FunASR / ModelScope / PyTorch stack for local ASR
-- A configured AI provider or local OpenAI-compatible endpoint
+- Python virtualenv
+- FunASR / ModelScope / PyTorch 本地 ASR 栈
+- 可用的 AI Provider 或 OpenAI-compatible 本地/云端接口
 
-Optional environment variables:
+常用环境变量：
 
 ```bash
 export BILIKNOWLEDGE_ROOT=/absolute/path/to/BiliKnowledge
 export BILIKNOWLEDGE_PYTHON=/absolute/path/to/python3
 ```
 
-## Knowledge Base Layout
-
-```text
-BiliKnowledge/
-├── config/config.json              # local-only config; ignored by Git
-├── manifest/videos.json            # imported/manual video manifest
-├── manifest/insights.json          # generated insights
-├── manifest/token_usage.json       # local token usage ledger
-├── subtitles/                      # fetched or transcribed subtitles
-├── notes/raw/                      # generated Markdown notes
-├── projects/project_candidates.json
-├── thoughts/user_ideas.json
-└── reports/
-```
-
-Generated local data, cookies, API keys, subtitles, personal notes, and manifests should not be committed.
-
-## Privacy and Security
-
-哔知 stores sensitive runtime data locally, including B 站 Cookie fields and AI provider API keys. When you use an external AI provider, selected subtitle or note text may be sent to that provider for processing.
-
-Before sharing logs, screenshots, or repositories, check for:
-
-- B 站 Cookie / `SESSDATA` / `bili_jct` / `DedeUserID`;
-- AI provider API keys;
-- private notes and subtitles;
-- model service request logs;
-- local file paths you do not want to expose.
-
-See [SECURITY.md](SECURITY.md) and [PRIVACY.md](PRIVACY.md).
-
-## Token Metering and Cost Notice
-
-哔知 records per-video AI usage for insight generation, note generation, and AI-assisted GitHub project matching.
-
-- If the provider returns `usage`, 哔知 records the provider value.
-- If the provider does not return `usage`, 哔知 records a local estimate.
-- Token metering is a cost transparency feature, not a billing system.
-- Actual cost is determined by the model provider configured by the user.
-
-## Chrome Companion
-
-`BiliKnowledgeCompanion/` contains a Chrome MV3 extension prototype. Its role is intentionally narrow:
-
-- detect current Bilibili video page;
-- read required Bilibili Cookie fields with user permission;
-- send current video metadata and login state to the local desktop app;
-- avoid moving AI processing into the browser.
-
-All AI processing remains inside the desktop app.
-
-## Development
-
-Install dependencies:
-
-```bash
-cd BiliKnowledgeApp
-npm install
-```
-
-Run the app:
-
-```bash
-npm run tauri dev
-```
-
-Run frontend build:
-
-```bash
-npm run build
-```
-
-Run Rust tests:
-
-```bash
-cd BiliKnowledgeApp/src-tauri
-cargo test
-```
-
-Run Python checks:
-
-```bash
-python3 BiliKnowledge/scripts/test_validate_knowledge_base.py
-python3 BiliKnowledge/scripts/test_update_processing_status.py
-python3 BiliKnowledge/scripts/validate_knowledge_base.py --root BiliKnowledge
-python3 -m compileall -q BiliKnowledge/scripts
-```
-
-Run Doctor:
+运行 Doctor：
 
 ```bash
 python3 BiliKnowledge/scripts/doctor.py --root BiliKnowledge
 ```
 
-## Release
+---
 
-Release packages are built by GitHub Actions from tags. The intended release flow is:
+## 验证命令
 
 ```bash
-git tag -a v0.1.0 -m "v0.1.0"
-git push origin main --tags
+cd BiliKnowledgeApp && npm run build
+cd BiliKnowledgeApp && npm audit --audit-level=moderate
+cd BiliKnowledgeApp/src-tauri && cargo test
+cd ../..
+python3 BiliKnowledge/scripts/test_validate_knowledge_base.py
+python3 BiliKnowledge/scripts/test_update_processing_status.py
+python3 BiliKnowledge/scripts/validate_knowledge_base.py --root BiliKnowledge
+python3 -m compileall -q BiliKnowledge/scripts
+python3 tools/scan_sensitive.py
 ```
 
-The release workflow builds desktop packages for macOS, Windows, and Linux using Tauri.
+---
 
-See [docs/RELEASE.md](docs/RELEASE.md).
+## 隐私、安全与合规边界
+
+哔知是本地优先工具，但它可能处理敏感数据：B 站 Cookie、AI API Key、字幕、私人笔记、Token 用量和本地路径。提交 Issue、截图或日志前，请先检查并脱敏。
+
+哔知仅用于个人知识整理，不提供绕过平台限制的能力，不建议批量抓取或高并发处理。用户需要自行遵守 B 站规则、版权要求、AI 服务商条款和所在地法律。
+
+更多说明：
+
+- [PRIVACY.md](PRIVACY.md)
+- [SECURITY.md](SECURITY.md)
+- [DISCLAIMER.md](DISCLAIMER.md)
+
+---
 
 ## Roadmap
 
-- Stabilize Doctor repair flow;
-- Improve first-run onboarding;
-- Harden Cookie refresh and browser bridge;
-- Improve subtitle quality checks;
-- Improve GitHub project matching confidence;
-- Add signed and notarized macOS release;
-- Add clearer Open Source RC checklist;
-- Prepare public beta documentation.
+- 稳定 Doctor 一键诊断与修复；
+- 改进首次使用引导；
+- 引入更成熟的 Browser Bridge / Cookie 刷新机制；
+- 强化字幕质量校验和 ASR 失败解释；
+- 优化 GitHub 项目精准匹配与候选入库；
+- 完善 Token 费用估算和多模型配置；
+- 补齐签名、公证和正式公开发布流程。
 
-## Contributing
+---
 
-Contributions are welcome, but please keep the product boundary clear:哔知 is a local-first, user-selected, low-concurrency knowledge workflow tool.
+## 贡献
 
-Before opening a PR, read [CONTRIBUTING.md](CONTRIBUTING.md) and run the verification commands above.
+欢迎提交 Issue 和 PR，但请保持产品边界：哔知不是爬虫平台，不追求全自动批量总结，而是服务于用户主动筛选、少量高价值沉淀的本地知识工作流。
+
+请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+---
 
 ## License
 
-MIT License. See [LICENSE](LICENSE).
+本项目采用 [MIT License](LICENSE)。
 
-## Disclaimer
-
-This project is for personal knowledge management and learning workflows. It is not affiliated with Bilibili. Users are responsible for complying with Bilibili rules, copyright requirements, AI provider terms, and local laws. Do not use this project to bypass platform restrictions or redistribute content without permission.
+Copyright (c) 2026 逸峰AI / Elvin

@@ -76,18 +76,72 @@ jobs:
         run: npm ci
         working-directory: BiliKnowledgeApp
 
-      - name: Build and upload Tauri bundles
-        uses: tauri-apps/tauri-action@v0
+      - name: Build Tauri bundles
+        run: npm run tauri build -- ${{ matrix.args }}
+        working-directory: BiliKnowledgeApp
+
+      - name: Normalize release asset names
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MATRIX_NAME: ${{ matrix.name }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import shutil
+          from pathlib import Path
+
+          root = Path("BiliKnowledgeApp/src-tauri/target")
+          out = Path("release-assets")
+          out.mkdir(exist_ok=True)
+
+          tag = os.environ["RELEASE_TAG"]
+          platform = (
+              os.environ["MATRIX_NAME"]
+              .lower()
+              .replace(" ", "-")
+              .replace("macos", "macos")
+          )
+
+          suffixes = [".app.tar.gz", ".dmg", ".AppImage", ".deb", ".rpm", ".exe"]
+          found = []
+
+          for path in root.rglob("*"):
+              if not path.is_file():
+                  continue
+              if "bundle" not in path.parts:
+                  continue
+
+              suffix = next((item for item in suffixes if path.name.endswith(item)), None)
+              if suffix is None:
+                  continue
+
+              target = out / f"BiZhi-{tag}-{platform}{suffix}"
+              if target.exists():
+                  stem = target.name[: -len(suffix)]
+                  target = out / f"{stem}-{len(found) + 1}{suffix}"
+              shutil.copy2(path, target)
+              found.append(target)
+
+          if not found:
+              raise SystemExit("No Tauri release assets found under BiliKnowledgeApp/src-tauri/target/**/bundle")
+
+          print("Normalized release assets:")
+          for item in found:
+              print(f"- {item}")
+          PY
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
         with:
-          projectPath: BiliKnowledgeApp
-          tagName: ${{ github.ref_name }}
-          releaseName: "哔知 ${{ github.ref_name }}"
-          releaseBody: |
+          name: "哔知 ${{ github.ref_name }}"
+          body: |
             哔知桌面安装包由 GitHub Actions 自动构建。
 
+            安装包文件使用 `BiZhi-<tag>-<platform>` 英文前缀，避免中文产品名在不同平台打包时被清空或转义。
+
             注意：如果未配置平台签名/公证密钥，产物可能未签名，仅适合内测或源码构建用户。
-          releaseDraft: true
+          draft: true
           prerelease: ${{ startsWith(github.ref_name, 'beta-rc-') || contains(github.ref_name, '-rc.') }}
-          args: ${{ matrix.args }}
+          files: release-assets/*
