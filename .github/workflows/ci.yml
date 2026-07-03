@@ -9,8 +9,12 @@ on:
       - "codex/**"
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   verify:
+    name: Verify
     runs-on: macos-latest
     defaults:
       run:
@@ -40,6 +44,10 @@ jobs:
         run: npm run build
         working-directory: BiliKnowledgeApp
 
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=moderate
+        working-directory: BiliKnowledgeApp
+
       - name: Run Rust tests
         run: cargo test
         working-directory: BiliKnowledgeApp/src-tauri
@@ -51,3 +59,16 @@ jobs:
 
       - name: Validate knowledge base structure
         run: python3 BiliKnowledge/scripts/validate_knowledge_base.py --root BiliKnowledge
+
+      - name: Compile Python scripts
+        run: python3 -m compileall -q BiliKnowledge/scripts
+
+      - name: Validate Chrome Companion
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('BiliKnowledgeCompanion/manifest.json','utf8')); console.log('manifest ok')"
+          node --check BiliKnowledgeCompanion/background.js
+          node --check BiliKnowledgeCompanion/content.js
+          node --check BiliKnowledgeCompanion/popup.js
+
+      - name: Scan tracked files for sensitive data
+        run: python3 tools/scan_sensitive.py
