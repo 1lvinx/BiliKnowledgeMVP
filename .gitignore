@@ -46,6 +46,7 @@ BiliKnowledge/manifest/processing_status.json
 BiliKnowledge/manifest/favorite_folders.json
 BiliKnowledge/manifest/insights.json
 BiliKnowledge/manifest/subtitles.json
+BiliKnowledge/manifest/token_usage.json
 
 # generated exports
 BiliKnowledge/projects/*.csv
