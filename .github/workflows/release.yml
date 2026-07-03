@@ -143,8 +143,15 @@ jobs:
           checksum_file="BiZhi-${RELEASE_TAG}-${platform}-SHA256SUMS.txt"
           (
             cd release-assets
-            rm -f ./*SHA256SUMS.txt
-            shasum -a 256 ./* > "$checksum_file"
+            rm -f ./*SHA256SUMS.txt ./*.sha256
+            for asset in ./*; do
+              [ -f "$asset" ] || continue
+              shasum -a 256 "$asset" | sed 's#  ./#  #' > "${asset#./}.sha256"
+            done
+            shasum -a 256 ./* | grep -vE 'SHA256SUMS\.txt|\.sha256$' | sed 's#  ./#  #' > "$checksum_file"
+            echo "Per-asset SHA256 files:"
+            ls -1 ./*.sha256
+            echo "Aggregate SHA256 file:"
             cat "$checksum_file"
           )
 
@@ -157,13 +164,14 @@ jobs:
 
             安装包文件使用 `BiZhi-<tag>-<platform>` 英文前缀，避免中文产品名在不同平台打包时被清空或转义。
 
-            每个平台会随安装包上传 `SHA256SUMS.txt` 校验文件。下载后可使用：
+            每个安装包都会随附独立 `.sha256` 校验文件，同时每个平台也会上传 `SHA256SUMS.txt` 汇总文件。下载后可使用：
 
             ```bash
             shasum -a 256 -c BiZhi-<tag>-<platform>-SHA256SUMS.txt
+            shasum -a 256 -c BiZhi-<tag>-<platform>.<ext>.sha256
             ```
 
             注意：如果未配置平台签名/公证密钥，产物可能未签名，仅适合内测或源码构建用户。
           draft: false
-          prerelease: ${{ startsWith(github.ref_name, 'beta-rc-') || contains(github.ref_name, '-rc.') }}
+          prerelease: false
           files: release-assets/*
