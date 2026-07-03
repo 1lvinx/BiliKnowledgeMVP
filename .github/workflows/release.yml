@@ -19,15 +19,19 @@ jobs:
         include:
           - name: macOS x64
             platform: macos-latest
+            rustTarget: x86_64-apple-darwin
             args: --target x86_64-apple-darwin
           - name: macOS arm64
             platform: macos-latest
+            rustTarget: aarch64-apple-darwin
             args: --target aarch64-apple-darwin
           - name: Windows x64
             platform: windows-latest
+            rustTarget: ""
             args: --bundles nsis
           - name: Linux x64
             platform: ubuntu-22.04
+            rustTarget: ""
             args: ""
 
     runs-on: ${{ matrix.platform }}
@@ -46,7 +50,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || matrix.platform == 'macos-13' && 'x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.rustTarget }}
 
       - name: Setup Rust cache
         uses: swatinem/rust-cache@v2
@@ -85,5 +89,5 @@ jobs:
 
             注意：如果未配置平台签名/公证密钥，产物可能未签名，仅适合内测或源码构建用户。
           releaseDraft: true
-          prerelease: ${{ startsWith(github.ref_name, 'beta-rc-') }}
+          prerelease: ${{ startsWith(github.ref_name, 'beta-rc-') || contains(github.ref_name, '-rc.') }}
           args: ${{ matrix.args }}
