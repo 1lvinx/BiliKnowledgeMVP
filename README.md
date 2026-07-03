@@ -226,6 +226,32 @@ python3 tools/scan_sensitive.py
 
 ---
 
+## 开源声明与联系作者
+
+哔知是作者利用工作之余持续打磨的个人业务开发小工具，最初目的是解决自己日常 B 站视频收藏、字幕整理、AI 笔记和知识库沉淀的问题。项目目前仍处于 Beta RC 阶段，功能、安装体验和跨平台兼容性都还在持续改进中。
+
+如果这个项目对你有帮助，欢迎 Star、试用、提 Issue 或提交 PR；如果遇到问题，也欢迎通过 GitHub Issue、公众号或邮件反馈。由于这是个人闲余时间维护的开源项目，响应速度可能无法像商业团队一样稳定，还请理性交流，不喜勿喷。
+
+- GitHub Issue：[提交问题或建议](https://github.com/1lvinx/BiliKnowledgeMVP/issues)
+- Email：[yolandear@gmail.com](mailto:yolandear@gmail.com)
+- 公众号：逸峰AI
+- 微信：扫码添加作者，请备注「哔知」
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/assets/contact/wechat-public-account-qr.jpg" alt="逸峰AI公众号二维码" width="220" />
+      <br />
+      <strong>公众号：逸峰AI</strong>
+    </td>
+    <td align="center">
+      <img src="docs/assets/contact/wechat-personal-qr.jpg" alt="作者微信二维码" width="220" />
+      <br />
+      <strong>作者微信</strong>
+    </td>
+  </tr>
+</table>
+
 ## Roadmap
 
 - 稳定 Doctor 一键诊断与修复；
