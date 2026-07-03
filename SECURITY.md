@@ -2,24 +2,35 @@
 
 ## Supported Scope
 
-This repository is intended for local-first desktop usage. Security-sensitive areas include:
+Security-sensitive areas include:
 
-- Stored Bilibili cookies in `BiliKnowledge/config/config.json`
-- Any AI provider API keys stored in local config
-- Tauri command allowlists and local script execution
+- Bilibili Cookie storage and refresh logic;
+- AI provider API key storage;
+- Chrome Companion browser bridge;
+- Tauri command allowlist and local script execution;
+- generated subtitles, notes, token usage, and local manifests;
+- release packaging and GitHub Actions secrets.
 
-## Reporting
+## Reporting a Vulnerability
 
-Please do not open public issues for credential leaks or command-execution concerns.
+Please do not open public issues for credential leaks, command execution concerns, or cookie handling vulnerabilities.
 
-Until a dedicated security contact is added, report issues privately to the repository maintainer and include:
+Until a dedicated security mailbox is published, report issues privately to the repository maintainer and include:
 
-- A short description of the impact
-- Reproduction steps
-- Whether secrets may have been exposed
+- affected version or commit;
+- impact summary;
+- reproduction steps;
+- whether secrets, cookies, local files, or API keys may be exposed;
+- suggested fix if available.
 
 ## Local Safety Expectations
 
-- Never commit real cookies or API keys
-- Prefer local-only test credentials
-- Re-run `python3 BiliKnowledge/scripts/validate_knowledge_base.py --root BiliKnowledge` before publishing changes
+- Never commit real Bilibili cookies or AI API keys.
+- Never upload `BiliKnowledge/config/config.json`.
+- Never share screenshots that expose Cookie, API Key, local paths, or private notes.
+- Run `python3 BiliKnowledge/scripts/validate_knowledge_base.py --root BiliKnowledge` before publishing changes.
+- Treat generated subtitles and notes as potentially private user data.
+
+## GitHub Actions Secrets
+
+Release workflows should store signing credentials, notarization credentials, and platform tokens only in GitHub Actions secrets. Do not hard-code secrets in workflow files.
