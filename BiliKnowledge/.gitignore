@@ -17,5 +17,5 @@ venv/
 .DS_Store
 *.log
 
-# BiliNote external
+# External research clones
 external/

@@ -78,3 +78,5 @@ BiliKnowledge/config/*.json
 BiliKnowledgeApp/dist/
 BiliKnowledgeApp/src-tauri/target/
 BiliKnowledgeApp/src-tauri/target*/
+# private research notes / external project analysis
+docs/research/

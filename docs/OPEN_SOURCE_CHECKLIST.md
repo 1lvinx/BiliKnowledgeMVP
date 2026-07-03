@@ -17,6 +17,7 @@ Use this checklist before making 哔知 public.
 - [ ] Run `python3 tools/scan_sensitive.py`.
 - [ ] Run `python3 BiliKnowledge/scripts/validate_knowledge_base.py --root BiliKnowledge`.
 - [ ] Check screenshots and docs for Cookie/API Key exposure.
+- [ ] Remove private research notes, competitor analysis, external project architecture reviews, and browser/Cookie investigation notes from public docs.
 - [ ] Check Git history if secrets may have been committed before.
 - [ ] Rotate any exposed token, Cookie, or API Key.
 
@@ -28,6 +29,7 @@ Use this checklist before making 哔知 public.
 - [ ] `SECURITY.md` explains how to report vulnerabilities.
 - [ ] `DISCLAIMER.md` explains platform, copyright, AI output, and cost boundaries.
 - [ ] `CONTRIBUTING.md` contains validation commands.
+- [ ] `CREDITS.md` and `CONTRIBUTING.md` credit direct open-source dependencies with author/organization links and upstream links.
 - [ ] `docs/RELEASE.md` explains release workflow.
 
 ## Product Boundaries

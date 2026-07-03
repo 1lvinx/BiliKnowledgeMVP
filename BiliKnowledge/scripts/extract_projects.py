@@ -650,9 +650,9 @@ def self_test():
     check("pip port mapping not extracted", "8080:80" not in pip_port)
 
     # GitHub extraction
-    github_text = "项目地址：https://github.com/karakeep-app/karakeep"
+    github_text = "项目地址：https://github.com/example-org/example-repo"
     github_urls = extract_urls(github_text, GITHUB_RE)
-    check("github url extracted", "https://github.com/karakeep-app/karakeep" in github_urls)
+    check("github url extracted", "https://github.com/example-org/example-repo" in github_urls)
 
     # Negative: github settings page (filtered at project level)
     github_neg = "https://github.com/settings/tokens"
@@ -710,13 +710,13 @@ def write_open_source_tools_md(tools, output_dir):
     print(f"[已写入] {path}")
 
 
-def write_karakeep_import(projects, output_dir):
+def write_bookmark_import(projects, output_dir):
     lines = ["url,title,tags,note"]
     for p in projects:
         tags = f"github,from-bilibili,{p.get('type', 'project')}"
         note = f"来源：{p.get('source_note', '')}；用途：待验证"
         lines.append(f'{p["url"]},{p["name"]},"{tags}","{note}"')
-    path = output_dir / "karakeep_import.csv"
+    path = output_dir / "bookmark_import.csv"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"[已写入] {path}")
 
@@ -762,7 +762,7 @@ def main():
     write_project_candidates(github, out)
     write_github_projects_md(github, out)
     write_open_source_tools_md(tools, out)
-    write_karakeep_import(github, out)
+    write_bookmark_import(github, out)
     print(f"\n[完成] 项目候选已输出到 {out}/")
 
 

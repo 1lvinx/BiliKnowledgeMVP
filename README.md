@@ -57,7 +57,7 @@ flowchart LR
 
 ### 收藏夹与单条处理链路
 
-![哔知收藏夹与单条处理链路](docs/assets/screenshots/02-library-workflow.png)
+![哔知收藏夹与单条处理链路](docs/assets/screenshots/02-library-processing.png)
 
 ### Doctor 与帮助反馈
 
@@ -91,8 +91,6 @@ flowchart LR
 | 推荐每日生成笔记 | 5–10 条 |
 | 本地生成笔记样本 | 8+ 条 |
 | 已识别开源候选样本 | 3+ 个 |
-| GitHub Actions CI | 通过 |
-| GitHub Actions 全平台打包 | macOS x64 / macOS arm64 / Windows x64 / Linux x64 通过 |
 
 这些数字不是性能承诺。哔知的目标不是批量吞掉全部收藏夹，而是帮助用户把真正值得留下的视频整理成知识资产。
 
@@ -124,7 +122,6 @@ flowchart LR
 ├── docs/                          # 发布、开源、研究和使用文档
 ├── reports/                       # RC 验证与封板记录
 ├── tools/                         # 脱敏和敏感信息扫描工具
-├── .github/workflows/             # CI 与 Release 自动打包 workflow
 ├── README.md
 ├── LICENSE
 ├── PRIVACY.md
@@ -138,9 +135,9 @@ flowchart LR
 
 ## 安装包与当前发布状态
 
-当前发布方式：GitHub Actions 根据 tag 自动生成 GitHub Release，并上传多平台安装包、独立 `.sha256` 校验文件和平台 `SHA256SUMS.txt` 汇总文件。
+Beta RC 阶段会提供多平台安装包，并配套独立 `.sha256` 校验文件和平台 `SHA256SUMS.txt` 汇总文件，方便内测用户校验下载内容。
 
-已验证打包目标：
+已验证安装包类型：
 
 - macOS x64：`.dmg` / `.app.tar.gz`
 - macOS arm64：`.dmg` / `.app.tar.gz`
@@ -223,6 +220,29 @@ python3 tools/scan_sensitive.py
 - [PRIVACY.md](PRIVACY.md)
 - [SECURITY.md](SECURITY.md)
 - [DISCLAIMER.md](DISCLAIMER.md)
+- [CREDITS.md](CREDITS.md)：开源依赖、上游作者与组织致谢
+
+---
+
+
+## 开源致谢与上游作者
+
+哔知基于开源生态构建。README 只列出本项目直接依赖中需要特别致谢的自然人作者；完整依赖、组织和许可证清单见 [CREDITS.md](CREDITS.md)。这些作者不默认代表参与了本仓库开发，但他们维护的开源项目让哔知得以更快构建。
+
+- [Evan You](https://github.com/yyx990803)：Vite / 前端构建生态。
+- [Andrey Sitnik](https://github.com/ai)：PostCSS / Autoprefixer 生态。
+- [Matt Perry](https://github.com/mattgperry)：Motion / Framer Motion 动画生态。
+- [Eric Fennis](https://github.com/ericfennis)：Lucide 图标生态。
+- [Espen Hovlandsdal](https://github.com/rexxars)：react-markdown / Markdown 渲染生态。
+- [Ryan Day](https://github.com/soldair)：node-qrcode / QR code 渲染。
+- [Luke Edwards](https://github.com/lukeed)：clsx 等轻量前端工具。
+- [Dany Castillo](https://github.com/dcastil)：tailwind-merge。
+- [Sean McArthur](https://github.com/seanmonstar)：reqwest。
+- [Kornel Lesiński](https://github.com/kornelski)：urlencoding。
+- [KokaKiwi](https://github.com/KokaKiwi)：rust-hex。
+- [Harry Fei](https://github.com/harryfei)：which-rs。
+
+如果贡献中新增第三方依赖、素材、样例或集成，请同步更新 [CONTRIBUTING.md](CONTRIBUTING.md) 和 [CREDITS.md](CREDITS.md)，保留上游作者、项目链接和许可证信息。
 
 ---
 

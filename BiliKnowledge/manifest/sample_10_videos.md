@@ -1,14 +1,16 @@
 # MVP 样本视频清单
 
+> 以下内容是占位示例，用于展示清单字段结构；不要在公开仓库中放入真实收藏夹、真实视频链接、第三方项目分析对象或个人研究选题。
+
 | # | 标题 | URL | 分类 | 优先级 | 处理状态 |
 |---|---|---|---|---|---|
-| 1 | 用Claude Code搭建个人AI工作流全攻略 | https://www.bilibili.com/video/BV1xK4y1E7pR | AI工具 | P0 | pending |
-| 2 | RAG系统实战：从向量数据库到生产部署 | https://www.bilibili.com/video/BV1yL3z2F8sT | AI技术 | P0 | pending |
-| 3 | 2026年最值得关注的10个开源AI项目 | https://www.bilibili.com/video/BV1zM4a3G9uV | 开源项目 | P0 | pending |
-| 4 | Docker部署Python全栈应用完整指南 | https://www.bilibili.com/video/BV1nO5b4H0wX | 开发部署 | P0 | pending |
-| 5 | Claude MCP协议深度解析与实战 | https://www.bilibili.com/video/BV1oP6c5I1xY | AI工具 | P0 | pending |
-| 6 | 用Next.js 15 + Tailwind v4搭建SaaS Landing Page | https://www.bilibili.com/video/BV1pQ7d6J2zA | 前端开发 | P0 | pending |
-| 7 | GitHub Copilot vs Cursor vs Claude Code 对比测评 | https://www.bilibili.com/video/BV1qR8e7K3aB | AI工具 | P0 | pending |
-| 8 | Karakeep自托管书签系统搭建教程 | https://www.bilibili.com/video/BV1rS9f8L4bC | 自托管 | P0 | pending |
-| 9 | FastAPI + SQLAlchemy 2.0 异步ORM最佳实践 | https://www.bilibili.com/video/BV1sT0g9M5cD | 后端开发 | P0 | pending |
-| 10 | 短视频AI自动剪辑工作流：从素材到成片 | https://www.bilibili.com/video/BV1tU1h0N6dE | 内容创作 | P1 | pending |
+| 1 | 示例视频：AI 工具入门 | https://www.bilibili.com/video/BV1example001 | AI工具 | P0 | pending |
+| 2 | 示例视频：本地知识库整理 | https://www.bilibili.com/video/BV1example002 | 知识管理 | P0 | pending |
+| 3 | 示例视频：开源项目候选识别 | https://www.bilibili.com/video/BV1example003 | 开源项目 | P0 | pending |
+| 4 | 示例视频：桌面应用配置 | https://www.bilibili.com/video/BV1example004 | 开发部署 | P0 | pending |
+| 5 | 示例视频：字幕质量检查 | https://www.bilibili.com/video/BV1example005 | 字幕处理 | P0 | pending |
+| 6 | 示例视频：笔记结构化 | https://www.bilibili.com/video/BV1example006 | 笔记整理 | P0 | pending |
+| 7 | 示例视频：模型成本估算 | https://www.bilibili.com/video/BV1example007 | AI成本 | P1 | pending |
+| 8 | 示例视频：浏览器助手使用 | https://www.bilibili.com/video/BV1example008 | 浏览器助手 | P1 | pending |
+| 9 | 示例视频：本地诊断流程 | https://www.bilibili.com/video/BV1example009 | Doctor | P1 | pending |
+| 10 | 示例视频：导出与备份 | https://www.bilibili.com/video/BV1example010 | 数据管理 | P1 | pending |

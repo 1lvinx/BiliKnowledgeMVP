@@ -175,7 +175,7 @@ BiliKnowledge/
 2. 运行项目提取流程获取真实项目
 3. 人工复核笔记
 4. 运行健康检查流程质检
-5. 导入 Karakeep
+5. 导入书签工具
 """
     return report
 

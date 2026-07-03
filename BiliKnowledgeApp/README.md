@@ -2,7 +2,7 @@
 
 Desktop application for the BiliKnowledge workspace, built with Tauri, React, TypeScript, and Rust.
 
-The app is a semi-automatic Bilibili video knowledge workspace. It is not intended to bulk summarize all favorites; users should select valuable videos, then run single-video subtitle, insight, note, and project-candidate workflows.
+The app is a user-guided Bilibili video knowledge workspace. It is not intended to bulk summarize all favorites; users select valuable videos, then process one video at a time through subtitle, insight, note, and project-candidate steps.
 
 ## Start
 

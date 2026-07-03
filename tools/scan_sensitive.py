@@ -24,8 +24,25 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 
 ALLOWLIST_FILES = {
     "BiliKnowledge/scripts/test_validate_knowledge_base.py",
-    "docs/research/bilinote-browser-analysis.md",
     "tools/scan_sensitive.py",
+}
+
+
+BLOCKED_TRACKED_PATH_PREFIXES = {
+    "docs/research/": "private research notes must not be committed",
+    "BiliKnowledge/projects/": "generated project analysis artifacts must not be committed",
+    "BiliKnowledge/reports/": "generated execution reports must not be committed",
+    "BiliKnowledge/manifest/source/": "raw imported source manifests must not be committed",
+}
+
+BLOCKED_TRACKED_FILES = {
+    "BiliKnowledge/manifest/videos.json": "generated video manifest must not be committed",
+    "BiliKnowledge/manifest/videos.csv": "generated video manifest must not be committed",
+    "BiliKnowledge/manifest/processing_status.json": "generated processing status must not be committed",
+    "BiliKnowledge/manifest/favorite_folders.json": "generated favorite-folder manifest must not be committed",
+    "BiliKnowledge/manifest/insights.json": "generated insight analysis must not be committed",
+    "BiliKnowledge/manifest/subtitles.json": "generated subtitles must not be committed",
+    "BiliKnowledge/manifest/token_usage.json": "generated token usage must not be committed",
 }
 
 ALLOWLIST_SNIPPETS = [
@@ -61,6 +78,19 @@ def main() -> int:
     findings: list[str] = []
     for path in tracked_files():
         rel = path.relative_to(ROOT).as_posix()
+        if not path.exists():
+            continue
+        blocked_reason = BLOCKED_TRACKED_FILES.get(rel)
+        if blocked_reason:
+            findings.append(f"{rel}: {blocked_reason}")
+            continue
+        for prefix, reason in BLOCKED_TRACKED_PATH_PREFIXES.items():
+            if rel.startswith(prefix):
+                findings.append(f"{rel}: {reason}")
+                blocked_reason = reason
+                break
+        if blocked_reason:
+            continue
         if rel in ALLOWLIST_FILES:
             continue
         if not is_text_file(path):
