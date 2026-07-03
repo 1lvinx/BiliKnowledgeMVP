@@ -61,3 +61,20 @@ BiliKnowledge/projects/project_candidates.json
 # Python virtual environments
 .venv/
 venv/
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+# local virtual environments and model caches
+BiliKnowledge/.cache/
+# app/runtime local config and secrets
+BiliKnowledge/config/*.json
+!BiliKnowledge/config/*.example.json
+/.env
+/.env.*
+# generated desktop release artifacts
+BiliKnowledgeApp/dist/
+BiliKnowledgeApp/src-tauri/target/
+BiliKnowledgeApp/src-tauri/target*/
