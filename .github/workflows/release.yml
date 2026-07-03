@@ -139,21 +139,34 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          platform="$(printf '%s' "$MATRIX_NAME" | tr '[:upper:] ' '[:lower:]-')"
-          checksum_file="BiZhi-${RELEASE_TAG}-${platform}-SHA256SUMS.txt"
-          (
-            cd release-assets
-            rm -f ./*SHA256SUMS.txt ./*.sha256
-            for asset in ./*; do
-              [ -f "$asset" ] || continue
-              shasum -a 256 "$asset" | sed 's#  ./#  #' > "${asset#./}.sha256"
-            done
-            shasum -a 256 ./* | grep -vE 'SHA256SUMS\.txt|\.sha256$' | sed 's#  ./#  #' > "$checksum_file"
-            echo "Per-asset SHA256 files:"
-            ls -1 ./*.sha256
-            echo "Aggregate SHA256 file:"
-            cat "$checksum_file"
-          )
+          python3 - <<'PY'
+          import hashlib
+          import os
+          from pathlib import Path
+
+          platform = os.environ["MATRIX_NAME"].lower().replace(" ", "-")
+          tag = os.environ["RELEASE_TAG"]
+          root = Path("release-assets")
+          checksum_file = root / f"BiZhi-{tag}-{platform}-SHA256SUMS.txt"
+
+          for old in list(root.glob("*SHA256SUMS.txt")) + list(root.glob("*.sha256")):
+              old.unlink()
+
+          assets = sorted(path for path in root.iterdir() if path.is_file())
+          lines = []
+          for asset in assets:
+              digest = hashlib.sha256(asset.read_bytes()).hexdigest()
+              lines.append(f"{digest}  {asset.name}")
+              (root / f"{asset.name}.sha256").write_text(f"{digest}  {asset.name}\n")
+
+          checksum_file.write_text("\n".join(lines) + "\n")
+
+          print("Per-asset SHA256 files:")
+          for item in sorted(root.glob("*.sha256")):
+              print(f"- {item}")
+          print("Aggregate SHA256 file:")
+          print(checksum_file.read_text())
+          PY
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
