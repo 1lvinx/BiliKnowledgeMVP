@@ -57,6 +57,20 @@ jobs:
           python3 BiliKnowledge/scripts/test_validate_knowledge_base.py
           python3 BiliKnowledge/scripts/test_update_processing_status.py
 
+      - name: Prepare empty knowledge base skeleton
+        run: |
+          mkdir -p \
+            BiliKnowledge/notes/raw \
+            BiliKnowledge/notes/reviewed \
+            BiliKnowledge/projects \
+            BiliKnowledge/reports
+          test -f BiliKnowledge/index.md || cat > BiliKnowledge/index.md <<'EOF'
+          # 哔知知识库
+
+          这是 CI 使用的空知识库骨架。真实收藏、字幕、笔记和报告均保留在本地，不提交到仓库。
+          EOF
+          test -f BiliKnowledge/manifest/videos.json || printf '[]\n' > BiliKnowledge/manifest/videos.json
+
       - name: Validate knowledge base structure
         run: python3 BiliKnowledge/scripts/validate_knowledge_base.py --root BiliKnowledge
 
