@@ -156,7 +156,7 @@ function applyAiPreset(config: Config, presetValue: string): Config {
 type HelpDocKey = "usage" | "workflow" | "qa";
 
 const feedbackIssueUrl = "https://github.com/1lvinx/BiliKnowledgeMVP/issues/new?title=%5BFeedback%5D%20%E5%93%94%E7%9F%A5%20Beta&body=%E8%AF%B7%E5%A1%AB%E5%86%99%EF%BC%9A%0A%0A-%20%E6%88%AA%E5%9B%BE%EF%BC%9A%0A-%20Doctor%20%E6%97%A5%E5%BF%97%EF%BC%9A%0A-%20%E8%A7%86%E9%A2%91%20BV%20%E5%8F%B7%EF%BC%9A%0A-%20%E7%82%B9%E5%87%BB%E7%9A%84%E6%8C%89%E9%92%AE%EF%BC%9A%0A-%20%E6%9C%9F%E6%9C%9B%E7%BB%93%E6%9E%9C%EF%BC%9A%0A-%20%E5%AE%9E%E9%99%85%E7%BB%93%E6%9E%9C%EF%BC%9A%0A";
-const feedbackEmail = "mailto:feedback@biliknowledge.local?subject=%E5%93%94%E7%9F%A5%20Beta%20Feedback&body=%E8%AF%B7%E9%99%84%E4%B8%8A%EF%BC%9A%E6%88%AA%E5%9B%BE%2C%20Doctor%20%E6%97%A5%E5%BF%97%2C%20BV%20%E5%8F%B7%2C%20%E6%93%8D%E4%BD%9C%E6%AD%A5%E9%AA%A4%2C%20%E6%9C%9F%E6%9C%9B%E7%BB%93%E6%9E%9C%E3%80%82";
+const feedbackEmail = "mailto:yolandear@gmail.com?subject=%E5%93%94%E7%9F%A5%20Beta%20Feedback&body=%E8%AF%B7%E9%99%84%E4%B8%8A%EF%BC%9A%E6%88%AA%E5%9B%BE%2C%20Doctor%20%E6%97%A5%E5%BF%97%2C%20BV%20%E5%8F%B7%2C%20%E6%93%8D%E4%BD%9C%E6%AD%A5%E9%AA%A4%2C%20%E6%9C%9F%E6%9C%9B%E7%BB%93%E6%9E%9C%E3%80%82";
 
 function helpDocMarkdown(key: HelpDocKey): string {
   const docs: Record<HelpDocKey, string> = {

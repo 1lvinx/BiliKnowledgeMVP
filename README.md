@@ -225,7 +225,7 @@ python3 tools/scan_sensitive.py
 
 欢迎提交 Issue 和 PR，但请保持产品边界：哔知不是爬虫平台，不追求全自动批量总结，而是服务于用户主动筛选、少量高价值沉淀的本地知识工作流。
 
-请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。如果需要私下反馈安全、隐私或安装问题，可以发送邮件至 [yolandear@gmail.com](mailto:yolandear@gmail.com)。
 
 ---
 

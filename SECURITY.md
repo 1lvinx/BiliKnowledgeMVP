@@ -15,7 +15,7 @@ Security-sensitive areas include:
 
 Please do not open public issues for credential leaks, command execution concerns, or cookie handling vulnerabilities.
 
-Until a dedicated security mailbox is published, report issues privately to the repository maintainer and include:
+Report issues privately to the repository maintainer at [yolandear@gmail.com](mailto:yolandear@gmail.com) and include:
 
 - affected version or commit;
 - impact summary;
