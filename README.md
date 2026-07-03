@@ -44,7 +44,16 @@ flowchart LR
 
 推荐用法很克制：每天精选 5–10 条真正值得留下的视频，优先处理 15 秒到 30 分钟内容，一次处理一条，确认字幕质量后再生成洞察和笔记。
 
+
 ---
+
+## 软件截图
+
+以下截图来自哔知真实前端界面，使用浏览器预览模式下的脱敏示例数据，不包含 Cookie、API Key、私人字幕或真实笔记内容。
+
+| 概览工作台 | 收藏夹与单条处理链路 | Doctor 与帮助反馈 |
+|---|---|---|
+| ![哔知概览工作台](docs/assets/screenshots/01-overview.png) | ![哔知收藏夹与单条处理链路](docs/assets/screenshots/02-library-workflow.png) | ![哔知 Doctor 与帮助反馈](docs/assets/screenshots/03-doctor-feedback.png) |
 
 ## 已实现功能
 
