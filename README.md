@@ -51,9 +51,17 @@ flowchart LR
 
 以下截图来自哔知真实前端界面，使用浏览器预览模式下的脱敏示例数据，不包含 Cookie、API Key、私人字幕或真实笔记内容。
 
-| 概览工作台 | 收藏夹与单条处理链路 | Doctor 与帮助反馈 |
-|---|---|---|
-| ![哔知概览工作台](docs/assets/screenshots/01-overview.png) | ![哔知收藏夹与单条处理链路](docs/assets/screenshots/02-library-workflow.png) | ![哔知 Doctor 与帮助反馈](docs/assets/screenshots/03-doctor-feedback.png) |
+### 概览工作台
+
+![哔知概览工作台](docs/assets/screenshots/01-overview.png)
+
+### 收藏夹与单条处理链路
+
+![哔知收藏夹与单条处理链路](docs/assets/screenshots/02-library-workflow.png)
+
+### Doctor 与帮助反馈
+
+![哔知 Doctor 与帮助反馈](docs/assets/screenshots/03-doctor-feedback.png)
 
 ## 已实现功能
 
