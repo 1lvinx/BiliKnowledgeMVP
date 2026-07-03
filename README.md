@@ -1,209 +1,245 @@
-# 哔知 / BiliKnowledge MVP
+# 哔知 / BiZhi
 
-Local-first desktop workspace for turning selected Bilibili videos into subtitles, insights, concise Markdown notes, open-source project candidates, and a personal knowledge base.
+> 把真正值得留下的 B 站视频，整理成可复用的知识资产。
 
-哔知不是“全自动总结所有视频”的工具，而是一个**半自动视频知识工作台**：
+哔知是一个本地优先的 B 站视频 AI 知识库工具。它帮助你从精选视频中获取字幕、生成洞察、沉淀 Markdown 笔记，并识别视频里提到的 GitHub 开源项目。
 
-- 用户负责选择真正值得沉淀的视频；
-- AI 负责字幕整理、洞察提取、笔记结构化和项目线索识别；
-- 用户最终负责判断、标签、取舍和复用。
+哔知不是“全自动总结所有视频”的爬虫工具。它更像一个半自动视频知识工作台：用户负责选择值得沉淀的视频，AI 负责字幕整理、洞察提取、笔记结构化和项目线索识别，最终由用户判断、标注、取舍和复用。
 
-Recommended positioning:
+## Why
 
-> 帮你把真正值得留下的 B站视频，整理成可复用的知识资产。
+很多人会在 B 站收藏大量 AI、编程、产品、设计、开源项目相关视频，但真正需要复用时，很难从收藏夹里再次找到关键知识。收藏夹保存的是视频入口，不是知识本身。
 
-## What Works Now
+哔知希望解决的问题是：
 
-- Tauri desktop app with React frontend and Rust command bridge
-- Local knowledge base stored in `BiliKnowledge/`
-- QR login flow for collecting Bilibili cookies in the desktop runtime
-- Favorite sync plus manual video add from BV / av / full Bilibili URL / b23.tv short link
-- Single-video workflow: fetch subtitles or local ASR, generate insight, generate concise note
-- GitHub project candidate extraction from generated notes and insights
-- Per-video Token metering for AI insight, note generation, and AI-assisted GitHub matching
-- Built-in AI model presets plus custom OpenAI-Compatible API configuration
-- Doctor diagnostics for Python, ffmpeg, yt-dlp, ASR dependencies, model cache, Bilibili login state, AI config, and workspace health
-- Script execution for manifest generation, project extraction, index build, and validation
-- CI checks for frontend build, Rust tests, and Python script tests
+- 收藏的视频难以再次检索；
+- 视频中的工具、仓库、方法论容易看过就忘；
+- AI 总结如果缺少字幕和证据，容易变成空泛废话；
+- 手动整理字幕、笔记、标签和项目线索太耗时；
+- 用户需要一个长期可维护、可导出、可验证的本地知识库。
 
-## Recommended Usage Boundary
+## Features
 
-哔知 is designed for **small, selected, high-value daily processing**, not mass scraping.
+- **B 站视频导入**：支持收藏夹同步和手动添加 BV / av / B 站链接 / b23.tv 短链。
+- **字幕优先**：优先抓取 B 站原生/AI 字幕；缺失时可使用本地 ASR 转写。
+- **视频洞察**：基于字幕生成摘要、关键观点、适用场景、风险和判断依据。
+- **精炼笔记**：生成本地 Markdown 笔记，面向复用而不是堆长文。
+- **开源候选**：从笔记和字幕中识别 GitHub 仓库，沉淀为高价值项目候选。
+- **想法注入**：允许用户记录真实判断、下一步动作和标签。
+- **Token 计量**：记录每条视频洞察/笔记生成的模型用量，帮助用户理解潜在成本。
+- **Doctor 诊断**：检查 Python、ffmpeg、yt-dlp、ASR 依赖、模型缓存、B 站登录态和 AI 配置。
+- **Chrome Companion**：浏览器助手用于获取当前视频、Cookie 和页面元数据，并发送到桌面端。
+- **本地优先**：知识库以本地文件形式保存，便于备份、审计和迁移。
 
-Recommended:
+## Screenshots
 
-- Pick 5–10 videos per day that are truly worth keeping.
-- Prefer short to medium videos. The current validation focus is roughly short clips to ~30 minute videos.
-- Process one selected video at a time.
-- Use manual subtitle import or local transcription as fallback when Bilibili subtitles are unavailable.
+Screenshots will be added before the public release.
 
-Not recommended:
-
-- Bulk processing thousands of favorites.
-- High-concurrency scraping.
-- Using the app as a crawler.
-- Publicly redistributing subtitles, generated notes, or source video content without permission.
-
-## Repository Layout
+## How It Works
 
 ```text
-.
-├── BiliKnowledge/         # Local data, notes, manifests, scripts, reports
-├── BiliKnowledgeApp/      # Tauri desktop app
-├── docs/                  # Extra docs
-├── .github/workflows/     # CI
-├── CONTRIBUTING.md
-├── SECURITY.md
-└── README.md
+B 站视频
+  ↓
+抓取字幕 / 本地转写
+  ↓
+生成视频洞察
+  ↓
+生成 Markdown 笔记
+  ↓
+识别 GitHub 项目候选
+  ↓
+沉淀到本地知识库 / 想法 / 开源候选
 ```
 
-## Local Requirements
+## Recommended Usage
 
-- Node.js 22+
-- Rust toolchain
-- python3
+哔知适合少量精选、高价值、低并发的日常知识整理。
 
-Optional:
+推荐：
 
-- `BILIKNOWLEDGE_ROOT` to point at a custom knowledge-base directory
-- `BILIKNOWLEDGE_PYTHON` to point at a custom Python interpreter
+- 每天精选 5–10 条真正值得沉淀的视频；
+- 优先处理 15 秒到 30 分钟的视频；
+- 一次处理一条视频，确认字幕质量后再生成洞察和笔记；
+- 使用 Doctor 检查本地环境；
+- 使用 Token 计量理解模型调用成本。
+
+不推荐：
+
+- 一次性批量处理整个收藏夹；
+- 高并发抓取字幕或视频信息；
+- 将哔知作为爬虫工具使用；
+- 未经许可公开分发字幕、笔记或视频内容；
+- 用 AI 生成内容替代原作者的视频内容。
+
+## Install
+
+Beta RC currently focuses on macOS local testing. Public multi-platform release packages will be generated through GitHub Actions after the release workflow is stabilized.
+
+For local development, see [Development](#development).
 
 ## Quick Start
 
 ```bash
+git clone https://github.com/<your-account>/<your-repo>.git
+cd bili-knowledge-mvp
 cd BiliKnowledgeApp
 npm install
 npm run tauri dev
 ```
 
-Desktop app behavior:
+The desktop app uses real local data through Tauri. Browser preview mode is only for UI preview and may show sample data.
 
-- In Tauri desktop mode, the app reads and writes real local data.
-- In browser preview mode, the app shows sample data only and does not execute local scripts.
+## Local Requirements
 
-## Verification
+Required:
+
+- Node.js 22+
+- Rust toolchain
+- Python 3.9+
+
+Recommended for full workflow:
+
+- ffmpeg
+- yt-dlp
+- Python virtual environment
+- FunASR / ModelScope / PyTorch stack for local ASR
+- A configured AI provider or local OpenAI-compatible endpoint
+
+Optional environment variables:
 
 ```bash
-cd BiliKnowledgeApp && npm run build
-cd BiliKnowledgeApp/src-tauri && cargo test
-cd /path/to/bili-knowledge-mvp
-python3 BiliKnowledge/scripts/test_validate_knowledge_base.py
-python3 BiliKnowledge/scripts/test_update_processing_status.py
-python3 BiliKnowledge/scripts/validate_knowledge_base.py --root BiliKnowledge
+export BILIKNOWLEDGE_ROOT=/absolute/path/to/BiliKnowledge
+export BILIKNOWLEDGE_PYTHON=/absolute/path/to/python3
 ```
 
-## Current Script Entry Points
-
-- `parse_favorites.py`
-- `fetch_subtitles.py`
-- `transcribe_subtitles.py`
-- `generate_insights.py`
-- `generate_notes.py`
-- `reconcile_notes.py`
-- `extract_projects.py`
-- `build_index.py`
-- `validate_knowledge_base.py`
-- `doctor.py`
-- `doctor_fix.py`
-
-## Runtime Data and Privacy
-
-Default local workspace:
+## Knowledge Base Layout
 
 ```text
 BiliKnowledge/
-├── config/config.json          # local app config, Bilibili cookie fields, AI config
-├── manifest/videos.json        # imported/manual video manifest
-├── manifest/insights.json      # generated insights
-├── manifest/token_usage.json   # per-video token usage ledger
-├── subtitles/                  # fetched or locally transcribed subtitles
-├── notes/raw/                  # generated Markdown notes
+├── config/config.json              # local-only config; ignored by Git
+├── manifest/videos.json            # imported/manual video manifest
+├── manifest/insights.json          # generated insights
+├── manifest/token_usage.json       # local token usage ledger
+├── subtitles/                      # fetched or transcribed subtitles
+├── notes/raw/                      # generated Markdown notes
 ├── projects/project_candidates.json
 ├── thoughts/user_ideas.json
 └── reports/
 ```
 
-Privacy notes:
+Generated local data, cookies, API keys, subtitles, personal notes, and manifests should not be committed.
 
-- Bilibili Cookie / SESSDATA is stored locally in `BiliKnowledge/config/config.json`.
-- AI provider API keys are stored locally in the same config file.
-- Subtitles, insights, notes, project candidates, and user ideas are local files.
-- When using an external AI provider, selected subtitle/text content may be sent to that provider for insight/note generation.
-- Token usage is recorded locally per video. If the provider returns `usage`, 哔知 stores the provider value; otherwise it stores a conservative local estimate.
-- Do not commit real cookies, API keys, personal notes, or private manifests.
+## Privacy and Security
 
-## Token Metering
+哔知 stores sensitive runtime data locally, including B 站 Cookie fields and AI provider API keys. When you use an external AI provider, selected subtitle or note text may be sent to that provider for processing.
 
-哔知会为每条视频记录 AI 用量，避免用户误以为模型调用没有成本：
+Before sharing logs, screenshots, or repositories, check for:
 
-- `generate_insights.py`：记录洞察生成的 prompt / completion / total tokens。
-- `generate_notes.py`：记录笔记生成的本地估算 token；如果触发 AI 精准匹配 GitHub 仓库，也会记录该次模型调用。
-- 前端右侧检查面板展示“AI 用量 / Token 计量”。
-- `BiliKnowledge/manifest/token_usage.json` 保存最近的用量流水。
+- B 站 Cookie / `SESSDATA` / `bili_jct` / `DedeUserID`;
+- AI provider API keys;
+- private notes and subtitles;
+- model service request logs;
+- local file paths you do not want to expose.
 
-说明：
+See [SECURITY.md](SECURITY.md) and [PRIVACY.md](PRIVACY.md).
 
-- API 返回 `usage` 时显示实际值。
-- API 不返回 `usage` 或本地模板生成时显示估算值。
-- Token 计量是成本预警和透明提示，不等同于最终账单；实际费用以用户所配置模型服务商的账单为准。
-- 建议继续按“每天精选 5–10 条视频”的方式使用，不建议批量高并发生成。
+## Token Metering and Cost Notice
 
-## AI Model Presets
+哔知 records per-video AI usage for insight generation, note generation, and AI-assisted GitHub project matching.
 
-设置页内置了几类模型入口，方便新用户先跑通体验：
+- If the provider returns `usage`, 哔知 records the provider value.
+- If the provider does not return `usage`, 哔知 records a local estimate.
+- Token metering is a cost transparency feature, not a billing system.
+- Actual cost is determined by the model provider configured by the user.
 
-- DeepSeek Chat：低成本云端模型预设。
-- SiliconFlow Qwen：常见免费额度/国产模型体验入口。
-- OpenRouter Free Router：免费模型路由入口。
-- Ollama Local：本机本地模型入口，不要求云端 API Key。
-- Custom：自定义 OpenAI-Compatible API。
+## Chrome Companion
 
-注意：
+`BiliKnowledgeCompanion/` contains a Chrome MV3 extension prototype. Its role is intentionally narrow:
 
-- “免费额度 / 免费模型”会随服务商政策变化，最终以服务商控制台为准。
-- 云端模型通常仍需要用户自己填写 API Key。
-- 本地 Ollama 需要用户自行安装 Ollama 并提前拉取对应模型。
-- 所有模型调用都会继续记录 Token 用量，帮助用户预估成本。
+- detect current Bilibili video page;
+- read required Bilibili Cookie fields with user permission;
+- send current video metadata and login state to the local desktop app;
+- avoid moving AI processing into the browser.
 
-## Legal and Platform Notes
+All AI processing remains inside the desktop app.
 
-This project is intended for personal learning, research, and local knowledge management.
+## Development
 
-- Users must comply with Bilibili platform rules and applicable copyright law.
-- The app does not provide any bypass for platform restrictions.
-- Avoid bulk fetching or high-frequency requests that may trigger platform risk controls.
-- Do not use this project to redistribute copyrighted video content, subtitles, or derivative notes without permission.
+Install dependencies:
 
-## Doctor
+```bash
+cd BiliKnowledgeApp
+npm install
+```
 
-Run diagnostics:
+Run the app:
+
+```bash
+npm run tauri dev
+```
+
+Run frontend build:
+
+```bash
+npm run build
+```
+
+Run Rust tests:
+
+```bash
+cd BiliKnowledgeApp/src-tauri
+cargo test
+```
+
+Run Python checks:
+
+```bash
+python3 BiliKnowledge/scripts/test_validate_knowledge_base.py
+python3 BiliKnowledge/scripts/test_update_processing_status.py
+python3 BiliKnowledge/scripts/validate_knowledge_base.py --root BiliKnowledge
+python3 -m compileall -q BiliKnowledge/scripts
+```
+
+Run Doctor:
 
 ```bash
 python3 BiliKnowledge/scripts/doctor.py --root BiliKnowledge
 ```
 
-Attempt local repair:
+## Release
+
+Release packages are built by GitHub Actions from tags. The intended release flow is:
 
 ```bash
-python3 BiliKnowledge/scripts/doctor.py --root BiliKnowledge --fix
+git tag -a v0.1.0 -m "v0.1.0"
+git push origin main --tags
 ```
 
-Doctor checks:
+The release workflow builds desktop packages for macOS, Windows, and Linux using Tauri.
 
-- Python virtual environment
-- ffmpeg
-- yt-dlp runtime
-- ASR Python modules
-- model cache hints
-- Bilibili login state
-- AI provider/base URL/model/API key
-- knowledge-base directory structure
+See [docs/RELEASE.md](docs/RELEASE.md).
 
-## Security Notes
+## Roadmap
 
-- Do not commit real Bilibili cookies or AI provider API keys.
-- The validation script scans notes, projects, thoughts, and manifests for common secret patterns.
+- Stabilize Doctor repair flow;
+- Improve first-run onboarding;
+- Harden Cookie refresh and browser bridge;
+- Improve subtitle quality checks;
+- Improve GitHub project matching confidence;
+- Add signed and notarized macOS release;
+- Add clearer Open Source RC checklist;
+- Prepare public beta documentation.
+
+## Contributing
+
+Contributions are welcome, but please keep the product boundary clear:哔知 is a local-first, user-selected, low-concurrency knowledge workflow tool.
+
+Before opening a PR, read [CONTRIBUTING.md](CONTRIBUTING.md) and run the verification commands above.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT License. See [LICENSE](LICENSE).
+
+## Disclaimer
+
+This project is for personal knowledge management and learning workflows. It is not affiliated with Bilibili. Users are responsible for complying with Bilibili rules, copyright requirements, AI provider terms, and local laws. Do not use this project to bypass platform restrictions or redistribute content without permission.
