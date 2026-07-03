@@ -138,7 +138,7 @@ flowchart LR
 
 ## 安装包与当前发布状态
 
-当前发布方式：GitHub Actions 根据 tag 自动生成 Draft Release。维护者需要人工检查草稿后再公开发布。
+当前发布方式：GitHub Actions 根据 tag 自动生成 GitHub Release，并上传多平台安装包、独立 `.sha256` 校验文件和平台 `SHA256SUMS.txt` 汇总文件。
 
 已验证打包目标：
 
