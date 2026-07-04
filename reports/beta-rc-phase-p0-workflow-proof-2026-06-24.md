@@ -1,7 +1,7 @@
 # Beta RC Phase P0 Workflow Proof
 
-Date: 2026-06-24  
-Release candidate: `v0.1.0-beta-rc.1`  
+Date: 2026-06-24
+Release candidate: `v0.1.0-beta-rc.1`
 Baseline branch: `main`
 
 ## Scope
@@ -90,7 +90,7 @@ This commit is suitable as the local Beta Candidate baseline. Remote push, relea
 
 ## Local package artifact proof
 
-Generated on: 2026-06-24  
+Generated on: 2026-06-24
 Command:
 
 ```bash

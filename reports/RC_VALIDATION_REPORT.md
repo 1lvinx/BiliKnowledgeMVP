@@ -1,8 +1,8 @@
 # Phase RC-Validation-1 — 真实数据闭环验证报告
 
-Date: 2026-06-24  
-Baseline tag: `v0.1.0-beta-rc.1`  
-Baseline branch: `main`  
+Date: 2026-06-24
+Baseline tag: `v0.1.0-beta-rc.1`
+Baseline branch: `main`
 Validation mode: local real-data probe + manual-gate checklist
 
 ## Executive Summary

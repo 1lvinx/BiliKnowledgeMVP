@@ -15,7 +15,7 @@ export function LogViewer({ logs }: Props) {
   }, [logs]);
 
   return (
-    <div 
+    <div
       ref={scrollRef}
       className="mac-console-body h-full custom-scrollbar"
     >
@@ -27,7 +27,7 @@ export function LogViewer({ logs }: Props) {
         logs.map((log, i) => {
           const isError = log.includes("[ERROR]") || log.includes("[错误]");
           const isSystem = log.includes("[系统]") || log.includes(">>>");
-          
+
           return (
             <div key={i} className={cn(
               "mac-console-line",
