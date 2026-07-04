@@ -1,4 +1,4 @@
-# 哔知 / BiZhi
+# 哔知
 
 <p align="center">
   <strong>把 B 站视频收藏，沉淀成可检索、可复用、可长期维护的本地 AI 知识库。</strong>
@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
-  <a href="docs/RELEASE.md"><img alt="Release" src="https://img.shields.io/badge/Release-Beta%20RC-orange.svg"></a>
+  <a href="docs/RELEASE.md"><img alt="Release" src="https://img.shields.io/badge/Release-v0.1.1-brightgreen.svg"></a>
   <img alt="Desktop" src="https://img.shields.io/badge/Desktop-Tauri-24C8DB.svg">
   <img alt="Local First" src="https://img.shields.io/badge/Local--first-Knowledge%20Base-7C3AED.svg">
 </p>
