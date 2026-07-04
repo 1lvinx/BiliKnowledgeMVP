@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "哔知助手",
   "description": "Bili Knowledge Companion：把当前 B 站视频与登录态发送到哔知 Desktop。",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "action": {
     "default_title": "发送到哔知",
     "default_popup": "popup.html"

@@ -43,8 +43,8 @@ It reduces drift by keeping the evidence targets visible in the same screen that
 The dashboard now renders a `Runtime Evidence Log` block with the latest evidence status and fixed evidence targets.
 
 ## Report Linkage
-- [`agentmemory-assisted-real-task-sop-2026-05-23.md`](/Users/elvinx/DevCompany/solo-company-os/reports/agentmemory-assisted-real-task-sop-2026-05-23.md)
-- [`agentmemory-assisted-biliknowledge-real-task-2026-05-23.md`](/Users/elvinx/DevCompany/solo-company-os/reports/agentmemory-assisted-biliknowledge-real-task-2026-05-23.md)
+
+Related private workspace reports are intentionally omitted from the public repository.
 
 ## Safety Boundary
 - No Solo Company OS production memory was mutated.

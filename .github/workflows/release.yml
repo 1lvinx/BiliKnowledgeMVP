@@ -182,5 +182,5 @@ jobs:
 
             注意：如果未配置平台签名/公证密钥，产物可能未签名，仅适合内测或源码构建用户。
           draft: false
-          prerelease: true
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
           files: release-assets/*

@@ -40,6 +40,7 @@ python3 BiliKnowledge/scripts/test_update_processing_status.py
 python3 BiliKnowledge/scripts/validate_knowledge_base.py --root BiliKnowledge
 python3 -m compileall -q BiliKnowledge/scripts
 python3 tools/scan_sensitive.py
+python3 tools/check_repo_hygiene.py
 ```
 
 ## Security and Privacy

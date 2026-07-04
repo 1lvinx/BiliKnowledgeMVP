@@ -85,7 +85,7 @@ async function sendToDesktop(payload = {}) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Bizhi-Companion": "0.1.0",
+      "X-Bizhi-Companion": "0.1.1",
     },
     body: JSON.stringify({ ...metadata, cookies }),
   });

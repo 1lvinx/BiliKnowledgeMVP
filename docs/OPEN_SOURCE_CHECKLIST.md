@@ -14,7 +14,7 @@ Use this checklist before making 哔知 public.
 
 ## Sensitive Data
 
-- [ ] Run `python3 tools/scan_sensitive.py`.
+- [ ] Run `python3 tools/scan_sensitive.py` and `python3 tools/check_repo_hygiene.py`.
 - [ ] Run `python3 BiliKnowledge/scripts/validate_knowledge_base.py --root BiliKnowledge`.
 - [ ] Check screenshots and docs for Cookie/API Key exposure.
 - [ ] Remove private research notes, competitor analysis, external project architecture reviews, and browser/Cookie investigation notes from public docs.

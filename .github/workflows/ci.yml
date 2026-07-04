@@ -56,6 +56,10 @@ jobs:
         run: |
           python3 BiliKnowledge/scripts/test_validate_knowledge_base.py
           python3 BiliKnowledge/scripts/test_update_processing_status.py
+          python3 BiliKnowledge/scripts/extract_projects.py --self-test
+
+      - name: Run repository hygiene checks
+        run: python3 tools/check_repo_hygiene.py
 
       - name: Prepare empty knowledge base skeleton
         run: |
